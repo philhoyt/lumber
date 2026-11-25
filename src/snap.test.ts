@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AABB, Vec3 } from './model';
-import { snapDelta } from './snap';
+import { snapDelta, snapQuad, snapWithHits } from './snap';
 
 const box = (min: Vec3, max: Vec3): AABB => ({ min, max });
 const moving = box([0, 0, 0], [10, 2, 4]);
@@ -53,5 +53,46 @@ describe('snapDelta', () => {
   it('only touches the requested axes', () => {
     const d = snapDelta(moving, [3.3, 4.4, 5.5], [0], [], opts);
     expect(d).toEqual([3.5, 4.4, 5.5]);
+  });
+});
+
+describe('snapWithHits', () => {
+  it('says which face of which box each axis snapped to', () => {
+    const other = box([20.6, 0, 0], [30, 2, 4]);
+    const { delta, hits } = snapWithHits(moving, [10, 0, 0], [0], [other], opts);
+    expect(delta[0]).toBeCloseTo(10.6);
+    expect(hits).toEqual([{ axis: 0, kind: 'face', other: 0, side: 'min', mine: 'max', at: 20.6 }]);
+  });
+
+  it('reports the floor and the grid', () => {
+    const lifted = box([0, 0, 0.9], [10, 4, 2.9]);
+    expect(snapWithHits(lifted, [0, 0, 0], [2], [], opts).hits).toEqual([
+      { axis: 2, kind: 'floor', mine: 'min', at: 0 },
+    ]);
+    expect(snapWithHits(moving, [3.3, 0, 0], [0], [], opts).hits).toEqual([
+      { axis: 0, kind: 'grid', mine: 'min', at: 3.5 },
+    ]);
+    expect(snapWithHits(moving, [3.3, 0, 0], [0], [], { grid: 0, snapParts: true }).hits).toEqual(
+      [],
+    );
+  });
+
+  it("draws the other box's whole face, the footprint on the floor, nothing for the grid", () => {
+    const other = box([20.6, -1, 0], [30, 3, 6]);
+    const { hits } = snapWithHits(moving, [10, 0, 0], [0], [other], opts);
+    expect(snapQuad(hits[0]!, box([10.6, 0, 0], [20.6, 2, 4]), [other])).toEqual({
+      axis: 0,
+      lo: [20.6, -1, 0],
+      hi: [20.6, 3, 6],
+    });
+    const lifted = box([0, 0, 0.9], [10, 4, 2.9]);
+    const floor = snapWithHits(lifted, [0, 0, 0], [2], [], opts).hits[0]!;
+    expect(snapQuad(floor, box([0, 0, 0], [10, 4, 2]), [])).toEqual({
+      axis: 2,
+      lo: [0, 0, 0],
+      hi: [10, 4, 0],
+    });
+    const grid = snapWithHits(moving, [3.3, 0, 0], [0], [], opts).hits[0]!;
+    expect(snapQuad(grid, moving, [])).toBeNull();
   });
 });

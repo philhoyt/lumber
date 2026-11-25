@@ -40,7 +40,7 @@ import { explodeOffsets, offsetAABB } from './explode';
 import { fastenerAt, fastenerLocal, fastenersKey, fastenersOf, type Fastener } from './fastener';
 import { buildMarkers, markerMesh, placeMarker } from './markers';
 import { measureBetween, measureText, nearestSnap, snapPoints } from './measure';
-import { snapDelta } from './snap';
+import { snapQuad, snapWithHits, type SnapHit } from './snap';
 import { stockById, type Stock } from './stock';
 import type { Store } from './store';
 import { fmt, parseLen } from './units';
@@ -61,6 +61,10 @@ interface Transform {
   startPos: Vec3[];
   aabb: AABB;
   others: AABB[];
+  /** Names of the parts behind `others`, for the readout. */
+  otherNames: string[];
+  /** What the last grab update snapped to, per axis. */
+  snaps: SnapHit[];
   before: string;
   moved: boolean;
   delta: Vec3;
@@ -214,6 +218,10 @@ export class LumberScene {
   private dimLabels: HTMLElement[] = [];
   private extentLabels: HTMLElement[] = [];
   private extentLines: THREE.LineSegments;
+  /** Translucent quads over the faces a drag snapped to; they flash when the target changes. */
+  private snapQuads: { fill: THREE.Mesh; edge: THREE.LineLoop }[] = [];
+  private snapKey = '';
+  private snapFlash = 0;
   private measure: { a: Vec3 | null; b: Vec3 | null; live: Vec3 | null } | null = null;
   private measureLine: THREE.Line;
   private measureLabel: HTMLElement;
@@ -314,6 +322,31 @@ export class LumberScene {
     this.snapDot.renderOrder = 992;
     this.snapDot.visible = false;
     this.scene.add(this.extentLines, this.measureLine, this.snapDot);
+    for (let i = 0; i < 3; i++) {
+      const pos = new THREE.BufferAttribute(new Float32Array(12), 3);
+      const fillGeo = new THREE.BufferGeometry()
+        .setAttribute('position', pos)
+        .setIndex([0, 1, 2, 0, 2, 3]);
+      const fill = new THREE.Mesh(
+        fillGeo,
+        new THREE.MeshBasicMaterial({
+          color: 0xffd27a,
+          transparent: true,
+          opacity: 0.3,
+          depthTest: false,
+          side: THREE.DoubleSide,
+        }),
+      );
+      const edge = new THREE.LineLoop(
+        new THREE.BufferGeometry().setAttribute('position', pos),
+        new THREE.LineBasicMaterial({ color: 0xffd27a, depthTest: false, transparent: true }),
+      );
+      fill.renderOrder = 985;
+      edge.renderOrder = 986;
+      fill.visible = edge.visible = false;
+      this.snapQuads.push({ fill, edge });
+      this.scene.add(fill, edge);
+    }
     this.measureLabel = document.createElement('div');
     this.measureLabel.className = 'measure-label';
     container.appendChild(this.measureLabel);
@@ -532,6 +565,11 @@ export class LumberScene {
     this.gizmo.update(rotating || this.explode ? null : center, vh);
     this.rotateGizmo.update(rotating ? center : null, vh);
     this.scaleMarkers();
+    if (this.snapFlash > 0.01) {
+      this.snapFlash *= 0.9;
+      for (const { fill } of this.snapQuads)
+        (fill.material as THREE.MeshBasicMaterial).opacity = 0.22 + 0.45 * this.snapFlash;
+    }
     this.renderer.render(this.scene, this.camera);
     this.updateLabels();
     this.updateDims();
@@ -591,9 +629,18 @@ export class LumberScene {
     const plane = c?.kind === 'plane' && t.constraintKey ? `Shift+${t.constraintKey} ` : '';
     if (t.typed) return `${plane}${LABELS[this.typedAxis(t)]} ${t.typed}▏`;
     const axes = c?.kind === 'axis' ? [c.axis] : (c?.axes ?? []);
+    const snapped = t.snaps
+      .filter((h) => h.kind !== 'grid')
+      .map((h) =>
+        h.kind === 'floor'
+          ? 'on the floor'
+          : `${h.mine === h.side ? 'flush with' : 'against'} ${t.otherNames[h.other!] ?? 'a part'}`,
+      );
+    const unique = [...new Set(snapped)];
     return (
       plane +
-      axes.map((a) => `${LABELS[a]} ${t.delta[a] >= 0 ? '+' : ''}${fmt(t.delta[a])}`).join('  ')
+      axes.map((a) => `${LABELS[a]} ${t.delta[a] >= 0 ? '+' : ''}${fmt(t.delta[a])}`).join('  ') +
+      (unique.length ? `  · ${unique.join(', ')}` : '')
     );
   }
 
@@ -1033,6 +1080,8 @@ export class LumberScene {
       startPos: list.map((p) => [...p.pos] as Vec3),
       aabb,
       others: this.store.parts.filter((p) => !ids.has(p.id) && !p.hidden).map(partAABB),
+      otherNames: this.store.parts.filter((p) => !ids.has(p.id) && !p.hidden).map((p) => p.name),
+      snaps: [],
       before: this.store.snapshot(),
       moved: modal,
       delta: [0, 0, 0],
@@ -1181,8 +1230,58 @@ export class LumberScene {
     const raw = this.rawDelta(t);
     if (!raw) return;
     const axes = t.constraint.kind === 'axis' ? [t.constraint.axis] : t.constraint.axes;
-    snapDelta(t.aabb, raw, axes, t.others, this.store.settings);
+    t.snaps = snapWithHits(t.aabb, raw, axes, t.others, this.store.settings).hits;
     this.applyDelta(raw);
+    this.showSnaps(t);
+  }
+
+  /** Lay a quad over each face (or floor footprint) the grab just snapped to. */
+  private showSnaps(t: Transform): void {
+    const moved: AABB = {
+      min: [t.aabb.min[0] + t.delta[0], t.aabb.min[1] + t.delta[1], t.aabb.min[2] + t.delta[2]],
+      max: [t.aabb.max[0] + t.delta[0], t.aabb.max[1] + t.delta[1], t.aabb.max[2] + t.delta[2]],
+    };
+    const quads = t.snaps.map((h) => snapQuad(h, moved, t.others)).filter((q) => q !== null);
+    const key = t.snaps
+      .filter((h) => h.kind !== 'grid')
+      .map((h) => `${h.axis}:${h.kind}:${h.other ?? ''}:${h.side ?? ''}`)
+      .join('|');
+    if (key !== this.snapKey) {
+      this.snapKey = key;
+      this.snapFlash = key ? 1 : 0;
+    }
+    this.snapQuads.forEach(({ fill, edge }, i) => {
+      const q = quads[i];
+      fill.visible = edge.visible = !!q;
+      if (!q) return;
+      const pos = fill.geometry.getAttribute('position') as THREE.BufferAttribute;
+      // The two axes across the quad, in order, so the loop goes around the rectangle.
+      const [u, v] = ([0, 1, 2] as AxisIndex[]).filter((a) => a !== q.axis) as [
+        AxisIndex,
+        AxisIndex,
+      ];
+      const corner = (cu: number, cv: number): Vec3 => {
+        const c: Vec3 = [...q.lo];
+        c[u] = cu;
+        c[v] = cv;
+        return c;
+      };
+      const corners = [
+        corner(q.lo[u], q.lo[v]),
+        corner(q.hi[u], q.lo[v]),
+        corner(q.hi[u], q.hi[v]),
+        corner(q.lo[u], q.hi[v]),
+      ];
+      corners.forEach((c, k) => pos.setXYZ(k, c[0], c[1], c[2]));
+      pos.needsUpdate = true;
+      fill.geometry.computeBoundingSphere();
+      edge.geometry.computeBoundingSphere();
+    });
+  }
+  private hideSnaps(): void {
+    for (const { fill, edge } of this.snapQuads) fill.visible = edge.visible = false;
+    this.snapKey = '';
+    this.snapFlash = 0;
   }
 
   private finishTransform(commit: boolean): void {
@@ -1210,6 +1309,7 @@ export class LumberScene {
     this.controls.enabled = true;
     this.container.style.cursor = '';
     this.tf = null;
+    this.hideSnaps();
   }
 
   /** The axis a typed distance applies to: the only one, or the one moved furthest so far. */
