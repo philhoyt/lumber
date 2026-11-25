@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lumber — build it from the stock you buy</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg:#1b1c1f; --panel:#242629; --panel2:#2c2f33; --line:#3a3d43; --text:#e8e6e1; --muted:#9a9890; --accent:#e0a94b; --sel:#5fb3ff; }
+  * { box-sizing:border-box }
+  html, body { margin:0; height:100%; font:13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--text); overflow:hidden }
+  #app { display:grid; grid-template-columns:190px 1fr 340px; grid-template-rows:42px 1fr 26px; height:100% }
+  @media (max-width: 1000px) { #app { grid-template-columns:150px 1fr 280px } }
+  #palette { grid-column:1; grid-row:2 } #viewport { grid-column:2; grid-row:2 } #side { grid-column:3; grid-row:2 }
+  #app.focus { grid-template-columns:0 1fr 0 } #app.focus #palette, #app.focus #side { display:none }
+  header { overflow-x:auto; scrollbar-width:none; white-space:nowrap } header label.small { white-space:nowrap }
+  header { grid-column:1/4; display:flex; align-items:center; gap:8px; padding:0 12px; border-bottom:1px solid var(--line); background:var(--panel) }
+  header h1 { font-size:15px; margin:0 14px 0 0; font-weight:600; letter-spacing:.3px }
+  header h1 span { color:var(--accent) }
+  header .sep { width:1px; height:22px; background:var(--line); margin:0 4px }
+  button, select, input { font:inherit; color:var(--text); background:var(--panel2); border:1px solid var(--line); border-radius:4px; padding:4px 8px }
+  button { cursor:pointer } button:hover { border-color:var(--muted) } button.primary { background:var(--accent); color:#1b1c1f; border-color:var(--accent); font-weight:600 }
+  button.danger:hover { border-color:#e06c5f; color:#e06c5f }
+  input[type=text], input[type=number] { width:100% } input:focus, select:focus { outline:1px solid var(--accent) }
+  label.small { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.5px }
+  #palette { border-right:1px solid var(--line); background:var(--panel); overflow:auto; padding:10px }
+  #palette h2, #side h2 { font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:8px 0 6px }
+  .stock { display:flex; align-items:center; gap:8px; padding:6px 8px; margin-bottom:4px; background:var(--panel2); border:1px solid var(--line); border-radius:5px; cursor:grab; user-select:none }
+  .stock:hover { border-color:var(--accent) } .stock:active { cursor:grabbing }
+  .stock .sw { width:18px; height:18px; border-radius:3px; flex:none; border:1px solid rgba(0,0,0,.4) }
+  .stock .nm { font-weight:600 } .stock .dim { color:var(--muted); font-size:11px }
+  #viewport { position:relative; overflow:hidden; background:#202226 }
+  #viewport canvas { display:block }
+  #viewport.dropping { outline:2px dashed var(--accent); outline-offset:-2px }
+  #label { position:absolute; pointer-events:none; background:rgba(20,20,22,.85); border:1px solid var(--sel); color:#fff; padding:3px 7px; border-radius:4px; font-size:12px; white-space:nowrap; transform:translate(-50%,-120%); display:none }
+  #hint { position:absolute; left:10px; bottom:10px; color:var(--muted); font-size:11px; pointer-events:none; line-height:1.6 }
+  #side { border-left:1px solid var(--line); background:var(--panel); display:flex; flex-direction:column; min-height:0 }
+  #props { padding:10px 12px; border-bottom:1px solid var(--line); max-height:62%; overflow:auto; flex:none }
+  #cutlist { padding:10px 12px; overflow:auto; flex:1 }
+  .row { display:flex; gap:8px; margin-bottom:6px; align-items:end } .row > div { flex:1 } .row.btns { gap:4px; flex-wrap:wrap } .row.btns button { flex:1 }
+  table { border-collapse:collapse; width:100%; margin:4px 0 10px } th, td { text-align:left; padding:3px 6px; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums } th { color:var(--muted); font-weight:500; font-size:11px; text-transform:uppercase } td.r, th.r { text-align:right }
+  .grp { font-weight:600; margin:10px 0 2px; display:flex; justify-content:space-between; align-items:center } .grp select { padding:2px 4px; font-size:12px }
+  .bin { margin:3px 0 } .bin svg { width:100%; height:auto; display:block } .bin .cap { font-size:11px; color:var(--muted) }
+  .total { font-weight:600; border-top:1px solid var(--line); padding-top:6px; margin-top:6px; display:flex; justify-content:space-between }
+  .muted { color:var(--muted) } .warn { color:#e8a05f }
+  footer { grid-column:1/4; display:flex; align-items:center; gap:16px; padding:0 12px; border-top:1px solid var(--line); background:var(--panel); color:var(--muted); font-size:12px }
+  footer b { color:var(--text); font-weight:500 }
+  #empty { color:var(--muted); font-style:italic }
+  input.price { width:64px; padding:1px 4px; text-align:right }
+  @media print { body { overflow:visible; background:#fff; color:#000 } #app { display:block } header, #palette, #viewport, #props, footer { display:none !important } #side { border:0; display:block } #cutlist { overflow:visible } th, td { border-color:#999 } .muted, th { color:#444 } input.price { border:0; background:none; color:#000 } }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Lumber<span>.</span></h1>
+    <button id="bNew" title="Start over">New</button>
+    <button id="bOpen" title="Open a saved .json">Open</button>
+    <button id="bSave" title="Download the model as .json">Save</button>
+    <input id="fileIn" type="file" accept=".json,application/json" style="display:none">
+    <span class="sep"></span>
+    <button id="bUndo" title="Ctrl+Z">Undo</button>
+    <button id="bRedo" title="Ctrl+Y">Redo</button>
+    <span class="sep"></span>
+    <label class="small">Grid</label>
+    <select id="gridSel">
+      <option value="0">off</option><option value="0.0625">1/16"</option><option value="0.125">1/8"</option><option value="0.25">1/4"</option><option value="0.5" selected>1/2"</option><option value="1">1"</option><option value="12">12"</option>
+    </select>
+    <label class="small">Snap to parts</label>
+    <input id="snapChk" type="checkbox" checked>
+    <span style="flex:1"></span>
+    <button id="bFocus" title="Hide or show the side panels (Tab)">Panels</button>
+    <button id="bSample" title="Load the sample workbench">Sample</button>
+    <button id="bCsv" title="Download the cut list as CSV">CSV</button>
+    <button id="bPrint" title="Print the cut list and buy list">Print</button>
+  </header>
+
+  <aside id="palette">
+    <h2>Boards</h2>
+    <div id="boards"></div>
+    <h2>Sheets</h2>
+    <div id="sheets"></div>
+    <p class="muted" style="font-size:11px;margin-top:12px">Drag a stock onto the scene, or click it to add one at the center.</p>
+  </aside>
+
+  <main id="viewport">
+    <div id="label"></div>
+    <div id="hint">Left-drag part: move · Shift+drag: move up/down · Ctrl+click: multi-select<br>R / T / F: rotate 90° about up / side / front · Arrows &amp; PgUp/PgDn: nudge · Ctrl+D: duplicate · Del: delete<br>Empty space: left-drag orbit · right-drag pan · wheel zoom</div>
+  </main>
+
+  <aside id="side">
+    <div id="props"><h2>Part</h2><div id="empty">Nothing selected.</div></div>
+    <div id="cutlist"><h2>Cut list</h2><div id="cutBody"></div></div>
+  </aside>
+
+  <footer><span id="stat">0 parts</span><span>Overall: <b id="overall">—</b></span><span style="flex:1"></span><span id="autosaveNote">Autosaves in this browser.</span></footer>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ---------- stock library (actual dimensions in inches; prices are placeholders you can edit in the buy list) ----------
+const STOCK = [
+  { id:'1x2',  name:'1x2',  t:0.75, w:1.5,  lengths:[96],            price:2.50, color:0xd8b88a },
+  { id:'1x3',  name:'1x3',  t:0.75, w:2.5,  lengths:[96],            price:3.50, color:0xd8b88a },
+  { id:'1x4',  name:'1x4',  t:0.75, w:3.5,  lengths:[96,120,144],    price:5.00, color:0xd8b88a },
+  { id:'1x6',  name:'1x6',  t:0.75, w:5.5,  lengths:[96,120,144],    price:8.00, color:0xd8b88a },
+  { id:'1x8',  name:'1x8',  t:0.75, w:7.25, lengths:[96,120,144],    price:11.00, color:0xd8b88a },
+  { id:'2x2',  name:'2x2',  t:1.5,  w:1.5,  lengths:[96],            price:3.50, color:0xcfa872 },
+  { id:'2x4',  name:'2x4',  t:1.5,  w:3.5,  lengths:[96,120,144,192],price:4.00, color:0xcfa872 },
+  { id:'2x6',  name:'2x6',  t:1.5,  w:5.5,  lengths:[96,120,144,192],price:7.00, color:0xcfa872 },
+  { id:'2x8',  name:'2x8',  t:1.5,  w:7.25, lengths:[96,120,144,192],price:10.00, color:0xcfa872 },
+  { id:'2x10', name:'2x10', t:1.5,  w:9.25, lengths:[96,120,144,192],price:14.00, color:0xcfa872 },
+  { id:'2x12', name:'2x12', t:1.5,  w:11.25,lengths:[96,120,144,192],price:19.00, color:0xcfa872 },
+  { id:'4x4',  name:'4x4',  t:3.5,  w:3.5,  lengths:[96,120,144],    price:12.00, color:0xb8925f },
+  { id:'ply34', name:'3/4" plywood', t:0.75,   sheet:[48,96], price:55.00, color:0xe3cfa3 },
+  { id:'ply12', name:'1/2" plywood', t:0.5,    sheet:[48,96], price:40.00, color:0xe3cfa3 },
+  { id:'ply14', name:'1/4" plywood', t:0.25,   sheet:[48,96], price:25.00, color:0xe3cfa3 },
+  { id:'osb',   name:'7/16" OSB',    t:0.4375, sheet:[48,96], price:18.00, color:0xc9a978 },
+  { id:'mdf34', name:'3/4" MDF',     t:0.75,   sheet:[49,97], price:45.00, color:0xb9a27f },
+];
+const stockById = id => STOCK.find(s => s.id === id);
+
+// ---------- units ----------
+function parseLen(str) {
+  if (str == null) return null;
+  let s = String(str).trim().toLowerCase().replace(/[”"]/g, '').replace(/\s*in(ch(es)?)?$/, '').trim();
+  if (!s) return null;
+  let total = 0;
+  const ft = s.match(/^(\d+(?:\.\d+)?)\s*(?:'|’|ft)\s*(.*)$/);
+  if (ft) { total = parseFloat(ft[1]) * 12; s = ft[2].trim(); if (!s) return total; }
+  let m;
+  if ((m = s.match(/^(\d+(?:\.\d+)?)\s*mm$/))) return total + parseFloat(m[1]) / 25.4;
+  if ((m = s.match(/^(\d+(?:\.\d+)?)\s*cm$/))) return total + parseFloat(m[1]) / 2.54;
+  if ((m = s.match(/^(\d+)[\s-]+(\d+)\s*\/\s*(\d+)$/))) return total + +m[1] + m[2] / m[3];
+  if ((m = s.match(/^(\d+)\s*\/\s*(\d+)$/))) return total + m[1] / m[2];
+  const d = Number(s);
+  return isNaN(d) ? null : total + d;
+}
+function fmt(x) {
+  const neg = x < 0; x = Math.abs(x);
+  let whole = Math.floor(x + 1e-9); let n = Math.round((x - whole) * 16); let d = 16;
+  if (n === 16) { whole++; n = 0; }
+  while (n && n % 2 === 0) { n /= 2; d /= 2; }
+  let s = n ? (whole ? `${whole} ${n}/${d}` : `${n}/${d}`) : `${whole}`;
+  return (neg ? '-' : '') + s + '"';
+}
+const fmtFt = x => (x % 12 === 0) ? `${x / 12} ft` : fmt(x);
+const r16 = x => Math.round(x * 32) / 32;
+const money = x => '$' + x.toFixed(2);
+
+// ---------- state ----------
+let parts = [];               // {id, stock, len, w, pos:[x,y,z] (center), q:[x,y,z,w], name}
+let selected = new Set();
+let undoStack = [], redoStack = [];
+let nextId = 1;
+let grid = 0.5, snapParts = true, kerf = 0.125;
+let stockLen = {};            // stockId -> chosen purchase length
+let prices = {};              // stockId -> price override
+
+// ---------- rotation helpers (all rotations are 90° about world axes) ----------
+const AX = { x: new THREE.Vector3(1,0,0), y: new THREE.Vector3(0,1,0), z: new THREE.Vector3(0,0,1) };
+function rot90(axis, sign = 1) { return new THREE.Quaternion().setFromAxisAngle(AX[axis], sign * Math.PI / 2); }
+function makeQ(seq) { let q = new THREE.Quaternion(); for (const a of seq) q = rot90(a).multiply(q); return q.toArray(); }
+const DEFAULT_Q = makeQ(['x']);   // lying flat: length along X, width along Z, thickness up
+
+function partDims(p) { const s = stockById(p.stock); return { x: p.len, y: s.sheet ? p.w : s.w, z: s.t }; }
+const _v = new THREE.Vector3(), _q = new THREE.Quaternion();
+function partAABB(p) {
+  const d = partDims(p); _q.fromArray(p.q);
+  const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < 8; i++) {
+    _v.set((i & 1 ? 1 : -1) * d.x / 2, (i & 2 ? 1 : -1) * d.y / 2, (i & 4 ? 1 : -1) * d.z / 2).applyQuaternion(_q);
+    const c = [_v.x + p.pos[0], _v.y + p.pos[1], _v.z + p.pos[2]];
+    for (let a = 0; a < 3; a++) { min[a] = Math.min(min[a], c[a]); max[a] = Math.max(max[a], c[a]); }
+  }
+  for (let a = 0; a < 3; a++) { min[a] = Math.round(min[a] * 1e6) / 1e6; max[a] = Math.round(max[a] * 1e6) / 1e6; }
+  return { min, max };
+}
+function unionAABB(list) {
+  const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+  for (const p of list) { const b = partAABB(p); for (let a = 0; a < 3; a++) { min[a] = Math.min(min[a], b.min[a]); max[a] = Math.max(max[a], b.max[a]); } }
+  return { min, max };
+}
+
+// ---------- three.js scene ----------
+const viewport = document.getElementById('viewport');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+viewport.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x202226);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.5, 5000);
+camera.position.set(90, 70, 110);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 18, 0);
+controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+controls.maxPolarAngle = Math.PI / 2 - 0.03; // never look up from under the floor
+controls.minDistance = 10; controls.maxDistance = 1200;
+controls.update();
+scene.add(new THREE.HemisphereLight(0xffffff, 0x404040, 1.1));
+const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(60, 120, 40); scene.add(sun);
+const minor = new THREE.GridHelper(240, 240, 0x33363b, 0x2a2d31); scene.add(minor);
+const major = new THREE.GridHelper(240, 20, 0x4a4e55, 0x4a4e55); major.position.y = 0.01; scene.add(major);
+const axes = new THREE.AxesHelper(12); axes.position.y = 0.02; scene.add(axes);
+const partsGroup = new THREE.Group(); scene.add(partsGroup);
+const meshes = new Map(); // id -> Group(mesh, edges)
+const matCache = new Map();
+function materialFor(stock, sel) {
+  const key = stock.id + (sel ? ':s' : '');
+  if (!matCache.has(key)) matCache.set(key, new THREE.MeshLambertMaterial({ color: stock.color, emissive: sel ? 0x1e4b73 : 0x000000 }));
+  return matCache.get(key);
+}
+function buildMesh(p) {
+  const d = partDims(p), s = stockById(p.stock);
+  const g = new THREE.Group();
+  const geo = new THREE.BoxGeometry(d.x, d.y, d.z);
+  const mesh = new THREE.Mesh(geo, materialFor(s, selected.has(p.id)));
+  mesh.userData.id = p.id;
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: selected.has(p.id) ? 0x9fd3ff : 0x3a2a15 }));
+  g.add(mesh, edges); g.userData.id = p.id;
+  return g;
+}
+function syncMesh(p) {
+  let g = meshes.get(p.id);
+  const d = partDims(p);
+  if (!g || g.userData.sig !== `${d.x},${d.y},${d.z},${p.stock}`) {
+    if (g) { partsGroup.remove(g); g.children.forEach(c => c.geometry.dispose()); }
+    g = buildMesh(p); g.userData.sig = `${d.x},${d.y},${d.z},${p.stock}`; partsGroup.add(g); meshes.set(p.id, g);
+  }
+  g.position.fromArray(p.pos); g.quaternion.fromArray(p.q);
+  const sel = selected.has(p.id);
+  g.children[0].material = materialFor(stockById(p.stock), sel);
+  g.children[1].material.color.set(sel ? 0x9fd3ff : 0x3a2a15);
+}
+function syncAll() {
+  const live = new Set(parts.map(p => p.id));
+  for (const [id, g] of meshes) if (!live.has(id)) { partsGroup.remove(g); g.children.forEach(c => c.geometry.dispose()); meshes.delete(id); }
+  parts.forEach(syncMesh);
+  renderProps(); renderCutlist(); renderStatus();
+}
+function resize() {
+  const w = viewport.clientWidth, h = viewport.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(viewport); resize();
+const labelEl = document.getElementById('label');
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update(); renderer.render(scene, camera);
+  if (selected.size === 1) {
+    const p = parts.find(x => selected.has(x.id)); if (!p) return;
+    const b = partAABB(p);
+    _v.set((b.min[0] + b.max[0]) / 2, b.max[1], (b.min[2] + b.max[2]) / 2).project(camera);
+    labelEl.style.display = 'block';
+    labelEl.style.left = ((_v.x + 1) / 2 * viewport.clientWidth) + 'px';
+    labelEl.style.top = ((1 - _v.y) / 2 * viewport.clientHeight) + 'px';
+    const s = stockById(p.stock);
+    labelEl.textContent = `${p.name} · ${s.name} · ${s.sheet ? fmt(p.w) + ' × ' : ''}${fmt(p.len)}`;
+  } else labelEl.style.display = 'none';
+}
+animate();
+
+// ---------- model ops ----------
+function snapshot() { return JSON.stringify({ parts, nextId }); }
+function restore(s) { const o = JSON.parse(s); parts = o.parts; nextId = o.nextId; selected = new Set([...selected].filter(id => parts.some(p => p.id === id))); syncAll(); }
+function commit(before) { undoStack.push(before); if (undoStack.length > 200) undoStack.shift(); redoStack = []; autosave(); }
+function mutate(fn) { const before = snapshot(); fn(); commit(before); syncAll(); }
+function undo() { if (!undoStack.length) return; redoStack.push(snapshot()); restore(undoStack.pop()); autosave(); }
+function redo() { if (!redoStack.length) return; undoStack.push(snapshot()); restore(redoStack.pop()); autosave(); }
+function autosave() { try { localStorage.setItem('lumber.autosave', snapshot()); } catch {} }
+
+function newPart(stockId, at) {
+  const s = stockById(stockId);
+  const p = { id: nextId++, stock: stockId, len: s.sheet ? s.sheet[1] : (s.lengths[0]), w: s.sheet ? s.sheet[0] : undefined, pos: [0, 0, 0], q: DEFAULT_Q.slice(), name: '' };
+  p.name = `${s.name} ${p.id}`;
+  const b = partAABB(p);
+  p.pos = [at[0] - (b.min[0] + b.max[0]) / 2 + p.pos[0], p.pos[1] - b.min[1], at[2] - (b.min[2] + b.max[2]) / 2 + p.pos[2]];
+  return p;
+}
+function addPart(stockId, at = [0, 0, 0]) {
+  let p; mutate(() => { p = newPart(stockId, at); parts.push(p); });
+  select([p.id]);
+}
+function select(ids) { selected = new Set(ids); parts.forEach(syncMesh); renderProps(); renderStatus(); }
+function selectedParts() { return parts.filter(p => selected.has(p.id)); }
+function keepMin(p, fn) { const b0 = partAABB(p); fn(); const b1 = partAABB(p); for (let a = 0; a < 3; a++) p.pos[a] += b0.min[a] - b1.min[a]; }
+function rotateSelected(axis) {
+  const list = selectedParts(); if (!list.length) return;
+  mutate(() => {
+    const u = unionAABB(list);
+    const c = new THREE.Vector3((u.min[0] + u.max[0]) / 2, (u.min[1] + u.max[1]) / 2, (u.min[2] + u.max[2]) / 2);
+    const R = rot90(axis);
+    for (const p of list) {
+      const v = new THREE.Vector3().fromArray(p.pos).sub(c).applyQuaternion(R).add(c);
+      p.pos = v.toArray(); p.q = R.clone().multiply(new THREE.Quaternion().fromArray(p.q)).toArray();
+    }
+    const u2 = unionAABB(list);
+    const dy = u.min[1] - u2.min[1];
+    for (const p of list) p.pos[1] += dy;
+  });
+}
+function nudge(dx, dy, dz) {
+  const list = selectedParts(); if (!list.length) return;
+  mutate(() => { for (const p of list) { p.pos[0] += dx; p.pos[1] += dy; p.pos[2] += dz; } });
+}
+function deleteSelected() { if (!selected.size) return; mutate(() => { parts = parts.filter(p => !selected.has(p.id)); }); selected.clear(); syncAll(); }
+function duplicateSelected(offset = [16, 0, 0]) {
+  const list = selectedParts(); if (!list.length) return;
+  const ids = [];
+  mutate(() => { for (const p of list) { const c = JSON.parse(JSON.stringify(p)); c.id = nextId++; c.name = `${stockById(c.stock).name} ${c.id}`; c.pos = [p.pos[0] + offset[0], p.pos[1] + offset[1], p.pos[2] + offset[2]]; parts.push(c); ids.push(c.id); } });
+  select(ids);
+}
+function arraySelected(axis, count, spacing) {
+  const list = selectedParts(); if (!list.length || count < 2) return;
+  const ai = { x: 0, y: 1, z: 2 }[axis]; const ids = [];
+  mutate(() => { for (let i = 1; i < count; i++) for (const p of list) { const c = JSON.parse(JSON.stringify(p)); c.id = nextId++; c.name = `${stockById(c.stock).name} ${c.id}`; c.pos[ai] += spacing * i; parts.push(c); ids.push(c.id); } });
+  select(ids);
+}
+
+// ---------- snapping ----------
+function snapDelta(aabb, delta, axes, excludeIds) {
+  const tol = 1.25;
+  const others = parts.filter(p => !excludeIds.has(p.id)).map(partAABB);
+  for (const a of axes) {
+    const myMin = aabb.min[a] + delta[a], myMax = aabb.max[a] + delta[a];
+    let best = null;
+    if (snapParts) {
+      for (const ob of others) for (const mine of [myMin, myMax]) for (const theirs of [ob.min[a], ob.max[a]]) {
+        const off = theirs - mine; if (Math.abs(off) < tol && (best === null || Math.abs(off) < Math.abs(best))) best = off;
+      }
+      if (a === 1) { const off = -myMin; if (Math.abs(off) < tol && (best === null || Math.abs(off) < Math.abs(best))) best = off; }
+    }
+    if (best !== null) delta[a] += best;
+    else if (grid > 0) delta[a] += Math.round(myMin / grid) * grid - myMin;
+  }
+  return delta;
+}
+
+// ---------- pointer interaction ----------
+const ray = new THREE.Raycaster(); const ndc = new THREE.Vector2();
+function pointerNDC(e) { const r = renderer.domElement.getBoundingClientRect(); ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, camera); }
+function pick(e) { pointerNDC(e); const hits = ray.intersectObjects(partsGroup.children.map(g => g.children[0]), false); return hits[0] || null; }
+function groundPoint(e, y = 0) { pointerNDC(e); const pl = new THREE.Plane(new THREE.Vector3(0, 1, 0), -y); const out = new THREE.Vector3(); return ray.ray.intersectPlane(pl, out) ? out : null; }
+let drag = null, downPos = null, downHit = null;
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  downPos = [e.clientX, e.clientY];
+  const hit = pick(e); downHit = hit;
+  if (!hit) return;
+  const id = hit.object.userData.id;
+  if (e.ctrlKey || e.metaKey) { const s = new Set(selected); s.has(id) ? s.delete(id) : s.add(id); select([...s]); return; }
+  if (!selected.has(id)) select([id]);
+  controls.enabled = false;
+  let plane;
+  if (e.shiftKey) { const n = new THREE.Vector3(); camera.getWorldDirection(n); n.y = 0; n.normalize(); plane = new THREE.Plane().setFromNormalAndCoplanarPoint(n, hit.point); }
+  else plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -hit.point.y);
+  const list = selectedParts();
+  drag = { plane, start: hit.point.clone(), vertical: e.shiftKey, ids: new Set(list.map(p => p.id)), startPos: list.map(p => p.pos.slice()), aabb: unionAABB(list), before: snapshot(), moved: false };
+  renderer.domElement.setPointerCapture(e.pointerId);
+});
+renderer.domElement.addEventListener('pointermove', e => {
+  if (!drag) return;
+  pointerNDC(e); const pt = new THREE.Vector3(); if (!ray.ray.intersectPlane(drag.plane, pt)) return;
+  const d = drag.vertical ? [0, pt.y - drag.start.y, 0] : [pt.x - drag.start.x, 0, pt.z - drag.start.z];
+  snapDelta(drag.aabb, d, drag.vertical ? [1] : [0, 2], drag.ids);
+  const list = selectedParts();
+  list.forEach((p, i) => { p.pos = [drag.startPos[i][0] + d[0], drag.startPos[i][1] + d[1], drag.startPos[i][2] + d[2]]; syncMesh(p); });
+  drag.moved = drag.moved || Math.hypot(e.clientX - downPos[0], e.clientY - downPos[1]) > 2;
+  renderProps(); renderStatus();
+});
+function endDrag(e) {
+  if (drag) { if (drag.moved) { commit(drag.before); renderCutlist(); } else { restore(drag.before); } controls.enabled = true; drag = null; }
+  else if (downPos && !downHit && Math.hypot(e.clientX - downPos[0], e.clientY - downPos[1]) < 3) select([]);
+  downPos = null;
+}
+renderer.domElement.addEventListener('pointerup', endDrag);
+renderer.domElement.addEventListener('pointercancel', endDrag);
+
+// drag from palette
+viewport.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; viewport.classList.add('dropping'); });
+viewport.addEventListener('dragleave', () => viewport.classList.remove('dropping'));
+viewport.addEventListener('drop', e => {
+  e.preventDefault(); viewport.classList.remove('dropping');
+  const id = e.dataTransfer.getData('text/stock'); if (!id) return;
+  const g = groundPoint(e) || new THREE.Vector3();
+  addPart(id, [grid ? Math.round(g.x / grid) * grid : g.x, 0, grid ? Math.round(g.z / grid) * grid : g.z]);
+});
+
+// ---------- keyboard ----------
+window.addEventListener('keydown', e => {
+  const t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) { if (e.key === 'Escape') t.blur(); return; }
+  const k = e.key.toLowerCase(); const step = grid || 0.0625;
+  if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); redo(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === 'd') { e.preventDefault(); duplicateSelected(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === 'a') { e.preventDefault(); select(parts.map(p => p.id)); return; }
+  if (e.key === 'Delete' || e.key === 'Backspace') { deleteSelected(); return; }
+  if (e.key === 'Escape') { select([]); return; }
+  if (e.key === 'Tab') { e.preventDefault(); document.getElementById('app').classList.toggle('focus'); return; }
+  if (k === 'r') rotateSelected('y'); else if (k === 't') rotateSelected('x'); else if (k === 'f') rotateSelected('z');
+  else if (e.key === 'ArrowLeft') nudge(-step, 0, 0); else if (e.key === 'ArrowRight') nudge(step, 0, 0);
+  else if (e.key === 'ArrowUp') nudge(0, 0, -step); else if (e.key === 'ArrowDown') nudge(0, 0, step);
+  else if (e.key === 'PageUp') nudge(0, step, 0); else if (e.key === 'PageDown') nudge(0, -step, 0);
+  else return;
+  e.preventDefault();
+});
+
+// ---------- palette ----------
+function hex(c) { return '#' + c.toString(16).padStart(6, '0'); }
+for (const s of STOCK) {
+  const el = document.createElement('div'); el.className = 'stock'; el.draggable = true;
+  const dim = s.sheet ? `${fmt(s.t)} · ${s.sheet[0] / 12}×${s.sheet[1] / 12} ft` : `${fmt(s.t)} × ${fmt(s.w)}`;
+  el.innerHTML = `<div class="sw" style="background:${hex(s.color)}"></div><div><div class="nm">${s.name}</div><div class="dim">${dim}</div></div>`;
+  el.addEventListener('dragstart', e => { e.dataTransfer.setData('text/stock', s.id); e.dataTransfer.effectAllowed = 'copy'; });
+  el.addEventListener('click', () => addPart(s.id, [0, 0, 0]));
+  document.getElementById(s.sheet ? 'sheets' : 'boards').appendChild(el);
+}
+
+// ---------- properties panel ----------
+const propsEl = document.getElementById('props');
+function renderProps() {
+  const list = selectedParts();
+  if (!list.length) { propsEl.innerHTML = '<h2>Part</h2><div id="empty">Nothing selected. Click a part, or drag stock in from the left.</div>'; return; }
+  const u = unionAABB(list);
+  const dims = [0, 1, 2].map(a => u.max[a] - u.min[a]);
+  let html = '';
+  if (list.length === 1) {
+    const p = list[0], s = stockById(p.stock);
+    html += `<h2>Part</h2>
+      <div class="row"><div><label class="small">Name</label><input type="text" id="pName" value="${esc(p.name)}"></div>
+      <div><label class="small">Stock</label><select id="pStock">${STOCK.map(x => `<option value="${x.id}" ${x.id === p.stock ? 'selected' : ''}>${x.name}</option>`).join('')}</select></div></div>
+      <div class="row"><div><label class="small">Length</label><input type="text" id="pLen" value="${fmt(p.len)}"></div>
+      ${s.sheet ? `<div><label class="small">Width</label><input type="text" id="pW" value="${fmt(p.w)}"></div>` : `<div><label class="small">Section</label><div style="padding:4px 0">${fmt(s.t)} × ${fmt(s.w)}</div></div>`}</div>`;
+  } else {
+    html += `<h2>${list.length} parts</h2>`;
+  }
+  html += `<div class="row"><div><label class="small">X (left)</label><input type="text" id="pX" value="${fmt(u.min[0])}"></div><div><label class="small">Y (bottom)</label><input type="text" id="pY" value="${fmt(u.min[1])}"></div><div><label class="small">Z (front)</label><input type="text" id="pZ" value="${fmt(u.min[2])}"></div></div>
+    <div class="muted" style="margin:-2px 0 8px">Footprint ${fmt(dims[0])} × ${fmt(dims[2])}, height ${fmt(dims[1])}</div>
+    <div class="row btns"><button id="bRotY" title="R">Rotate ↻ (R)</button><button id="bRotX" title="T">Tip (T)</button><button id="bRotZ" title="F">Flip (F)</button></div>
+    <div class="row btns"><button id="bDup" title="Ctrl+D">Duplicate</button><button id="bDel" class="danger" title="Delete">Delete</button></div>
+    <div class="row"><div><label class="small">Array along</label><select id="arrAxis"><option value="x">X</option><option value="z">Z</option><option value="y">Y</option></select></div>
+      <div><label class="small">Count</label><input type="number" id="arrN" value="4" min="2" step="1"></div><div><label class="small">On center</label><input type="text" id="arrS" value="16"></div><div style="flex:0"><button id="bArr">Array</button></div></div>`;
+  propsEl.innerHTML = html;
+  const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('change', fn); };
+  if (list.length === 1) {
+    const p = list[0];
+    bind('pName', e => mutate(() => { p.name = e.target.value; }));
+    bind('pStock', e => mutate(() => { keepMin(p, () => { const ns = stockById(e.target.value); const was = stockById(p.stock); p.stock = ns.id; if (ns.sheet && !was.sheet) { p.w = ns.sheet[0]; p.len = ns.sheet[1]; } if (!ns.sheet) p.w = undefined; }); }));
+    bind('pLen', e => { const v = parseLen(e.target.value); if (v > 0) mutate(() => keepMin(p, () => { p.len = v; })); else renderProps(); });
+    bind('pW', e => { const v = parseLen(e.target.value); if (v > 0) mutate(() => keepMin(p, () => { p.w = v; })); else renderProps(); });
+  }
+  const moveTo = (a, val) => { const v = parseLen(val); if (v === null) return renderProps(); const d = v - u.min[a]; mutate(() => list.forEach(p => { p.pos[a] += d; })); };
+  bind('pX', e => moveTo(0, e.target.value)); bind('pY', e => moveTo(1, e.target.value)); bind('pZ', e => moveTo(2, e.target.value));
+  document.getElementById('bRotY').onclick = () => rotateSelected('y');
+  document.getElementById('bRotX').onclick = () => rotateSelected('x');
+  document.getElementById('bRotZ').onclick = () => rotateSelected('z');
+  document.getElementById('bDup').onclick = () => duplicateSelected();
+  document.getElementById('bDel').onclick = () => deleteSelected();
+  document.getElementById('bArr').onclick = () => arraySelected(document.getElementById('arrAxis').value, +document.getElementById('arrN').value, parseLen(document.getElementById('arrS').value) || 16);
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+
+// ---------- cut list, buy list, nesting ----------
+function packBoards(items, L, kerf) { // items: {len,name} ; first-fit decreasing
+  const bins = []; const sorted = [...items].sort((a, b) => b.len - a.len);
+  for (const it of sorted) {
+    if (it.len > L + 1e-9) { bins.push({ items: [it], used: it.len, over: true }); continue; }
+    let bin = bins.find(b => !b.over && b.used + (b.items.length ? kerf : 0) + it.len <= L + 1e-9);
+    if (!bin) { bin = { items: [], used: 0 }; bins.push(bin); }
+    bin.used += (bin.items.length ? kerf : 0) + it.len; bin.items.push(it);
+  }
+  return bins;
+}
+function packSheets(items, SW, SL, kerf) { // shelf packing; items {w,l,name}; shelves run along sheet length SL, stack across SW
+  const sheets = []; const sorted = [...items].sort((a, b) => Math.min(b.w, b.l) - Math.min(a.w, a.l));
+  const orient = (it, shelfH) => { // returns [alongLength, acrossWidth] or null
+    const o1 = [Math.max(it.w, it.l), Math.min(it.w, it.l)], o2 = [o1[1], o1[0]];
+    for (const o of [o1, o2]) if (o[0] <= SL + 1e-9 && o[1] <= (shelfH ?? SW) + 1e-9) return o;
+    return null;
+  };
+  for (const it of sorted) {
+    let placed = false;
+    for (const sh of sheets) {
+      for (const shelf of sh.shelves) { const o = orient(it, shelf.h); if (o && shelf.x + (shelf.items.length ? kerf : 0) + o[0] <= SL + 1e-9) { shelf.x += (shelf.items.length ? kerf : 0); shelf.items.push({ ...it, x: shelf.x, y: shelf.y, a: o[0], b: o[1] }); shelf.x += o[0]; placed = true; break; } }
+      if (placed) break;
+      const o = orient(it, null); if (!o) break;
+      const y = sh.shelves.length ? sh.shelves.at(-1).y + sh.shelves.at(-1).h + kerf : 0;
+      if (y + o[1] <= SW + 1e-9) { sh.shelves.push({ y, h: o[1], x: o[0], items: [{ ...it, x: 0, y, a: o[0], b: o[1] }] }); placed = true; break; }
+    }
+    if (!placed) { const o = orient(it, null); if (!o) { sheets.push({ shelves: [], over: it }); continue; } sheets.push({ shelves: [{ y: 0, h: o[1], x: o[0], items: [{ ...it, x: 0, y: 0, a: o[0], b: o[1] }] }] }); }
+  }
+  return sheets;
+}
+function cutRows() { // grouped identical cuts
+  const map = new Map();
+  for (const p of parts) {
+    const s = stockById(p.stock); const len = r16(p.len), w = s.sheet ? r16(p.w) : s.w;
+    const key = `${p.stock}|${len}|${w}`;
+    if (!map.has(key)) map.set(key, { stock: s, len, w, qty: 0, names: [] });
+    const r = map.get(key); r.qty++; r.names.push(p.name);
+  }
+  return [...map.values()].sort((a, b) => STOCK.indexOf(a.stock) - STOCK.indexOf(b.stock) || b.len - a.len || b.w - a.w);
+}
+function renderCutlist() {
+  const body = document.getElementById('cutBody');
+  if (!parts.length) { body.innerHTML = '<div class="muted">Add parts and the cut list writes itself.</div>'; return; }
+  const rows = cutRows();
+  let html = `<table><tr><th>Stock</th><th>Cut</th><th class="r">Qty</th><th>Parts</th></tr>`;
+  for (const r of rows) html += `<tr><td>${r.stock.name}</td><td>${r.stock.sheet ? fmt(r.w) + ' × ' : ''}${fmt(r.len)}</td><td class="r">${r.qty}</td><td class="muted" style="font-size:11px">${esc(r.names.join(', '))}</td></tr>`;
+  html += `</table>`;
+  html += `<h2 style="display:flex;justify-content:space-between;align-items:center">Buy list <span style="text-transform:none;letter-spacing:0;font-size:12px">kerf <input class="price" id="kerfIn" value="${fmt(kerf)}"></span></h2>`;
+  const byStock = new Map();
+  for (const p of parts) { if (!byStock.has(p.stock)) byStock.set(p.stock, []); byStock.get(p.stock).push(p); }
+  let total = 0;
+  for (const s of STOCK) {
+    const list = byStock.get(s.id); if (!list) continue;
+    const price = prices[s.id] ?? s.price;
+    if (!s.sheet) {
+      const L = stockLen[s.id] ?? s.lengths[0];
+      const bins = packBoards(list.map(p => ({ len: p.len, name: p.name })), L, kerf);
+      const cost = bins.length * price; total += cost;
+      html += `<div class="grp"><span>${bins.length} × ${s.name} @ ${fmtFt(L)}</span><span><select data-stock="${s.id}" class="lenSel">${s.lengths.map(l => `<option value="${l}" ${l === L ? 'selected' : ''}>${fmtFt(l)}</option>`).join('')}</select> <input class="price" data-price="${s.id}" value="${price.toFixed(2)}"> = ${money(cost)}</span></div>`;
+      for (const b of bins) {
+        const W = 300, H = 14, sc = W / L; let x = 0;
+        let svg = `<svg viewBox="0 0 ${W} ${H + 2}"><rect x="0" y="1" width="${W}" height="${H}" fill="#3a3326" stroke="#555"/>`;
+        for (const it of b.items) { const w = it.len * sc; svg += `<rect x="${x}" y="1" width="${Math.max(w, 1)}" height="${H}" fill="${hex(s.color)}" stroke="#1b1c1f" stroke-width="0.6"/>`; if (w > 22) svg += `<text x="${x + w / 2}" y="${H / 2 + 4.5}" font-size="9" text-anchor="middle" fill="#1b1c1f" font-family="system-ui">${esc(fmt(it.len))}</text>`; x += w + kerf * sc; }
+        svg += `</svg>`;
+        const waste = L - b.used;
+        html += `<div class="bin">${svg}<div class="cap">${b.items.map(i => fmt(i.len)).join(' + ')}${b.over ? ` <span class="warn">— longer than ${fmtFt(L)}</span>` : ` · offcut ${fmt(waste)}`}</div></div>`;
+      }
+    } else {
+      const sheets = packSheets(list.map(p => ({ w: p.w, l: p.len, name: p.name })), s.sheet[0], s.sheet[1], kerf);
+      const cost = sheets.length * price; total += cost;
+      html += `<div class="grp"><span>${sheets.length} × ${s.name} ${s.sheet[0] / 12}×${s.sheet[1] / 12}</span><span><input class="price" data-price="${s.id}" value="${price.toFixed(2)}"> = ${money(cost)}</span></div>`;
+      for (const sh of sheets) {
+        const W = 300, sc = W / s.sheet[1], H = s.sheet[0] * sc;
+        let svg = `<svg viewBox="0 0 ${W} ${H + 2}"><rect x="0" y="1" width="${W}" height="${H}" fill="#3a3326" stroke="#555"/>`; let used = 0;
+        for (const shelf of sh.shelves) for (const it of shelf.items) { used += it.a * it.b; svg += `<rect x="${it.x * sc}" y="${1 + it.y * sc}" width="${it.a * sc}" height="${it.b * sc}" fill="${hex(s.color)}" stroke="#1b1c1f" stroke-width="0.6"/><text x="${(it.x + it.a / 2) * sc}" y="${1 + (it.y + it.b / 2) * sc + 3.5}" font-size="9" text-anchor="middle" fill="#1b1c1f" font-family="system-ui">${esc(fmt(it.b) + '×' + fmt(it.a))}</text>`; }
+        svg += `</svg>`;
+        html += `<div class="bin">${svg}<div class="cap">${sh.over ? `<span class="warn">${esc(sh.over.name)} does not fit on one sheet</span>` : `${Math.round(used / (s.sheet[0] * s.sheet[1]) * 100)}% used · shelf layout, no grain direction yet`}</div></div>`;
+      }
+    }
+  }
+  html += `<div class="total"><span>Estimated total</span><span>${money(total)}</span></div><div class="muted" style="font-size:11px;margin-top:4px">Prices are placeholders; edit them per stock. Board feet and sheet nesting with grain come later.</div>`;
+  body.innerHTML = html;
+  body.querySelectorAll('.lenSel').forEach(el => el.addEventListener('change', e => { stockLen[e.target.dataset.stock] = +e.target.value; renderCutlist(); }));
+  body.querySelectorAll('[data-price]').forEach(el => el.addEventListener('change', e => { const v = parseFloat(e.target.value); if (!isNaN(v)) prices[e.target.dataset.price] = v; renderCutlist(); }));
+  document.getElementById('kerfIn').addEventListener('change', e => { const v = parseLen(e.target.value); if (v !== null && v >= 0) kerf = v; renderCutlist(); });
+}
+function renderStatus() {
+  document.getElementById('stat').textContent = `${parts.length} part${parts.length === 1 ? '' : 's'}${selected.size ? ` · ${selected.size} selected` : ''}`;
+  const o = document.getElementById('overall');
+  if (!parts.length) { o.textContent = '—'; return; }
+  const u = unionAABB(parts); o.textContent = `${fmt(u.max[0] - u.min[0])} W × ${fmt(u.max[2] - u.min[2])} D × ${fmt(u.max[1] - u.min[1])} H`;
+}
+
+// ---------- header buttons ----------
+document.getElementById('gridSel').addEventListener('change', e => { grid = parseFloat(e.target.value); });
+document.getElementById('snapChk').addEventListener('change', e => { snapParts = e.target.checked; });
+document.getElementById('bUndo').onclick = undo; document.getElementById('bRedo').onclick = redo;
+document.getElementById('bNew').onclick = () => { if (!parts.length || confirm('Clear the model?')) { mutate(() => { parts = []; }); selected.clear(); syncAll(); } };
+document.getElementById('bSave').onclick = () => download('lumber-model.json', JSON.stringify({ version: 1, parts, stockLen, prices }, null, 1), 'application/json');
+document.getElementById('bOpen').onclick = () => document.getElementById('fileIn').click();
+document.getElementById('fileIn').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const o = JSON.parse(await f.text()); if (!Array.isArray(o.parts)) throw 0; mutate(() => { parts = o.parts; nextId = Math.max(0, ...parts.map(p => p.id)) + 1; stockLen = o.stockLen || {}; prices = o.prices || {}; }); selected.clear(); syncAll(); }
+  catch { alert('That file is not a Lumber model.'); }
+  e.target.value = '';
+});
+document.getElementById('bCsv').onclick = () => {
+  const rows = [['Part', 'Stock', 'Thickness', 'Width', 'Length', 'Qty']];
+  for (const r of cutRows()) rows.push([r.names.join('; '), r.stock.name, r.stock.t, r.w, r.len, r.qty]);
+  download('cut-list.csv', rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n'), 'text/csv');
+};
+document.getElementById('bPrint').onclick = () => window.print();
+document.getElementById('bFocus').onclick = () => document.getElementById('app').classList.toggle('focus');
+document.getElementById('bSample').onclick = () => { if (!parts.length || confirm('Replace the model with the sample workbench?')) loadSample(); };
+function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
+
+// ---------- sample: a simple workbench ----------
+function loadSample() {
+  mutate(() => {
+    parts = []; nextId = 1;
+    const add = (stock, len, seq, pos, name, w) => { const p = { id: nextId++, stock, len, w, pos, q: makeQ(seq), name }; parts.push(p); return p; };
+    add('ply34', 48, ['x'], [0, 34 - 0.375, 0], 'Top', 24);
+    const legH = 34 - 0.75;
+    for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) add('2x4', legH, ['x', 'z'], [x * (24 - 0.75), legH / 2, z * (12 - 1.75)], `Leg ${x < 0 ? 'L' : 'R'}${z < 0 ? 'B' : 'F'}`);
+    for (const z of [-1, 1]) add('2x4', 45, ['x', 'x'], [0, legH - 1.75, z * (12 - 0.75)], `Apron long ${z < 0 ? 'back' : 'front'}`);
+    for (const x of [-1, 1]) add('2x4', 17, ['x', 'x', 'y'], [x * (24 - 0.75), legH - 1.75, 0], `Apron short ${x < 0 ? 'L' : 'R'}`);
+    for (const z of [-1, 1]) add('2x4', 45, ['x', 'x'], [0, 8 - 1.75 + 3.5, z * (12 - 0.75)], `Stretcher ${z < 0 ? 'back' : 'front'}`);
+    add('ply12', 45, ['x'], [0, 8 + 3.5 + 0.25, 0], 'Shelf', 21);
+  });
+  select([]); syncAll();
+}
+
+// ---------- boot ----------
+const saved = (() => { try { return localStorage.getItem('lumber.autosave'); } catch { return null; } })();
+if (saved) { try { restore(saved); } catch { loadSample(); } } else loadSample();
+undoStack = []; redoStack = [];
+syncAll();
+</script>
+</body>
+</html>
