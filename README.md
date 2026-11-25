@@ -10,7 +10,8 @@ list of boxes. See [ARCHITECTURE.md](ARCHITECTURE.md) for how it is put together
 
 ## Run it
 
-Needs Node 20 or later.
+Live at <https://philhoyt.github.io/lumber/>; every push to `main` that passes the
+checks is published there by GitHub Actions. To run it yourself, Node 20 or later:
 
     npm install
     npm run dev          # http://localhost:5173
