@@ -18,8 +18,11 @@ export interface Stock {
   sheet?: [number, number];
   /** Sheets only: false for stock with no grain to respect (MDF, OSB). Default true. */
   grain?: boolean;
-  /** Price per piece. */
+  /** Price per piece, or per board foot when `priceUnit` is 'bf'. */
   price: number;
+  priceUnit?: 'piece' | 'bf';
+  /** Boards: nominal [thickness, width] in inches for board feet (2x4 is [2, 4]). */
+  nominal?: [number, number];
   /** Display colour, 0xRRGGBB. */
   color: number;
 }
@@ -96,7 +99,29 @@ export const cloneStock = (list: readonly Stock[]): Stock[] =>
     ...s,
     lengths: s.lengths ? [...s.lengths] : undefined,
     sheet: s.sheet ? [...s.sheet] : undefined,
+    nominal: s.nominal ? [...s.nominal] : undefined,
   }));
+
+/** "2x4" or "1 x 6" as a nominal [thickness, width]; null when it does not read as one. */
+export function parseNominal(text: string): [number, number] | null {
+  const m = /^\s*(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*$/i.exec(text);
+  if (!m) return null;
+  const t = parseFloat(m[1]!);
+  const w = parseFloat(m[2]!);
+  return t > 0 && w > 0 ? [t, w] : null;
+}
+
+/** The nominal size a board stock uses for board feet: set, read from a name like 2x4, or actual. */
+export function nominalOf(s: Stock): [number, number] {
+  if (s.nominal) return s.nominal;
+  return parseNominal(s.name) ?? [s.t, s.w ?? 0];
+}
+
+/** Board feet of a length of board stock: nominal thickness × width × length ÷ 144. */
+export function boardFeet(s: Stock, lengthInches: number): number {
+  const [t, w] = nominalOf(s);
+  return (t * w * lengthInches) / 144;
+}
 
 let current: Stock[] = cloneStock(DEFAULT_STOCK);
 let version = 0;
@@ -160,7 +185,14 @@ export function sanitizeStock(list: unknown): Stock[] | null {
     } else {
       s.w = x.w;
       s.lengths = lengths && lengths.length ? lengths : [96];
+      if (
+        Array.isArray(x.nominal) &&
+        x.nominal.length === 2 &&
+        x.nominal.every((n) => typeof n === 'number' && n > 0)
+      )
+        s.nominal = [x.nominal[0], x.nominal[1]];
     }
+    if (x.priceUnit === 'bf') s.priceUnit = 'bf';
     out.push(s);
   }
   return out;

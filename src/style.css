@@ -845,6 +845,14 @@ label.small select.inline {
   margin-top: 2px;
 }
 
+.bf {
+  font-size: 11px;
+  margin: -2px 0 4px;
+}
+.stock-table td select.inline {
+  margin-left: 4px;
+}
+
 /* cut list */
 table {
   border-collapse: collapse;

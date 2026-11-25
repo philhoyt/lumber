@@ -53,6 +53,32 @@ export function packBoards(
   return bins;
 }
 
+/**
+ * Pack into each purchase length on offer and keep the one that buys the least total
+ * length; on a tie, the fewer pieces. Returns the chosen length with its bins.
+ */
+export function packBoardsAuto(
+  items: readonly BoardItem[],
+  lengths: readonly number[],
+  kerf: number,
+): { length: number; bins: BoardBin[] } {
+  let best: { length: number; bins: BoardBin[] } | null = null;
+  for (const L of lengths) {
+    const bins = packBoards(items, L, kerf);
+    const over = bins.filter((b) => b.over).length;
+    const bought = bins.length * L;
+    if (
+      !best ||
+      over < best.bins.filter((b) => b.over).length ||
+      (over === best.bins.filter((b) => b.over).length &&
+        (bought < best.bins.length * best.length ||
+          (bought === best.bins.length * best.length && bins.length < best.bins.length)))
+    )
+      best = { length: L, bins };
+  }
+  return best ?? { length: lengths[0] ?? 96, bins: [] };
+}
+
 export interface SheetItem {
   w: number;
   l: number;

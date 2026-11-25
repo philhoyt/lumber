@@ -5,6 +5,7 @@
  */
 import { Plus, RotateCcw, Trash2, X } from 'lucide';
 import type { Store } from '../store';
+import { nominalOf, parseNominal } from '../stock';
 import { fmt, fmtFt, parseLen } from '../units';
 import { esc, hex } from './dom';
 import { keepFocus } from './fields';
@@ -66,11 +67,14 @@ export class StockEditor {
       `<td><input type="color" id="st-${s.id}-color" value="${hex(s.color)}" title="Color"></td><td><input type="text" id="st-${s.id}-name" value="${esc(s.name)}"></td>`;
     const tail = (s: (typeof boards)[number]) => {
       const used = store.stockUseCount(s.id);
-      return `<td><input type="text" class="price" id="st-${s.id}-price" value="${s.price.toFixed(2)}"></td><td><button class="icon ghost danger" data-del="${s.id}" ${used ? `disabled title="Used by ${used} part${used === 1 ? '' : 's'}"` : 'title="Delete"'}></button></td>`;
+      const unit = s.sheet
+        ? ''
+        : `<select id="st-${s.id}-unit" class="inline" title="Price per piece, or per board foot for hardwood"><option value="piece"${s.priceUnit === 'bf' ? '' : ' selected'}>/pc</option><option value="bf"${s.priceUnit === 'bf' ? ' selected' : ''}>/bf</option></select>`;
+      return `<td><input type="text" class="price" id="st-${s.id}-price" value="${s.price.toFixed(2)}">${unit}</td><td><button class="icon ghost danger" data-del="${s.id}" ${used ? `disabled title="Used by ${used} part${used === 1 ? '' : 's'}"` : 'title="Delete"'}></button></td>`;
     };
-    let html = `<h3>Boards</h3><table class="stock-table"><tr><th></th><th>Name</th><th>Thick</th><th>Wide</th><th>Sold as</th><th>Price</th><th></th></tr>`;
+    let html = `<h3>Boards</h3><table class="stock-table"><tr><th></th><th>Name</th><th>Thick</th><th>Wide</th><th>Sold as</th><th title="Nominal size for board feet, e.g. 2x4; blank reads it from the name">Nominal</th><th>Price</th><th></th></tr>`;
     for (const s of boards)
-      html += `<tr>${common(s)}<td>${len(s.id, 't', s.t)}</td><td>${len(s.id, 'w', s.w ?? 0)}</td><td><input type="text" id="st-${s.id}-lengths" value="${esc((s.lengths ?? []).map(fmtFt).join(', '))}" title="Purchase lengths, e.g. 8 ft, 10 ft, 12 ft"></td>${tail(s)}</tr>`;
+      html += `<tr>${common(s)}<td>${len(s.id, 't', s.t)}</td><td>${len(s.id, 'w', s.w ?? 0)}</td><td><input type="text" id="st-${s.id}-lengths" value="${esc((s.lengths ?? []).map(fmtFt).join(', '))}" title="Purchase lengths, e.g. 8 ft, 10 ft, 12 ft"></td><td><input type="text" id="st-${s.id}-nominal" value="${esc(s.nominal ? `${s.nominal[0]}x${s.nominal[1]}` : '')}" placeholder="${esc(nominalOf(s).join('x'))}" title="Nominal thickness x width for board feet"></td>${tail(s)}</tr>`;
     html += `</table><h3>Sheets</h3><table class="stock-table"><tr><th></th><th>Name</th><th>Thick</th><th>Wide</th><th>Long</th><th title="Untick for MDF, OSB and other stock with no grain to respect">Grain</th><th>Price</th><th></th></tr>`;
     for (const s of sheets)
       html += `<tr>${common(s)}<td>${len(s.id, 't', s.t)}</td><td>${len(s.id, 'sw', s.sheet![0], 1)}</td><td>${len(s.id, 'sl', s.sheet![1], 1)}</td><td><input type="checkbox" id="st-${s.id}-grain"${s.grain === false ? '' : ' checked'}></td>${tail(s)}</tr>`;
@@ -85,7 +89,7 @@ export class StockEditor {
 
   private onChange = (e: Event): void => {
     const el = e.target as HTMLInputElement;
-    const m = /^st-(.+)-(name|color|t|w|sw|sl|lengths|price|grain)$/.exec(el.id);
+    const m = /^st-(.+)-(name|color|t|w|sw|sl|lengths|price|grain|nominal|unit)$/.exec(el.id);
     if (!m) return;
     const [, id, field] = m;
     const s = this.store.stock.find((x) => x.id === id);
@@ -133,6 +137,18 @@ export class StockEditor {
       }
       case 'grain':
         this.store.updateStock(id!, { grain: el.checked ? undefined : false });
+        break;
+      case 'nominal': {
+        if (!el.value.trim()) this.store.updateStock(id!, { nominal: undefined });
+        else {
+          const n = parseNominal(el.value);
+          if (n) this.store.updateStock(id!, { nominal: n });
+          else this.render();
+        }
+        break;
+      }
+      case 'unit':
+        this.store.updateStock(id!, { priceUnit: el.value === 'bf' ? 'bf' : undefined });
         break;
       case 'price': {
         const v = parseFloat(el.value);

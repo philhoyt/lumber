@@ -83,6 +83,13 @@ arrows and squares. Drag stock in from the left, or click it to add at the
 center. With several parts selected, the Align buttons make them flush or
 centred on any axis. Sizes accept fractions and feet.
 
+The buy list shows board feet: each board stock lists the board feet in its parts
+and in what you buy, using the nominal size (2x4 is 2 × 4; the stock table has
+a Nominal column for anything the name does not say), and the total sums lumber
+in board feet and sheet goods in square feet. A stock can be priced per board
+foot instead of per piece, for hardwood. The purchase length defaults to Auto,
+which buys the least total length.
+
 Sheet nesting is guillotine: every cut runs edge to edge across the piece it
 splits, as on a table saw, and each sheet diagram numbers the cuts in order.
 Three part orders are tried and the one that uses the fewest sheets is kept.

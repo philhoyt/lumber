@@ -1,7 +1,7 @@
 /** The cut list and buy list panel, with cutting diagrams and a cost estimate. */
-import { cutRows, packBoards, packSheets, partsByStock } from '../pack';
+import { cutRows, packBoards, packBoardsAuto, packSheets, partsByStock } from '../pack';
 import { describeCut, grainOf } from '../model';
-import { stockById } from '../stock';
+import { boardFeet, stockById } from '../stock';
 import type { Store } from '../store';
 import { fmt, fmtFt, fmtSheet, money, parseLen } from '../units';
 import { esc, hex } from './dom';
@@ -52,24 +52,36 @@ export class CutlistPanel {
     html += `<h2 class="buy-head">Buy list <span>kerf <input class="price len" data-min="0" id="kerfIn" value="${fmt(settings.kerf)}"></span></h2>`;
 
     let total = 0;
+    let totalBf = 0;
+    let totalSqFt = 0;
     for (const [stockId, list] of partsByStock(parts)) {
       const s = stockById(stockId);
       const price = s.price;
-      const priceInput = `<input class="price" data-price="${s.id}" value="${price.toFixed(2)}">`;
+      const perBf = s.priceUnit === 'bf';
+      const priceInput = `<input class="price" data-price="${s.id}" value="${price.toFixed(2)}" title="${perBf ? 'Price per board foot' : 'Price per piece'}">${perBf ? '<span class="muted">/bf</span>' : ''}`;
       if (!s.sheet) {
         const lengths = s.lengths ?? [96];
-        const L = settings.stockLen[s.id] ?? lengths[0]!;
-        const bins = packBoards(
-          list.map((p) => ({ len: p.len, name: p.name })),
-          L,
-          settings.kerf,
-        );
-        const cost = bins.length * price;
+        const chosen = settings.stockLen[s.id] ?? 0; // 0: pick the least-waste length
+        const items = list.map((p) => ({ len: p.len, name: p.name }));
+        const { length: L, bins } =
+          chosen > 0
+            ? { length: chosen, bins: packBoards(items, chosen, settings.kerf) }
+            : packBoardsAuto(items, lengths, settings.kerf);
+        const partsBf = list.reduce((sum, p) => sum + boardFeet(s, p.len), 0);
+        const boughtBf = boardFeet(s, L) * bins.length;
+        totalBf += boughtBf;
+        // A per-piece price is for the first listed length; longer boards cost in proportion.
+        const pieceCost = perBf ? 0 : price * (L / (lengths[0] ?? L));
+        const cost = perBf ? boughtBf * price : bins.length * pieceCost;
         total += cost;
-        const lenOptions = lengths
-          .map((l) => `<option value="${l}" ${l === L ? 'selected' : ''}>${fmtFt(l)}</option>`)
-          .join('');
-        html += `<div class="grp"><span>${bins.length} × ${esc(s.name)} @ ${fmtFt(L)}</span><span><select data-stock="${s.id}" class="lenSel">${lenOptions}</select> ${priceInput} = ${money(cost)}</span></div>`;
+        const lenOptions = [
+          `<option value="0"${chosen === 0 ? ' selected' : ''}>Auto · ${fmtFt(L)}</option>`,
+          ...lengths.map(
+            (l) => `<option value="${l}"${l === chosen ? ' selected' : ''}>${fmtFt(l)}</option>`,
+          ),
+        ].join('');
+        html += `<div class="grp"><span>${bins.length} × ${esc(s.name)} @ ${fmtFt(L)}</span><span><select data-stock="${s.id}" class="lenSel" title="Purchase length; Auto buys the least total length">${lenOptions}</select> ${priceInput} = ${money(cost)}</span></div>
+        <div class="muted bf">${partsBf.toFixed(1)} bf of parts · ${boughtBf.toFixed(1)} bf bought · ${Math.round((partsBf / Math.max(boughtBf, 1e-9)) * 100)}% used</div>`;
         for (const b of bins) {
           const sc = DIAGRAM_W / L;
           let x = 0;
@@ -102,6 +114,7 @@ export class CutlistPanel {
         );
         const cost = sheets.length * price;
         total += cost;
+        totalSqFt += (sheets.length * SW * SL) / 144;
         html += `<div class="grp"><span>${sheets.length} × ${esc(s.name)} ${fmtSheet(SW, SL)}</span><span>${priceInput} = ${money(cost)}</span></div>`;
         for (const sh of sheets) {
           const sc = DIAGRAM_W / SL;
@@ -136,7 +149,10 @@ export class CutlistPanel {
         }
       }
     }
-    html += `<div class="total"><span>Estimated total</span><span>${money(total)}</span></div><div class="muted note">Prices come from the stock table; edit them there or here. Board feet totals come later.</div>`;
+    const totals: string[] = [];
+    if (totalBf) totals.push(`${totalBf.toFixed(1)} board feet of lumber`);
+    if (totalSqFt) totals.push(`${totalSqFt.toFixed(0)} sq ft of sheet goods`);
+    html += `<div class="total"><span>Estimated total</span><span>${money(total)}</span></div>${totals.length ? `<div class="muted bf">${totals.join(' · ')}</div>` : ''}<div class="muted note">Prices come from the stock table; edit them there or here. A per-piece price is for the first listed length and scales with the length bought. Board feet use the nominal size (2x4 is 2 × 4) over the length bought.</div>`;
     const restoreFocus = keepFocus(el);
     el.innerHTML = html;
     restoreFocus();
@@ -183,6 +199,7 @@ export function cutListCsv(store: Store): string {
       'Grain',
       'Cuts',
       'Qty',
+      'Board feet',
     ],
   ];
   for (const r of cutRows(store.parts))
@@ -198,6 +215,7 @@ export function cutListCsv(store: Store): string {
       r.grain,
       r.cuts.map((c) => describeCut(c, fmt)).join('; '),
       r.qty,
+      r.stock.sheet ? '' : (boardFeet(r.stock, r.len) * r.qty).toFixed(2),
     ]);
   return rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
 }
