@@ -81,6 +81,11 @@ arrows and squares. Drag stock in from the left, or click it to add at the
 center. With several parts selected, the Align buttons make them flush or
 centred on any axis. Sizes accept fractions and feet.
 
+Boards can have a miter at each end: two angle fields in the Part section,
+degrees from square, cut across the width, positive for a short point on the
+back edge. The length stays long point to long point; the cut list prints the
+angles and the short-point length, and the 3D view draws the angled ends.
+
 The stock table is yours to edit: the gear button in the palette opens it. Change
 sizes, purchase lengths, prices and colors, add custom boards or sheets, delete
 unused ones, or reset to the defaults. Metric sizes can be typed as `38mm`. The

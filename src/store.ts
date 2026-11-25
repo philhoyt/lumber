@@ -23,6 +23,7 @@ import {
   type Group,
   type Part,
   type Vec3,
+  MAX_MITER,
 } from './model';
 
 export interface Settings {
@@ -604,6 +605,17 @@ export function parseDocument(o: unknown): Document | null {
       x.q.length !== 4
     )
       return null;
+    // Miters must be a pair of angles within range; anything else reads as square.
+    if (x.miter !== undefined) {
+      const m = x.miter as unknown;
+      if (
+        Array.isArray(m) &&
+        m.length === 2 &&
+        m.every((n) => typeof n === 'number' && Math.abs(n) <= MAX_MITER)
+      ) {
+        if (m[0] === 0 && m[1] === 0) delete x.miter;
+      } else delete x.miter;
+    }
   }
   let parts = d.parts as Part[];
   if (d.version !== 2) parts = migrateFromYUp(parts);

@@ -29,8 +29,15 @@ export class CutlistPanel {
       return;
     }
     let html = `<table><tr><th>Stock</th><th>Cut</th><th class="r">Qty</th><th>Parts</th></tr>`;
-    for (const r of cutRows(parts))
-      html += `<tr><td>${esc(r.stock.name)}</td><td>${r.stock.sheet ? fmt(r.w) + ' × ' : ''}${fmt(r.len)}</td><td class="r">${r.qty}</td><td class="muted names">${esc(r.names.join(', '))}</td></tr>`;
+    for (const r of cutRows(parts)) {
+      const mitered = r.miter[0] !== 0 || r.miter[1] !== 0;
+      const cut = r.stock.sheet
+        ? `${fmt(r.w)} × ${fmt(r.len)}`
+        : mitered
+          ? `${fmt(r.len)} <span class="muted">long · ${fmt(r.short)} short · ${angleText(r.miter)}</span>`
+          : fmt(r.len);
+      html += `<tr><td>${esc(r.stock.name)}</td><td>${cut}</td><td class="r">${r.qty}</td><td class="muted names">${esc(r.names.join(', '))}</td></tr>`;
+    }
     html += `</table>`;
     html += `<h2 class="buy-head">Buy list <span>kerf <input class="price len" data-min="0" id="kerfIn" value="${fmt(settings.kerf)}"></span></h2>`;
 
@@ -125,10 +132,38 @@ export class CutlistPanel {
   }
 }
 
+/** "45°/45°" with the short-point edge marked. */
+export function angleText(m: [number, number]): string {
+  const one = (a: number) => (a === 0 ? 'square' : `${Math.abs(a)}°${a > 0 ? '▴' : '▾'}`);
+  return `${one(m[0])} / ${one(m[1])}`;
+}
+
 /** The cut list as CSV text. */
 export function cutListCsv(store: Store): string {
-  const rows: (string | number)[][] = [['Part', 'Stock', 'Thickness', 'Width', 'Length', 'Qty']];
+  const rows: (string | number)[][] = [
+    [
+      'Part',
+      'Stock',
+      'Thickness',
+      'Width',
+      'Length (long point)',
+      'Short point',
+      'Miter A',
+      'Miter B',
+      'Qty',
+    ],
+  ];
   for (const r of cutRows(store.parts))
-    rows.push([r.names.join('; '), r.stock.name, r.stock.t, r.w, r.len, r.qty]);
+    rows.push([
+      r.names.join('; '),
+      r.stock.name,
+      r.stock.t,
+      r.w,
+      r.len,
+      r.short,
+      r.miter[0],
+      r.miter[1],
+      r.qty,
+    ]);
   return rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
 }

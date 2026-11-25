@@ -36,6 +36,64 @@ export interface Part {
   group?: number;
   /** In an array group: 0 for the source cell, 1.. for generated copies. */
   arrayIndex?: number;
+  /**
+   * Miter angles in degrees at the −X and +X ends, cut across the width (like a picture
+   * frame or a rafter's plumb cut). 0 is square. Positive puts the short point on the +Y
+   * edge, negative on the −Y edge. `len` stays the long-point length.
+   */
+  miter?: [number, number];
+}
+
+export const MAX_MITER = 75;
+
+/** A part's miter angles, square when unset. */
+export const miterOf = (p: Part): [number, number] => p.miter ?? [0, 0];
+export const hasMiter = (p: Part): boolean => miterOf(p).some((a) => a !== 0);
+
+/** Clamp and tidy a typed angle: whole or half degrees, within the limits. */
+export function clampMiter(deg: number): number {
+  if (!Number.isFinite(deg)) return 0;
+  return Math.max(-MAX_MITER, Math.min(MAX_MITER, Math.round(deg * 2) / 2)) || 0;
+}
+
+/** How much a miter takes off the short edge at one end, inches. */
+export const miterSetback = (deg: number, width: number): number =>
+  width * Math.tan((Math.abs(deg) * Math.PI) / 180);
+
+/**
+ * The outline of a mitered board's face in its local frame, counterclockwise from the
+ * −X −Y corner: [x, y] pairs. A square end is two points at the same x.
+ */
+export function miterOutline(
+  len: number,
+  width: number,
+  miter: [number, number],
+): [number, number][] {
+  const [a, b] = miter;
+  const sa = miterSetback(a, width);
+  const sb = miterSetback(b, width);
+  const x0 = -len / 2;
+  const x1 = len / 2;
+  const y0 = -width / 2;
+  const y1 = width / 2;
+  return [
+    [x0 + (a < 0 ? sa : 0), y0],
+    [x1 - (b < 0 ? sb : 0), y0],
+    [x1 - (b > 0 ? sb : 0), y1],
+    [x0 + (a > 0 ? sa : 0), y1],
+  ];
+}
+
+/**
+ * The short-point length: the shorter of the two edges. With both short points on
+ * the same edge that edge is shorter by both setbacks; on opposite edges (a
+ * parallelogram) both edges lose one setback.
+ */
+export function shortLength(len: number, width: number, miter: [number, number]): number {
+  const o = miterOutline(len, width, miter);
+  const bottom = o[1]![0] - o[0]![0];
+  const top = o[2]![0] - o[3]![0];
+  return Math.min(bottom, top);
 }
 
 export interface AABB {

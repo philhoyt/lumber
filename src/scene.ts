@@ -16,6 +16,9 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { axisParam, Gizmo, ringAngle, RotateGizmo } from './gizmo';
 import {
   aabbCenter,
+  hasMiter,
+  miterOf,
+  miterOutline,
   partAABB,
   partDims,
   rotateParts,
@@ -114,6 +117,20 @@ const VIEW_DIRS: Record<Exclude<ViewName, 'fit' | 'selected'>, THREE.Vector3> = 
   right: new THREE.Vector3(1, 0, 0),
   left: new THREE.Vector3(-1, 0, 0),
 };
+
+const meshSignature = (p: Part, d: Vec3): string =>
+  `${d.join(',')},${p.stock},${miterOf(p).join('/')}`;
+
+/** A box, or for a mitered board the face outline extruded through the thickness. */
+function partGeometry(p: Part, d: Vec3): THREE.BufferGeometry {
+  if (!hasMiter(p) || stockById(p.stock).sheet) return new THREE.BoxGeometry(d[0], d[1], d[2]);
+  const shape = new THREE.Shape(
+    miterOutline(d[0], d[1], miterOf(p)).map(([x, y]) => new THREE.Vector2(x, y)),
+  );
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: d[2], bevelEnabled: false });
+  geo.translate(0, 0, -d[2] / 2);
+  return geo;
+}
 
 export class LumberScene {
   private renderer: THREE.WebGLRenderer;
@@ -290,13 +307,13 @@ export class LumberScene {
   private buildMesh(p: Part): THREE.Group {
     const d = partDims(p);
     const g = new THREE.Group();
-    const geo = new THREE.BoxGeometry(d[0], d[1], d[2]);
+    const geo = partGeometry(p, d);
     const mesh = new THREE.Mesh(geo, this.materialFor(stockById(p.stock), 'normal'));
     mesh.userData.id = p.id;
     const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), this.edgeMats.normal);
     g.add(mesh, edges);
     g.userData.id = p.id;
-    g.userData.sig = `${d.join(',')},${p.stock}`;
+    g.userData.sig = meshSignature(p, d);
     return g;
   }
   private disposeGroup(g: THREE.Group): void {
@@ -306,7 +323,7 @@ export class LumberScene {
   private syncMesh(p: Part): void {
     let g = this.meshes.get(p.id);
     const d = partDims(p);
-    const sig = `${d.join(',')},${p.stock}`;
+    const sig = meshSignature(p, d);
     if (!g || g.userData.sig !== sig) {
       if (g) this.disposeGroup(g);
       g = this.buildMesh(p);
@@ -446,7 +463,9 @@ export class LumberScene {
       this.labelEl.style.left = `${x}px`;
       this.labelEl.style.top = `${y}px`;
       const s = stockById(p.stock);
-      this.labelEl.textContent = `${p.name} · ${s.name} · ${s.sheet ? fmt(p.w ?? s.sheet[0]) + ' × ' : ''}${fmt(p.len)}`;
+      const m = miterOf(p);
+      const miter = hasMiter(p) ? ` · ${Math.abs(m[0])}°/${Math.abs(m[1])}°` : '';
+      this.labelEl.textContent = `${p.name} · ${s.name} · ${s.sheet ? fmt(p.w ?? s.sheet[0]) + ' × ' : ''}${fmt(p.len)}${miter}`;
     } else this.labelEl.style.display = 'none';
 
     const t = this.tf;

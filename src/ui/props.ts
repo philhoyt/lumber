@@ -5,6 +5,8 @@
 import { ChevronDown, ChevronRight } from 'lucide';
 import {
   aabbSize,
+  clampMiter,
+  miterOf,
   unionAABB,
   withMinKept,
   type AlignMode,
@@ -95,6 +97,11 @@ export class PropsPanel {
             ? `<div><label class="small">Width</label><input type="text" class="len" data-min="0.0625" id="pW" value="${fmt(p.w ?? s.sheet[0])}"></div>`
             : `<div><label class="small">Section</label><div class="static">${fmt(s.t)} × ${fmt(s.w ?? 0)}</div></div>`
         }</div>`;
+      if (!s.sheet) {
+        const [ma, mb] = miterOf(p);
+        part += `<div class="row"><div><label class="small">Miter A (−X end)</label><input type="number" id="pMiterA" value="${ma}" min="-75" max="75" step="0.5"></div><div><label class="small">Miter B (+X end)</label><input type="number" id="pMiterB" value="${mb}" min="-75" max="75" step="0.5"></div></div>
+        <div class="muted note">Degrees from square, across the width. Positive puts the short point on the back (+Y) edge. Length is long point to long point.</div>`;
+      }
       if (inGroup) {
         const g = store.groupById(p.group!);
         part += `<div class="muted note">In ${esc(g?.name ?? 'a group')} · click the part in the view to select the whole group</div>`;
@@ -250,6 +257,17 @@ export class PropsPanel {
         if (v !== null && v > 0) store.mutate(() => withMinKept(p, () => (p.w = v)));
         else this.render();
       });
+      const setMiter = (end: 0 | 1, text: string) => {
+        const v = clampMiter(parseFloat(text));
+        store.mutate(() => {
+          const m = miterOf(p);
+          m[end] = v;
+          if (m[0] === 0 && m[1] === 0) delete p.miter;
+          else p.miter = m;
+        });
+      };
+      onChange(el, 'pMiterA', (i) => setMiter(0, i.value));
+      onChange(el, 'pMiterB', (i) => setMiter(1, i.value));
     }
     const moveTo = (axis: 0 | 1 | 2, text: string) => {
       const v = parseLen(text);

@@ -3,7 +3,7 @@
  * lengths; sheets pack by shelves (rows of parts across the sheet). Both are simple on
  * purpose: good enough to buy the right amount, and easy to check by hand.
  */
-import type { Part } from './model';
+import { miterOf, shortLength, type Part } from './model';
 import { getStock, stockById, stockWidth, type Stock } from './stock';
 import { r32 } from './units';
 
@@ -128,8 +128,13 @@ export function packSheets(
 
 export interface CutRow {
   stock: Stock;
+  /** Long-point length. */
   len: number;
   w: number;
+  /** Miter angles at each end, 0/0 for square. */
+  miter: [number, number];
+  /** Short-point length when mitered, else the length. */
+  short: number;
   qty: number;
   names: string[];
 }
@@ -146,10 +151,11 @@ export function cutRows(parts: readonly Part[]): CutRow[] {
     const s = stockById(p.stock);
     const len = r32(p.len);
     const w = r32(stockWidth(s, p.w));
-    const key = `${p.stock}|${len}|${w}`;
+    const miter = miterOf(p);
+    const key = `${p.stock}|${len}|${w}|${miter.join('/')}`;
     let r = map.get(key);
     if (!r) {
-      r = { stock: s, len, w, qty: 0, names: [] };
+      r = { stock: s, len, w, miter, short: r32(shortLength(len, w, miter)), qty: 0, names: [] };
       map.set(key, r);
     }
     r.qty++;
