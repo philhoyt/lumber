@@ -863,7 +863,8 @@ label.small select.inline {
   font-size: 13px;
   margin: 12px 0 4px;
 }
-.fasten-bar {
+.fasten-bar,
+.explode-bar {
   position: absolute;
   top: 10px;
   left: 50%;
@@ -882,7 +883,8 @@ label.small select.inline {
   max-width: calc(100% - 24px);
   white-space: nowrap;
 }
-.fasten-bar[hidden] {
+.fasten-bar[hidden],
+.explode-bar[hidden] {
   display: none;
 }
 .fasten-bar select,
@@ -893,8 +895,23 @@ label.small select.inline {
 .fasten-bar select,
 .fasten-bar input,
 .fasten-bar button,
-.fasten-bar strong {
+.fasten-bar strong,
+.explode-bar input,
+.explode-bar button,
+.explode-bar strong {
   flex: 0 0 auto;
+}
+.explode-bar input[type='range'] {
+  width: 150px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.explode-bar .muted {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .fasten-bar input {
   width: 130px;

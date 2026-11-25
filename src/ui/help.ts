@@ -54,6 +54,7 @@ const SECTIONS: [string, [string, string][]][] = [
       ['2 / 4 / 6 / 8', 'Orbit in 15° steps'],
       ['5', 'Perspective / orthographic'],
       ['. / Home', 'Frame the selection / fit the model'],
+      ['E', 'Exploded view: pull the parts apart; drag the slider; E collapses'],
       ['D', 'Dimension labels and selection extents'],
       ['M', 'Measure: click two points; Esc ends'],
       ['N / T / Tab', 'Side panel / palette / both'],

@@ -65,6 +65,7 @@ theme.
 | Middle-drag, Shift+middle, wheel   | Orbit, pan, zoom (right-drag also pans)                                   |
 | Numpad 1 / 3 / 7, with Ctrl        | Front / right / top, back / left / bottom (top-row digits too)            |
 | Numpad 5                           | Perspective or orthographic; axis views are ortho, orbiting returns       |
+| E                                  | Exploded view: pull the parts apart to look; slider sets how far          |
 | Numpad 2 / 4 / 6 / 8               | Orbit in 15° steps                                                        |
 | Numpad . , Home                    | Frame the selection, fit the model                                        |
 | D                                  | Dimension labels on every part and the selection's W × D × H              |

@@ -36,6 +36,7 @@ import {
   type Part,
   type Vec3,
 } from './model';
+import { explodeOffsets, offsetAABB } from './explode';
 import { fastenerAt, fastenerLocal, fastenersKey, fastenersOf, type Fastener } from './fastener';
 import { buildMarkers, markerMesh, placeMarker } from './markers';
 import { measureBetween, measureText, nearestSnap, snapPoints } from './measure';
@@ -221,6 +222,11 @@ export class LumberScene {
   /** F: placing fastener markers. The ghost shows where the next one would go. */
   private fasten: { ghost: THREE.Group | null; ghostKind: string } | null = null;
   private fastenWatchers: ((on: boolean) => void)[] = [];
+  /** E: how far the view is exploded, 0..1. Parts draw displaced; the model stays put. */
+  explode = 0;
+  private lastExplode = 0.5;
+  private offsets = new Map<number, Vec3>();
+  private explodeWatchers: ((amount: number) => void)[] = [];
 
   constructor(
     private container: HTMLElement,
@@ -413,7 +419,8 @@ export class LumberScene {
       this.partsGroup.add(g);
       this.meshes.set(p.id, g);
     }
-    g.position.fromArray(p.pos);
+    const o = this.offsetOf(p.id);
+    g.position.set(p.pos[0] + o[0], p.pos[1] + o[1], p.pos[2] + o[2]);
     g.quaternion.fromArray(p.q);
     g.visible = !p.hidden;
     this.applyState(g, p);
@@ -424,6 +431,13 @@ export class LumberScene {
     (g.children[1] as THREE.LineSegments).material = this.edgeMats[state];
   }
   syncAll(): void {
+    this.offsets = this.explode
+      ? explodeOffsets(
+          this.store.visibleParts(),
+          (p) => this.store.rootGroupOf(p.id)?.id,
+          this.explode,
+        )
+      : new Map();
     const live = new Set(this.store.parts.map((p) => p.id));
     for (const [id, g] of this.meshes)
       if (!live.has(id)) {
@@ -515,7 +529,7 @@ export class LumberScene {
     const center = this.selectionCenter();
     const rotating = this.tf?.kind === 'rotate';
     const vh = center ? this.viewHeightAt(center) : 0;
-    this.gizmo.update(rotating ? null : center, vh);
+    this.gizmo.update(rotating || this.explode ? null : center, vh);
     this.rotateGizmo.update(rotating ? center : null, vh);
     this.scaleMarkers();
     this.renderer.render(this.scene, this.camera);
@@ -527,7 +541,7 @@ export class LumberScene {
   private selectionCenter(): THREE.Vector3 | null {
     const list = this.store.selectedParts();
     if (!list.length) return null;
-    return new THREE.Vector3().fromArray(aabbCenter(unionAABB(list)));
+    return new THREE.Vector3().fromArray(aabbCenter(this.displayBounds(list)));
   }
 
   private toScreen(v: THREE.Vector3): [number, number] {
@@ -585,6 +599,7 @@ export class LumberScene {
 
   // ---- dimensions ----
   toggleDims(): void {
+    if (this.explode && !this.showDims) this.setExplode(0);
     this.showDims = !this.showDims;
     if (!this.showDims) {
       for (const el of this.dimLabels) el.style.display = 'none';
@@ -682,6 +697,7 @@ export class LumberScene {
   // ---- measuring ----
   /** M: measure between two clicked points, snapping to part corners, edges and faces. */
   toggleMeasure(): void {
+    if (this.explode) this.setExplode(0);
     if (this.measure) this.endMeasure();
     else {
       this.measure = { a: null, b: null, live: null };
@@ -696,6 +712,57 @@ export class LumberScene {
     this.measureLabel.style.display = 'none';
     this.container.style.cursor = '';
     this.onMeasureChange?.(false);
+  }
+
+  // ---- exploded view ----
+  get exploded(): boolean {
+    return this.explode > 0;
+  }
+  /**
+   * Pull the parts apart (0..1) to see how they go together. The view is look-only while
+   * exploded: clicks select, but transforms, measuring, marking and dimensions wait until
+   * it collapses, and starting any of them collapses it.
+   */
+  setExplode(amount: number): void {
+    const v = Math.max(0, Math.min(1, amount)) || 0;
+    if (v === this.explode) return;
+    if (v > 0) {
+      if (this.tf) this.finishTransform(false);
+      if (this.measure) this.endMeasure();
+      if (this.fasten) this.endFasten();
+      if (this.showDims) this.toggleDims();
+      this.lastExplode = v;
+    }
+    this.explode = v;
+    this.syncAll();
+    for (const w of this.explodeWatchers) w(v);
+  }
+  /** E: explode to the last amount, or collapse. */
+  toggleExplode(): void {
+    this.setExplode(this.explode > 0 ? 0 : this.lastExplode);
+  }
+  watchExplode(fn: (amount: number) => void): void {
+    this.explodeWatchers.push(fn);
+  }
+  private offsetOf(id: number): Vec3 {
+    return this.offsets.get(id) ?? [0, 0, 0];
+  }
+  /** A part's bounds as drawn: shifted while the view is exploded. */
+  private displayAABB(p: Part): AABB {
+    return this.explode ? offsetAABB(p, this.offsetOf(p.id)) : partAABB(p);
+  }
+  private displayBounds(parts: readonly Part[]): AABB {
+    if (!this.explode) return unionAABB(parts);
+    const min: Vec3 = [Infinity, Infinity, Infinity];
+    const max: Vec3 = [-Infinity, -Infinity, -Infinity];
+    for (const p of parts) {
+      const b = this.displayAABB(p);
+      for (const a of [0, 1, 2] as const) {
+        min[a] = Math.min(min[a], b.min[a]);
+        max[a] = Math.max(max[a], b.max[a]);
+      }
+    }
+    return { min, max };
   }
 
   // ---- fastener markers ----
@@ -713,6 +780,7 @@ export class LumberScene {
   }
   /** F: click a face to add a marker there, click a marker to take it away. */
   toggleFasten(): void {
+    if (this.explode) this.setExplode(0);
     if (this.fasten) this.endFasten();
     else {
       if (this.measure) this.endMeasure();
@@ -840,7 +908,7 @@ export class LumberScene {
 
   // ---- views ----
   private bounds(parts: readonly Part[]): AABB {
-    return parts.length ? unionAABB(parts) : { min: [-24, -24, 0], max: [24, 24, 24] };
+    return parts.length ? this.displayBounds(parts) : { min: [-24, -24, 0], max: [24, 24, 24] };
   }
   setView(name: ViewName): void {
     const parts =
@@ -948,6 +1016,7 @@ export class LumberScene {
 
   // ---- transforms ----
   private startTransform(kind: Transform['kind'], modal: boolean): Transform | null {
+    if (this.explode) return null; // look-only while exploded
     const list = this.store.selectedParts();
     if (!list.length) return null;
     const ids = new Set(list.map((p) => p.id));
@@ -1207,7 +1276,7 @@ export class LumberScene {
     this.setRay(e.clientX, e.clientY);
 
     // Gizmo handles win over parts.
-    const gh = this.gizmo.pick(this.ray);
+    const gh = this.explode ? null : this.gizmo.pick(this.ray);
     const center = this.selectionCenter();
     if (gh && center) {
       const t = this.startTransform('grab', false);
@@ -1228,7 +1297,7 @@ export class LumberScene {
       }
       if (!this.store.selected.has(id)) this.store.select(this.store.selectionForClick(id));
       const t = this.startTransform('grab', false);
-      if (!t) return;
+      if (!t) return; // nothing selected, or the view is exploded
       // Slide on a floor-parallel plane through the grabbed point.
       const plane = new THREE.Plane(Z_UP, -hit.point.z);
       t.constraint = { kind: 'plane', axes: [0, 1], plane, ref: hit.point.clone() };
@@ -1298,7 +1367,7 @@ export class LumberScene {
       return;
     }
     this.setRay(e.clientX, e.clientY);
-    const gh = this.gizmo.pick(this.ray);
+    const gh = this.explode ? null : this.gizmo.pick(this.ray);
     this.gizmo.setHover(gh?.object ?? null);
     const hit = gh ? null : this.pickPart();
     this.setHover(hit ? (hit.object.userData.id as number) : null);
@@ -1339,7 +1408,7 @@ export class LumberScene {
     const y1 = Math.max(b.y0, b.y1) - r.top;
     const ids = b.additive ? new Set(this.store.selected) : new Set<number>();
     for (const p of this.store.visibleParts()) {
-      const [x, y] = this.toScreen(new THREE.Vector3().fromArray(aabbCenter(partAABB(p))));
+      const [x, y] = this.toScreen(new THREE.Vector3().fromArray(aabbCenter(this.displayAABB(p))));
       if (x >= x0 && x <= x1 && y >= y0 && y <= y1) ids.add(p.id);
     }
     this.store.select(ids);

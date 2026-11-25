@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Copy,
   Drill,
+  Expand,
   Eye,
   EyeOff,
   FlipHorizontal2,
@@ -47,6 +48,7 @@ export interface MenuActions {
   duplicateAndGrab(): void;
   setView(name: ViewName): void;
   toggleFasten(): void;
+  toggleExplode(): void;
 }
 
 const VIEWS: [ViewName, string, string][] = [
@@ -108,6 +110,12 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
       action: () => scene.setView(name),
     })),
   };
+  const exploded: MenuItem = {
+    label: 'Exploded view',
+    key: 'E',
+    icon: Expand,
+    action: () => scene.toggleExplode(),
+  };
   const selectAll: MenuItem = {
     label: 'Select all',
     key: 'A',
@@ -134,6 +142,7 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
       first,
       [
         views,
+        exploded,
         { label: 'Fit all', key: 'Home', icon: Maximize, action: () => scene.setView('fit') },
       ],
     ];
@@ -203,7 +212,7 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
   });
   const sections = [edit, arrange];
   if (grouping.length) sections.push(grouping);
-  return [...sections, visibility, [addStock, selectAll, views]];
+  return [...sections, visibility, [addStock, selectAll, views, exploded]];
 }
 
 /** A title for the menu: the part's name, or how many parts are selected. */

@@ -273,6 +273,7 @@ export function wireKeyboard(
     else if (k === 'h') store.hideSelected();
     else if (k === 'm') scene.toggleMeasure();
     else if (k === 'f') scene.toggleFasten();
+    else if (k === 'e') scene.toggleExplode();
     else if (k === 'd') scene.toggleDims();
     else if (k === 'n') togglePanels('side');
     else if (k === 't') togglePanels('palette');

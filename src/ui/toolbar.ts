@@ -8,6 +8,7 @@ import {
   ArrowLeftRight,
   DraftingCompass,
   Drill,
+  Expand,
   Boxes,
   CircleHelp,
   Copy,
@@ -95,6 +96,10 @@ export function buildToolbar(
     () => scene.toggleFasten(),
   );
   scene.watchFasten((on) => fasten.classList.toggle('on', on));
+  const explode = iconButton(Expand, 'Exploded view (E): pull the parts apart to look', () =>
+    scene.toggleExplode(),
+  );
+  scene.watchExplode((v) => explode.classList.toggle('on', v > 0));
   const iso = viewButton('iso', 'Isometric view', () => scene.setView('iso'));
   const top = viewButton('top', 'Top view (7) · Ctrl for bottom', () => scene.setView('top'));
   const front = viewButton('front', 'Front view (1) · Ctrl for back', () => scene.setView('front'));
@@ -130,6 +135,7 @@ export function buildToolbar(
     dims,
     measure,
     fasten,
+    explode,
     spacer,
     iso,
     top,
