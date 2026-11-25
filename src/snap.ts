@@ -99,6 +99,30 @@ export function snapDelta(
   return snapWithHits(aabb, delta, axes, others, opts).delta;
 }
 
+/** A face of another box lying on the plane a hit snapped to. */
+export interface CoplanarFace {
+  other: number;
+  side: 'min' | 'max';
+}
+
+/**
+ * Every face of every other box on the plane a face hit snapped to, the hit's own face
+ * first. When a part lands in line with several pieces, all of them are in line.
+ */
+export function coplanarFaces(hit: SnapHit, others: readonly AABB[], eps = 1e-6): CoplanarFace[] {
+  if (hit.kind !== 'face') return [];
+  const out: CoplanarFace[] = [];
+  others.forEach((ob, other) => {
+    for (const side of ['min', 'max'] as const)
+      if (Math.abs(ob[side][hit.axis] - hit.at) <= eps) out.push({ other, side });
+  });
+  return out.sort(
+    (a, b) =>
+      Number(b.other === hit.other && b.side === hit.side) -
+      Number(a.other === hit.other && a.side === hit.side),
+  );
+}
+
 /** A rectangle in the snapped plane: `lo` and `hi` corners, equal along the snap axis. */
 export interface SnapQuad {
   axis: AxisIndex;
@@ -107,16 +131,18 @@ export interface SnapQuad {
 }
 
 /**
- * Where to draw the feedback for a hit: the other part's whole face for a face snap, the
- * moved box's footprint on the floor for a floor snap, nothing for the grid.
+ * Where to draw the feedback for a hit: every face on the snapped plane for a face snap,
+ * the moved box's footprint on the floor for a floor snap, nothing for the grid.
  */
-export function snapQuad(hit: SnapHit, moved: AABB, others: readonly AABB[]): SnapQuad | null {
-  if (hit.kind === 'grid') return null;
-  const src = hit.kind === 'floor' ? moved : others[hit.other!];
-  if (!src) return null;
-  const lo: Vec3 = [...src.min];
-  const hi: Vec3 = [...src.max];
-  lo[hit.axis] = hit.at;
-  hi[hit.axis] = hit.at;
-  return { axis: hit.axis, lo, hi };
+export function snapQuads(hit: SnapHit, moved: AABB, others: readonly AABB[]): SnapQuad[] {
+  if (hit.kind === 'grid') return [];
+  const quad = (src: AABB): SnapQuad => {
+    const lo: Vec3 = [...src.min];
+    const hi: Vec3 = [...src.max];
+    lo[hit.axis] = hit.at;
+    hi[hit.axis] = hit.at;
+    return { axis: hit.axis, lo, hi };
+  };
+  if (hit.kind === 'floor') return [quad(moved)];
+  return coplanarFaces(hit, others).map((f) => quad(others[f.other]!));
 }

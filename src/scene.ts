@@ -40,7 +40,7 @@ import { explodeOffsets, offsetAABB } from './explode';
 import { fastenerAt, fastenerLocal, fastenersKey, fastenersOf, type Fastener } from './fastener';
 import { buildMarkers, markerMesh, placeMarker } from './markers';
 import { measureBetween, measureText, nearestSnap, snapPoints } from './measure';
-import { snapQuad, snapWithHits, type SnapHit } from './snap';
+import { coplanarFaces, snapQuads, snapWithHits, type SnapHit } from './snap';
 import { stockById, type Stock } from './stock';
 import type { Store } from './store';
 import { fmt, parseLen } from './units';
@@ -322,31 +322,6 @@ export class LumberScene {
     this.snapDot.renderOrder = 992;
     this.snapDot.visible = false;
     this.scene.add(this.extentLines, this.measureLine, this.snapDot);
-    for (let i = 0; i < 3; i++) {
-      const pos = new THREE.BufferAttribute(new Float32Array(12), 3);
-      const fillGeo = new THREE.BufferGeometry()
-        .setAttribute('position', pos)
-        .setIndex([0, 1, 2, 0, 2, 3]);
-      const fill = new THREE.Mesh(
-        fillGeo,
-        new THREE.MeshBasicMaterial({
-          color: 0xffd27a,
-          transparent: true,
-          opacity: 0.3,
-          depthTest: false,
-          side: THREE.DoubleSide,
-        }),
-      );
-      const edge = new THREE.LineLoop(
-        new THREE.BufferGeometry().setAttribute('position', pos),
-        new THREE.LineBasicMaterial({ color: 0xffd27a, depthTest: false, transparent: true }),
-      );
-      fill.renderOrder = 985;
-      edge.renderOrder = 986;
-      fill.visible = edge.visible = false;
-      this.snapQuads.push({ fill, edge });
-      this.scene.add(fill, edge);
-    }
     this.measureLabel = document.createElement('div');
     this.measureLabel.className = 'measure-label';
     container.appendChild(this.measureLabel);
@@ -629,18 +604,30 @@ export class LumberScene {
     const plane = c?.kind === 'plane' && t.constraintKey ? `Shift+${t.constraintKey} ` : '';
     if (t.typed) return `${plane}${LABELS[this.typedAxis(t)]} ${t.typed}▏`;
     const axes = c?.kind === 'axis' ? [c.axis] : (c?.axes ?? []);
-    const snapped = t.snaps
-      .filter((h) => h.kind !== 'grid')
-      .map((h) =>
+    // Group the targets by relation: "against Leg LF, Leg RF · flush with Apron left".
+    const byRelation = new Map<string, string[]>();
+    for (const h of t.snaps) {
+      if (h.kind === 'grid') continue;
+      const pairs =
         h.kind === 'floor'
-          ? 'on the floor'
-          : `${h.mine === h.side ? 'flush with' : 'against'} ${t.otherNames[h.other!] ?? 'a part'}`,
-      );
-    const unique = [...new Set(snapped)];
+          ? [['on the floor', '']]
+          : coplanarFaces(h, t.others).map((f) => [
+              h.mine === f.side ? 'flush with' : 'against',
+              t.otherNames[f.other] ?? 'a part',
+            ]);
+      for (const [rel, name] of pairs as [string, string][]) {
+        const list = byRelation.get(rel) ?? [];
+        if (name && !list.includes(name)) list.push(name);
+        byRelation.set(rel, list);
+      }
+    }
+    const targets = [...byRelation]
+      .map(([rel, names]) => (names.length ? `${rel} ${names.join(', ')}` : rel))
+      .join(' · ');
     return (
       plane +
       axes.map((a) => `${LABELS[a]} ${t.delta[a] >= 0 ? '+' : ''}${fmt(t.delta[a])}`).join('  ') +
-      (unique.length ? `  · ${unique.join(', ')}` : '')
+      (targets ? `  · ${targets}` : '')
     );
   }
 
@@ -1235,25 +1222,56 @@ export class LumberScene {
     this.showSnaps(t);
   }
 
-  /** Lay a quad over each face (or floor footprint) the grab just snapped to. */
+  /** The i-th feedback quad, made on first use. */
+  private snapQuadAt(i: number): { fill: THREE.Mesh; edge: THREE.LineLoop } {
+    while (this.snapQuads.length <= i) {
+      const pos = new THREE.BufferAttribute(new Float32Array(12), 3);
+      const fillGeo = new THREE.BufferGeometry()
+        .setAttribute('position', pos)
+        .setIndex([0, 1, 2, 0, 2, 3]);
+      const fill = new THREE.Mesh(
+        fillGeo,
+        new THREE.MeshBasicMaterial({
+          color: 0xffd27a,
+          transparent: true,
+          opacity: 0.3,
+          depthTest: false,
+          side: THREE.DoubleSide,
+        }),
+      );
+      const edge = new THREE.LineLoop(
+        new THREE.BufferGeometry().setAttribute('position', pos),
+        new THREE.LineBasicMaterial({ color: 0xffd27a, depthTest: false, transparent: true }),
+      );
+      fill.renderOrder = 985;
+      edge.renderOrder = 986;
+      fill.visible = edge.visible = false;
+      this.snapQuads.push({ fill, edge });
+      this.scene.add(fill, edge);
+    }
+    return this.snapQuads[i]!;
+  }
+
+  /** Lay a quad over every face (or the floor footprint) the grab just snapped to. */
   private showSnaps(t: Transform): void {
     const moved: AABB = {
       min: [t.aabb.min[0] + t.delta[0], t.aabb.min[1] + t.delta[1], t.aabb.min[2] + t.delta[2]],
       max: [t.aabb.max[0] + t.delta[0], t.aabb.max[1] + t.delta[1], t.aabb.max[2] + t.delta[2]],
     };
-    const quads = t.snaps.map((h) => snapQuad(h, moved, t.others)).filter((q) => q !== null);
+    const quads = t.snaps.flatMap((h) => snapQuads(h, moved, t.others));
     const key = t.snaps
       .filter((h) => h.kind !== 'grid')
-      .map((h) => `${h.axis}:${h.kind}:${h.other ?? ''}:${h.side ?? ''}`)
+      .map((h) => `${h.axis}:${h.kind}:${h.at}`)
       .join('|');
     if (key !== this.snapKey) {
       this.snapKey = key;
       this.snapFlash = key ? 1 : 0;
     }
-    this.snapQuads.forEach(({ fill, edge }, i) => {
+    for (let i = 0; i < Math.max(quads.length, this.snapQuads.length); i++) {
+      const { fill, edge } = this.snapQuadAt(i);
       const q = quads[i];
       fill.visible = edge.visible = !!q;
-      if (!q) return;
+      if (!q) continue;
       const pos = fill.geometry.getAttribute('position') as THREE.BufferAttribute;
       // The two axes across the quad, in order, so the loop goes around the rectangle.
       const [u, v] = ([0, 1, 2] as AxisIndex[]).filter((a) => a !== q.axis) as [
@@ -1276,7 +1294,7 @@ export class LumberScene {
       pos.needsUpdate = true;
       fill.geometry.computeBoundingSphere();
       edge.geometry.computeBoundingSphere();
-    });
+    }
   }
   private hideSnaps(): void {
     for (const { fill, edge } of this.snapQuads) fill.visible = edge.visible = false;
