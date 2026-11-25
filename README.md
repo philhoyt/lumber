@@ -82,6 +82,7 @@ theme.
 | M                                  | Measure: click two points (snaps to corners, edges, faces); Esc           |
 | N, T, Tab                          | Toggle the side panel, the palette, both                                  |
 | Up / Down in a length field        | Step by the grid; Shift 1", Ctrl 1/16"                                    |
+| Arithmetic in a length field       | 48 - 3/4, (96 - 2 * 1.5) / 3, 2 ft + 3 1/2; a spaced slash divides        |
 | Arrows, PgUp / PgDn                | Nudge by the grid step                                                    |
 
 Groups are assemblies: clicking any part in the view selects the whole
@@ -94,7 +95,9 @@ and the eye to hide or show. Hovering a row highlights the part.
 You can also drag a part's body to slide it on the floor, or drag the gizmo's
 arrows and squares. Drag stock in from the left, or click it to add at the
 center. With several parts selected, the Align buttons make them flush or
-centred on any axis. Sizes accept fractions and feet.
+centred on any axis. Every length field takes fractions, feet and inches, millimetres,
+and arithmetic: `48 - 3/4`, `(96 - 2 * 1.5) / 3`, `2 ft + 3 1/2`. A slash with no spaces
+is a fraction (`3/4`, `1-1/2`); with spaces around it, it divides (`48 / 3`).
 
 The buy list shows board feet: each board stock lists the board feet in its parts
 and in what you buy, using the nominal size (2x4 is 2 × 4; the stock table has

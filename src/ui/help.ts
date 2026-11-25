@@ -20,7 +20,7 @@ const SECTIONS: [string, [string, string][]][] = [
       ['G', 'Grab: follows the mouse on the floor'],
       ['X / Y / Z while grabbing', 'Move along one axis'],
       ['Shift+X / Y / Z', 'Move in the plane without that axis'],
-      ['Type a length, Enter', "Move exactly that far (16, 3/4, 2'6)"],
+      ['Type a length, Enter', "Move exactly that far (16, 3/4, 2'6, 48 - 3/4)"],
       ['R then X / Y / Z', 'Quarter turn; Shift reverses; or drag a ring'],
       ['S then a length', 'Set the cut length'],
       ['Enter / click · Esc / right-click', 'Confirm · cancel'],
@@ -42,6 +42,7 @@ const SECTIONS: [string, [string, string][]][] = [
       ['Ctrl+Z / Ctrl+Shift+Z', 'Undo / redo'],
       ['Ctrl+S / Ctrl+O', 'Save / open'],
       ['Up / Down in a length field', 'Step by the grid; Shift 1", Ctrl 1/16"'],
+      ['Arithmetic in a length field', '48 - 3/4, (96 - 2 * 1.5) / 3, 2 ft + 3 1/2'],
     ],
   ],
   [

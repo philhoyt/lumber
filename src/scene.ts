@@ -1654,7 +1654,7 @@ export class LumberScene {
     } else if (t.kind === 'rotate' && (lower === 'x' || lower === 'y' || lower === 'z')) {
       this.turn(AXIS_NAMES.indexOf(lower) as AxisIndex, e.shiftKey ? -1 : 1);
     } else if (t.kind !== 'rotate' && k === 'Backspace') t.typed = t.typed.slice(0, -1);
-    else if (t.kind !== 'rotate' && k.length === 1 && /[\d./'" -]/.test(k)) t.typed += k;
+    else if (t.kind !== 'rotate' && k.length === 1 && /[\d./'" +*()-]/.test(k)) t.typed += k;
     else return;
     e.preventDefault();
     e.stopImmediatePropagation();
