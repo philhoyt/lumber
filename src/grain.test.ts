@@ -7,19 +7,19 @@ describe('packSheets with grain', () => {
   // A 4x8 sheet is 48 wide (SW) by 96 long (SL); grain runs the long way.
   it('turns a part either way when grain is free', () => {
     const [sheet] = packSheets([{ w: 40, l: 20, name: 'a', grain: 'any' }], 48, 96, 0);
-    const it = sheet!.shelves[0]!.items[0]!;
-    expect([it.a, it.b]).toEqual([40, 20]); // the long side runs along the sheet
+    const it = sheet!.items[0]!;
+    expect([it.a, it.b].sort((x, y) => x - y)).toEqual([20, 40]); // either way is allowed
   });
 
   it('keeps the length with the grain when asked', () => {
     const [sheet] = packSheets([{ w: 40, l: 20, name: 'a', grain: 'length' }], 48, 96, 0);
-    const it = sheet!.shelves[0]!.items[0]!;
+    const it = sheet!.items[0]!;
     expect([it.a, it.b]).toEqual([20, 40]); // the 20" length runs along the sheet
   });
 
   it('keeps the length across the grain when asked', () => {
     const [sheet] = packSheets([{ w: 20, l: 40, name: 'a', grain: 'width' }], 48, 96, 0);
-    const it = sheet!.shelves[0]!.items[0]!;
+    const it = sheet!.items[0]!;
     expect([it.a, it.b]).toEqual([20, 40]);
   });
 

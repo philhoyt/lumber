@@ -108,8 +108,8 @@ export class CutlistPanel {
           const H = SW * sc;
           let svg = `<svg viewBox="0 0 ${DIAGRAM_W} ${H + 2}"><rect x="0" y="1" width="${DIAGRAM_W}" height="${H}" fill="#3a3326" stroke="#555"/>`;
           let used = 0;
-          for (const shelf of sh.shelves)
-            for (const it of shelf.items) {
+          for (const it of sh.items) {
+            {
               used += it.a * it.b;
               svg += `<rect x="${it.x * sc}" y="${1 + it.y * sc}" width="${it.a * sc}" height="${it.b * sc}" fill="${hex(s.color)}" stroke="#1b1c1f" stroke-width="0.6"/>`;
               // Grain lines run the sheet's long way on stock that has grain.
@@ -120,15 +120,23 @@ export class CutlistPanel {
                 }
               svg += `<text x="${(it.x + it.a / 2) * sc}" y="${1 + (it.y + it.b / 2) * sc + 3.5}" ${LABEL}>${esc(fmt(it.b) + '×' + fmt(it.a))}</text>`;
             }
+          }
+          // The saw cuts in order, numbered at their midpoints.
+          sh.cuts.forEach((c, k) => {
+            svg += `<line x1="${c.x1 * sc}" y1="${1 + c.y1 * sc}" x2="${c.x2 * sc}" y2="${1 + c.y2 * sc}" stroke="#e8e6e1" stroke-width="0.8" stroke-dasharray="3 2"/>`;
+            const mx = ((c.x1 + c.x2) / 2) * sc;
+            const my = 1 + ((c.y1 + c.y2) / 2) * sc;
+            svg += `<circle cx="${mx}" cy="${my}" r="5" fill="#e8e6e1"/><text x="${mx}" y="${my + 2.6}" font-size="7" text-anchor="middle" fill="#1b1c1f" font-family="system-ui" font-weight="700">${k + 1}</text>`;
+          });
           svg += `</svg>`;
           const cap = sh.over
             ? `<span class="warn">${esc(sh.over.name)} does not fit on one sheet</span>`
-            : `${Math.round((used / (SW * SL)) * 100)}% used · shelf layout${s.grain === false ? ' · no grain' : ' · grain runs the long way'}`;
+            : `${Math.round((used / (SW * SL)) * 100)}% used · ${sh.cuts.length} cut${sh.cuts.length === 1 ? '' : 's'} in the numbered order${s.grain === false ? ' · no grain' : ' · grain runs the long way'}`;
           html += `<div class="bin">${svg}<div class="cap">${cap}</div></div>`;
         }
       }
     }
-    html += `<div class="total"><span>Estimated total</span><span>${money(total)}</span></div><div class="muted note">Prices are placeholders; edit them per stock. Board feet and sheet nesting with grain come later.</div>`;
+    html += `<div class="total"><span>Estimated total</span><span>${money(total)}</span></div><div class="muted note">Prices come from the stock table; edit them there or here. Board feet totals come later.</div>`;
     const restoreFocus = keepFocus(el);
     el.innerHTML = html;
     restoreFocus();

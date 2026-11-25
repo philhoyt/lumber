@@ -70,78 +70,144 @@ export interface PlacedItem extends SheetItem {
   /** Extent across the width. */
   b: number;
 }
-export interface Shelf {
-  y: number;
-  h: number;
-  /** Next free x. */
-  x: number;
-  items: PlacedItem[];
+/** One saw cut on a sheet, in sheet coordinates (x along the length, y across the width). */
+export interface SheetCut {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
 }
 export interface SheetBin {
-  shelves: Shelf[];
+  items: PlacedItem[];
+  /** The guillotine cuts in order: each runs edge to edge across the piece it splits. */
+  cuts: SheetCut[];
   /** An item that does not fit on a sheet at all. */
   over?: SheetItem;
 }
 
-/** Shelf packing. Shelves run along the sheet length (SL) and stack across its width (SW). */
+interface Free {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+interface Working {
+  free: Free[];
+  items: PlacedItem[];
+  cuts: SheetCut[];
+  over?: SheetItem;
+}
+
+const EPS = 1e-9;
+
+/** Orientations the grain allows, as [along the sheet length, across its width]. */
+function orientations(it: SheetItem): [number, number][] {
+  const along: [number, number] = [it.l, it.w]; // the part's length runs the sheet's long way
+  const across: [number, number] = [it.w, it.l];
+  const g = it.grain ?? 'any';
+  if (g === 'length') return [along];
+  if (g === 'width') return [across];
+  return [along, across];
+}
+
+/**
+ * Put one item on a sheet: the free rectangle and orientation with the least leftover on
+ * the short side (best short side fit), then split the rectangle edge to edge the way
+ * that keeps the larger remainder. Returns false when nothing fits.
+ */
+function place(sh: Working, it: SheetItem, kerf: number): boolean {
+  let best: { i: number; a: number; b: number; score: [number, number] } | null = null;
+  sh.free.forEach((r, i) => {
+    for (const [a, b] of orientations(it)) {
+      if (a > r.w + EPS || b > r.h + EPS) continue;
+      const score: [number, number] = [Math.min(r.w - a, r.h - b), Math.max(r.w - a, r.h - b)];
+      if (
+        !best ||
+        score[0] < best.score[0] ||
+        (score[0] === best.score[0] && score[1] < best.score[1])
+      )
+        best = { i, a, b, score };
+    }
+  });
+  if (!best) return false;
+  const { i, a, b } = best;
+  const r = sh.free[i]!;
+  sh.free.splice(i, 1);
+  sh.items.push({ ...it, x: r.x, y: r.y, a, b });
+  const right = r.w - a - kerf; // room left along the length
+  const top = r.h - b - kerf; // room left across the width
+  // Split the whole rectangle either across its width (keeping a full-width strip above)
+  // or along its length (keeping a full-height strip beside); keep the larger remainder.
+  const splitAcross = top * r.w >= right * r.h;
+  const pushFree = (f: Free) => {
+    if (f.w > EPS && f.h > EPS) sh.free.push(f);
+  };
+  const cut = (x1: number, y1: number, x2: number, y2: number) => {
+    if (Math.abs(x2 - x1) > EPS || Math.abs(y2 - y1) > EPS) sh.cuts.push({ x1, y1, x2, y2 });
+  };
+  if (splitAcross) {
+    // First cut: across the piece at the top of the item (if anything is above it).
+    if (top > EPS) cut(r.x, r.y + b + kerf / 2, r.x + r.w, r.y + b + kerf / 2);
+    // Second: separate the item from what is beside it in its strip.
+    if (right > EPS) cut(r.x + a + kerf / 2, r.y, r.x + a + kerf / 2, r.y + b);
+    pushFree({ x: r.x + a + kerf, y: r.y, w: right, h: b });
+    pushFree({ x: r.x, y: r.y + b + kerf, w: r.w, h: top });
+  } else {
+    if (right > EPS) cut(r.x + a + kerf / 2, r.y, r.x + a + kerf / 2, r.y + r.h);
+    if (top > EPS) cut(r.x, r.y + b + kerf / 2, r.x + a, r.y + b + kerf / 2);
+    pushFree({ x: r.x + a + kerf, y: r.y, w: right, h: r.h });
+    pushFree({ x: r.x, y: r.y + b + kerf, w: a, h: top });
+  }
+  return true;
+}
+
+function packOnce(items: readonly SheetItem[], SW: number, SL: number, kerf: number): Working[] {
+  const sheets: Working[] = [];
+  for (const it of items) {
+    if (!orientations(it).some(([a, b]) => a <= SL + EPS && b <= SW + EPS)) {
+      sheets.push({ free: [], items: [], cuts: [], over: it });
+      continue;
+    }
+    if (sheets.some((sh) => !sh.over && place(sh, it, kerf))) continue;
+    const sh: Working = { free: [{ x: 0, y: 0, w: SL, h: SW }], items: [], cuts: [] };
+    place(sh, it, kerf);
+    sheets.push(sh);
+  }
+  return sheets;
+}
+
+const ORDERS: ((a: SheetItem, b: SheetItem) => number)[] = [
+  (a, b) => b.w * b.l - a.w * a.l, // biggest first
+  (a, b) => Math.max(b.w, b.l) - Math.max(a.w, a.l), // longest side first
+  (a, b) => Math.min(b.w, b.l) - Math.min(a.w, a.l), // widest first
+];
+
+/**
+ * Guillotine nesting: every cut runs edge to edge across the piece it splits, as on a
+ * table saw or track saw. Three part orders are tried and the best kept: fewest sheets,
+ * then the most free area left on the last sheet.
+ */
 export function packSheets(
   items: readonly SheetItem[],
   SW: number,
   SL: number,
   kerf: number,
 ): SheetBin[] {
-  const sheets: SheetBin[] = [];
-  const sorted = [...items].sort((a, b) => Math.min(b.w, b.l) - Math.min(a.w, a.l));
-  /** Orientation [along length, across width] that fits a shelf of height h (or a new shelf). */
-  /** Orientations the grain allows, as [along the sheet length, across its width], best first. */
-  const options = (it: SheetItem): [number, number][] => {
-    const along: [number, number] = [it.l, it.w]; // the part's length runs the sheet's long way
-    const across: [number, number] = [it.w, it.l];
-    const g = it.grain ?? 'any';
-    if (g === 'length') return [along];
-    if (g === 'width') return [across];
-    return it.l >= it.w ? [along, across] : [across, along];
-  };
-  const orient = (it: SheetItem, h: number | null): [number, number] | null => {
-    for (const o of options(it)) if (o[0] <= SL + 1e-9 && o[1] <= (h ?? SW) + 1e-9) return o;
-    return null;
-  };
-  for (const it of sorted) {
-    let placed = false;
-    for (const sh of sheets) {
-      for (const shelf of sh.shelves) {
-        const o = orient(it, shelf.h);
-        const gap = shelf.items.length ? kerf : 0;
-        if (o && shelf.x + gap + o[0] <= SL + 1e-9) {
-          shelf.x += gap;
-          shelf.items.push({ ...it, x: shelf.x, y: shelf.y, a: o[0], b: o[1] });
-          shelf.x += o[0];
-          placed = true;
-          break;
-        }
-      }
-      if (placed) break;
-      const o = orient(it, null);
-      if (!o) break;
-      const last = sh.shelves[sh.shelves.length - 1];
-      const y = last ? last.y + last.h + kerf : 0;
-      if (y + o[1] <= SW + 1e-9) {
-        sh.shelves.push({ y, h: o[1], x: o[0], items: [{ ...it, x: 0, y, a: o[0], b: o[1] }] });
-        placed = true;
-        break;
-      }
+  let best: Working[] | null = null;
+  let bestKey: [number, number] | null = null;
+  for (const order of ORDERS) {
+    const result = packOnce([...items].sort(order), SW, SL, kerf);
+    const last = [...result].reverse().find((sh) => !sh.over);
+    const leftover = last ? last.free.reduce((sum, f) => sum + f.w * f.h, 0) : 0;
+    const key: [number, number] = [result.length, -leftover];
+    if (!bestKey || key[0] < bestKey[0] || (key[0] === bestKey[0] && key[1] < bestKey[1])) {
+      best = result;
+      bestKey = key;
     }
-    if (placed) continue;
-    const o = orient(it, null);
-    if (!o) {
-      sheets.push({ shelves: [], over: it });
-      continue;
-    }
-    sheets.push({
-      shelves: [{ y: 0, h: o[1], x: o[0], items: [{ ...it, x: 0, y: 0, a: o[0], b: o[1] }] }],
-    });
   }
-  return sheets;
+  return (best ?? []).map(({ items: its, cuts, over }) =>
+    over ? { items: [], cuts: [], over } : { items: its, cuts },
+  );
 }
 
 export interface CutRow {

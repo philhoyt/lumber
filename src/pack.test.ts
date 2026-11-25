@@ -62,13 +62,13 @@ describe('packSheets', () => {
       0,
     );
     expect(sheets).toHaveLength(1);
-    expect(sheets[0]!.shelves[0]!.items).toHaveLength(2);
+    expect(sheets[0]!.items).toHaveLength(2);
   });
 
   it('places a full-width part by rotating it to run along the length', () => {
     const sheets = packSheets([{ w: 96, l: 48, name: 'a' }], 48, 96, KERF);
     expect(sheets).toHaveLength(1);
-    const it = sheets[0]!.shelves[0]!.items[0]!;
+    const it = sheets[0]!.items[0]!;
     expect(it.a).toBe(96);
     expect(it.b).toBe(48);
   });
@@ -92,11 +92,10 @@ describe('packSheets', () => {
       { w: 15, l: 15 },
     ].map((r, i) => ({ ...r, name: `${i}` }));
     for (const sh of packSheets(items, 48, 96, KERF))
-      for (const shelf of sh.shelves)
-        for (const it of shelf.items) {
-          expect(it.x + it.a).toBeLessThanOrEqual(96 + 1e-9);
-          expect(it.y + it.b).toBeLessThanOrEqual(48 + 1e-9);
-        }
+      for (const it of sh.items) {
+        expect(it.x + it.a).toBeLessThanOrEqual(96 + 1e-9);
+        expect(it.y + it.b).toBeLessThanOrEqual(48 + 1e-9);
+      }
   });
 
   it('flags a part larger than the sheet', () => {
