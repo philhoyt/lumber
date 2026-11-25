@@ -3,6 +3,8 @@ import { defineConfig, devices } from '@playwright/test';
 /** End-to-end tests drive the real app in Chromium against the Vite dev server. */
 export default defineConfig({
   testDir: 'e2e',
+  // Each test boots the whole app with WebGL; under parallel workers that takes a while.
+  timeout: 60_000,
   fullyParallel: true,
   // CI can pass --retries=2 --reporter=github on the command line.
   reporter: 'list',

@@ -179,3 +179,80 @@ test('assembly steps walk the build in the order the Part panel sets', async ({ 
   await page.locator('#bUndo').click();
   await expect(page.locator('#pStep')).toHaveValue('');
 });
+
+test('D labels every part and shows the selection extents', async ({ page }) => {
+  await openBench(page);
+  await hoverView(page);
+  await page.keyboard.press('d');
+  const shown = page.locator('.dim-label:not(.extent)').filter({ visible: true });
+  await expect(shown).toHaveCount(12);
+  await expect(shown.first()).toContainText('"');
+  await selectPart(page, 'Leg LF');
+  await expect(page.locator('.dim-label.extent').filter({ visible: true })).toHaveCount(3);
+  await expect(page.locator('.dim-label.extent').filter({ hasText: /^H/ })).toContainText(
+    '33 1/4"',
+  );
+  await expect(shown).toHaveCount(11); // the part label already names the selected one
+  await hoverView(page);
+  await page.keyboard.press('d');
+  await expect(page.locator('.dim-label').filter({ visible: true })).toHaveCount(0);
+});
+
+test('M measures between two snapped points', async ({ page }) => {
+  await openBench(page);
+  const v = await hoverView(page);
+  await page.keyboard.press('m');
+  await expect(page.locator('#viewport')).toHaveCSS('cursor', 'crosshair');
+  // Two points on the bench top: the readout gives the distance and its axis parts.
+  await page.mouse.click(v.x + v.w * 0.41, v.y + v.h * 0.37);
+  await page.mouse.click(v.x + v.w * 0.55, v.y + v.h * 0.39);
+  const label = page.locator('.measure-label');
+  await expect(label).toBeVisible();
+  await expect(label).toContainText('ΔX');
+  await expect(label).toContainText('"');
+  await page.keyboard.press('Escape');
+  await expect(label).toBeHidden();
+  await expect(page.locator('#viewport')).toHaveCSS('cursor', 'auto');
+});
+
+test('F places a fastener marker on a face and lists it as hardware', async ({ page }) => {
+  await openBench(page);
+  const v = await hoverView(page);
+  await page.keyboard.press('f');
+  const bar = page.locator('.fasten-bar');
+  await expect(bar).toBeVisible();
+  await page.mouse.click(v.x + v.w * 0.48, v.y + v.h * 0.37); // the bench top
+  await expect(page.locator('#bUndo')).toBeEnabled();
+  await page.keyboard.press('Escape');
+  await expect(bar).toBeHidden();
+  await page.locator('[data-tab="cut"]').click();
+  await expect(page.locator('#cutBody')).toContainText('Hardware');
+  await expect(page.locator('#cutBody')).toContainText('screw');
+  await page.locator('#bUndo').click();
+  await expect(page.locator('#bUndo')).toBeDisabled();
+});
+
+test('E explodes the view, which is look-only, and collapses again', async ({ page }) => {
+  await openBench(page);
+  await selectPart(page, 'Leg LF');
+  const before = await page.locator('#pX').inputValue();
+  await hoverView(page);
+  await page.keyboard.press('e');
+  const bar = page.locator('.explode-bar:not(.assembly-bar)');
+  await expect(bar).toBeVisible();
+  await expect(bar).toContainText('Looking only');
+  // A grab does not start while exploded: no readout, no move cursor, nothing to undo.
+  await page.keyboard.press('g');
+  await expect(page.locator('.drag-label')).toBeHidden();
+  await expect(page.locator('#viewport')).not.toHaveCSS('cursor', 'move');
+  await expect(page.locator('#pX')).toHaveValue(before);
+  await expect(page.locator('#bUndo')).toBeDisabled();
+  await bar.locator('#explodeDone').click();
+  await expect(bar).toBeHidden();
+  // The slider's amount is remembered: E again explodes to the same amount.
+  await page.keyboard.press('e');
+  await expect(bar).toBeVisible();
+  await expect(bar.locator('#explodeAmt')).toHaveValue('50');
+  await page.keyboard.press('e');
+  await expect(bar).toBeHidden();
+});
