@@ -1,6 +1,33 @@
 import { Ray, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
-import { axisParam } from './gizmo';
+import { axisParam, ringAngle } from './gizmo';
+
+describe('ringAngle', () => {
+  const origin = new Vector3(0, 0, 0);
+  const down = new Vector3(0, 0, -1);
+
+  it('measures right-handed about Z from +X', () => {
+    expect(ringAngle(origin, 2, new Ray(new Vector3(5, 0, 10), down))).toBeCloseTo(0);
+    expect(ringAngle(origin, 2, new Ray(new Vector3(0, 5, 10), down))).toBeCloseTo(Math.PI / 2);
+    expect(ringAngle(origin, 2, new Ray(new Vector3(-5, 0, 10), down))).toBeCloseTo(Math.PI);
+  });
+
+  it('measures about X from +Y toward +Z', () => {
+    const toward = new Vector3(-1, 0, 0);
+    expect(ringAngle(origin, 0, new Ray(new Vector3(10, 5, 0), toward))).toBeCloseTo(0);
+    expect(ringAngle(origin, 0, new Ray(new Vector3(10, 0, 5), toward))).toBeCloseTo(Math.PI / 2);
+  });
+
+  it('is measured from the origin', () => {
+    expect(ringAngle(new Vector3(5, 0, 0), 2, new Ray(new Vector3(5, 3, 10), down))).toBeCloseTo(
+      Math.PI / 2,
+    );
+  });
+
+  it('returns null for a ray parallel to the plane', () => {
+    expect(ringAngle(origin, 2, new Ray(new Vector3(0, 0, 10), new Vector3(1, 0, 0)))).toBeNull();
+  });
+});
 
 describe('axisParam', () => {
   const origin = new Vector3(0, 0, 0);

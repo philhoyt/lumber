@@ -30,6 +30,94 @@ export function axisParam(origin: THREE.Vector3, dir: THREE.Vector3, ray: THREE.
   return (b * e - d) / denom;
 }
 
+/**
+ * Angle, in radians, of the point where a ray meets the plane through `origin` that is
+ * perpendicular to `axis`, measured right-handed about that axis. This is how a ring
+ * drag turns the mouse position into a rotation. Returns null when the ray misses.
+ */
+export function ringAngle(origin: THREE.Vector3, axis: AxisIndex, ray: THREE.Ray): number | null {
+  const n = AXIS_DIRS[axis];
+  const u = AXIS_DIRS[(axis + 1) % 3]!;
+  const v = AXIS_DIRS[(axis + 2) % 3]!;
+  const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(n, origin);
+  const pt = new THREE.Vector3();
+  if (!ray.intersectPlane(plane, pt)) return null;
+  pt.sub(origin);
+  return Math.atan2(pt.dot(v), pt.dot(u));
+}
+
+/** Three rings for the rotate mode: drag one to turn about its axis, snapping to quarter turns. */
+export class RotateGizmo {
+  readonly group = new THREE.Group();
+  private axes = new Map<THREE.Object3D, AxisIndex>();
+  private pickables: THREE.Object3D[] = [];
+  private visuals = new Map<THREE.Object3D, THREE.MeshBasicMaterial>();
+  private hovered: THREE.Object3D | null = null;
+
+  constructor() {
+    this.group.visible = false;
+    for (let a = 0; a < 3; a++) {
+      const axis = a as AxisIndex;
+      const m = new THREE.MeshBasicMaterial({
+        color: AXIS_COLORS[axis],
+        transparent: true,
+        opacity: 0.9,
+        depthTest: false,
+        depthWrite: false,
+      });
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.018, 8, 64), m);
+      const pick = new THREE.Mesh(
+        new THREE.TorusGeometry(1, 0.16, 6, 48),
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+      );
+      const g = new THREE.Group();
+      g.add(ring, pick);
+      // A torus lies in the XY plane (about Z); turn it to its axis.
+      if (axis === 0) g.rotation.y = Math.PI / 2;
+      if (axis === 1) g.rotation.x = Math.PI / 2;
+      ring.renderOrder = 1000;
+      pick.renderOrder = 1000;
+      this.axes.set(pick, axis);
+      this.pickables.push(pick);
+      this.visuals.set(pick, m);
+      this.group.add(g);
+    }
+  }
+
+  update(origin: THREE.Vector3 | null, camera: THREE.PerspectiveCamera): void {
+    if (!origin) {
+      this.group.visible = false;
+      return;
+    }
+    this.group.visible = true;
+    this.group.position.copy(origin);
+    const s = camera.position.distanceTo(origin) * 0.16;
+    this.group.scale.set(s, s, s);
+  }
+
+  pick(ray: THREE.Raycaster): { object: THREE.Object3D; axis: AxisIndex } | null {
+    if (!this.group.visible) return null;
+    const hit = ray.intersectObjects(this.pickables, false)[0];
+    if (!hit) return null;
+    return { object: hit.object, axis: this.axes.get(hit.object)! };
+  }
+
+  setHover(o: THREE.Object3D | null): void {
+    if (o === this.hovered) return;
+    if (this.hovered) {
+      const v = this.visuals.get(this.hovered)!;
+      v.opacity = 0.9;
+      v.color.set(AXIS_COLORS[this.axes.get(this.hovered)!]);
+    }
+    this.hovered = o;
+    if (o) {
+      const v = this.visuals.get(o)!;
+      v.opacity = 1;
+      v.color.set(0xffe08a);
+    }
+  }
+}
+
 export class Gizmo {
   readonly group = new THREE.Group();
   private handles = new Map<THREE.Object3D, Handle>();

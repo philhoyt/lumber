@@ -13,7 +13,7 @@
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { axisParam, Gizmo } from './gizmo';
+import { axisParam, Gizmo, ringAngle, RotateGizmo } from './gizmo';
 import {
   aabbCenter,
   partAABB,
@@ -54,6 +54,20 @@ interface Transform {
   delta: Vec3;
   /** Digits typed during the transform, applied on Enter. */
   typed: string;
+  /** A ring being dragged in rotate mode. */
+  ring: RingDrag | null;
+  /** Quarter turns applied so far in rotate mode, per axis, for the readout. */
+  turns: Vec3;
+}
+
+interface RingDrag {
+  axis: AxisIndex;
+  /** Angle at the start of the drag and the last unwrapped angle, radians. */
+  start: number;
+  last: number;
+  /** Quarter turns applied by this drag so far. */
+  applied: number;
+  moved: boolean;
 }
 
 interface BoxSelect {
@@ -76,6 +90,8 @@ const EDGE_COLORS: Record<MeshState, number> = {
 };
 const EMISSIVE: Record<MeshState, number> = { normal: 0, hover: 0x2a2416, selected: 0x1e4b73 };
 const LABELS = ['X', 'Y', 'Z'] as const;
+/** Quarter turns as a signed count in -1..2, so three turns read as -90°. */
+const signedTurns = (n: number): number => ((((n + 1) % 4) + 4) % 4) - 1;
 const Z_UP = new THREE.Vector3(0, 0, 1);
 const VIEW_DIRS: Record<Exclude<ViewName, 'fit' | 'selected'>, THREE.Vector3> = {
   iso: new THREE.Vector3(1, -1, 0.8),
@@ -101,6 +117,7 @@ export class LumberScene {
     selected: new THREE.LineBasicMaterial({ color: EDGE_COLORS.selected }),
   };
   private gizmo = new Gizmo();
+  private rotateGizmo = new RotateGizmo();
   private ray = new THREE.Raycaster();
   private ndc = new THREE.Vector2();
   private tf: Transform | null = null;
@@ -162,7 +179,7 @@ export class LumberScene {
     const axes = new THREE.AxesHelper(12);
     axes.position.z = 0.02;
     this.scene.add(axes);
-    this.scene.add(this.partsGroup, this.gizmo.group);
+    this.scene.add(this.partsGroup, this.gizmo.group, this.rotateGizmo.group);
 
     new ResizeObserver(() => this.resize()).observe(container);
     this.resize();
@@ -270,7 +287,10 @@ export class LumberScene {
   private animate = (): void => {
     requestAnimationFrame(this.animate);
     this.controls.update();
-    this.gizmo.update(this.selectionCenter(), this.camera);
+    const center = this.selectionCenter();
+    const rotating = this.tf?.kind === 'rotate';
+    this.gizmo.update(rotating ? null : center, this.camera);
+    this.rotateGizmo.update(rotating ? center : null, this.camera);
     this.renderer.render(this.scene, this.camera);
     this.updateLabels();
   };
@@ -314,7 +334,13 @@ export class LumberScene {
   }
 
   private transformText(t: Transform): string {
-    if (t.kind === 'rotate') return 'Rotate: X / Y / Z (Shift reverses) · Enter';
+    if (t.kind === 'rotate') {
+      const done = ([0, 1, 2] as AxisIndex[])
+        .filter((a) => t.turns[a])
+        .map((a) => `${LABELS[a]} ${signedTurns(t.turns[a]) * 90}°`)
+        .join('  ');
+      return done || 'Rotate: drag a ring, or X / Y / Z (Shift reverses) · Enter';
+    }
     if (t.kind === 'size') return `Length: ${t.typed}▏`;
     const c = t.constraint;
     const plane = c?.kind === 'plane' && t.constraintKey ? `Shift+${t.constraintKey} ` : '';
@@ -410,9 +436,57 @@ export class LumberScene {
       moved: modal,
       delta: [0, 0, 0],
       typed: '',
+      ring: null,
+      turns: [0, 0, 0],
     };
-    if (modal) this.container.style.cursor = 'move';
+    if (modal) this.container.style.cursor = kind === 'rotate' ? '' : 'move';
     return this.tf;
+  }
+
+  /** Turn the selection quarter turns about an axis during rotate mode, keeping the readout. */
+  private turn(axis: AxisIndex, turns: number): void {
+    const t = this.tf;
+    if (!t || t.kind !== 'rotate' || !turns) return;
+    rotateParts(this.store.selectedParts(), AXIS_NAMES[axis]!, turns);
+    t.turns[axis] = ((((t.turns[axis] + turns) % 4) + 4) % 4) as number;
+    t.moved = true;
+    this.syncAll();
+    this.store.notify('drag');
+  }
+
+  private beginRingDrag(axis: AxisIndex): void {
+    const t = this.tf;
+    if (!t || t.kind !== 'rotate') return;
+    const a = ringAngle(t.origin, axis, this.currentRay());
+    if (a === null) return;
+    t.ring = { axis, start: a, last: a, applied: 0, moved: false };
+  }
+
+  private updateRingDrag(): void {
+    const t = this.tf;
+    const r = t?.ring;
+    if (!t || !r) return;
+    const a = ringAngle(t.origin, r.axis, this.currentRay());
+    if (a === null) return;
+    // Unwrap so a drag past ±180° keeps counting in the same direction.
+    let d = a - r.last;
+    if (d > Math.PI) d -= 2 * Math.PI;
+    if (d < -Math.PI) d += 2 * Math.PI;
+    r.last += d;
+    const want = Math.round((r.last - r.start) / (Math.PI / 2));
+    if (want !== r.applied) {
+      this.turn(r.axis, want - r.applied);
+      r.applied = want;
+    }
+  }
+
+  private endRingDrag(): void {
+    const t = this.tf;
+    const r = t?.ring;
+    if (!t || !r) return;
+    // A click on a ring, with no drag to speak of, is one quarter turn.
+    if (!r.moved && r.applied === 0) this.turn(r.axis, 1);
+    t.ring = null;
   }
 
   /** G: grab the selection so it follows the pointer until confirmed. */
@@ -551,6 +625,16 @@ export class LumberScene {
   private onPointerDown(e: PointerEvent): void {
     this.lastPointer = [e.clientX, e.clientY];
     if (this.tf?.modal) {
+      if (e.button === 0 && this.tf.kind === 'rotate') {
+        this.setRay(e.clientX, e.clientY);
+        const rh = this.rotateGizmo.pick(this.ray);
+        if (rh) {
+          this.downPos = [e.clientX, e.clientY];
+          this.beginRingDrag(rh.axis);
+          this.capture(e);
+          return;
+        }
+      }
       if (e.button === 0) this.finishTransform(true);
       else if (e.button === 2) this.finishTransform(false);
       return;
@@ -612,6 +696,19 @@ export class LumberScene {
     this.lastPointer = [e.clientX, e.clientY];
     const t = this.tf;
     if (t) {
+      if (t.kind === 'rotate') {
+        if (t.ring) {
+          if (!t.ring.moved && this.downPos)
+            t.ring.moved = Math.hypot(e.clientX - this.downPos[0], e.clientY - this.downPos[1]) > 4;
+          if (t.ring.moved) this.updateRingDrag();
+        } else {
+          this.setRay(e.clientX, e.clientY);
+          const rh = this.rotateGizmo.pick(this.ray);
+          this.rotateGizmo.setHover(rh?.object ?? null);
+          this.container.style.cursor = rh ? 'grab' : '';
+        }
+        return;
+      }
       if (t.kind !== 'grab') return;
       if (!t.moved && this.downPos)
         t.moved = Math.hypot(e.clientX - this.downPos[0], e.clientY - this.downPos[1]) > 2;
@@ -635,7 +732,8 @@ export class LumberScene {
   }
 
   private onPointerUp(e: PointerEvent): void {
-    if (this.tf && !this.tf.modal) this.finishTransform(true);
+    if (this.tf?.ring) this.endRingDrag();
+    else if (this.tf && !this.tf.modal) this.finishTransform(true);
     else if (this.box) {
       const b = this.box;
       this.box = null;
@@ -686,10 +784,7 @@ export class LumberScene {
       this.setConstraint(key === t.constraintKey ? '' : key);
       this.updateGrab();
     } else if (t.kind === 'rotate' && (lower === 'x' || lower === 'y' || lower === 'z')) {
-      rotateParts(this.store.selectedParts(), lower, e.shiftKey ? -1 : 1);
-      t.moved = true;
-      this.syncAll();
-      this.store.notify('drag');
+      this.turn(AXIS_NAMES.indexOf(lower) as AxisIndex, e.shiftKey ? -1 : 1);
     } else if (t.kind !== 'rotate' && k === 'Backspace') t.typed = t.typed.slice(0, -1);
     else if (t.kind !== 'rotate' && k.length === 1 && /[\d./'" -]/.test(k)) t.typed += k;
     else return;
