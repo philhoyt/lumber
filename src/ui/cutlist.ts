@@ -4,6 +4,7 @@ import { stockById } from '../stock';
 import type { Store } from '../store';
 import { fmt, fmtFt, money, parseLen } from '../units';
 import { esc, hex } from './dom';
+import { keepFocus } from './fields';
 
 const DIAGRAM_W = 300;
 const BAR_H = 14;
@@ -31,7 +32,7 @@ export class CutlistPanel {
     for (const r of cutRows(parts))
       html += `<tr><td>${esc(r.stock.name)}</td><td>${r.stock.sheet ? fmt(r.w) + ' × ' : ''}${fmt(r.len)}</td><td class="r">${r.qty}</td><td class="muted names">${esc(r.names.join(', '))}</td></tr>`;
     html += `</table>`;
-    html += `<h2 class="buy-head">Buy list <span>kerf <input class="price" id="kerfIn" value="${fmt(settings.kerf)}"></span></h2>`;
+    html += `<h2 class="buy-head">Buy list <span>kerf <input class="price len" data-min="0" id="kerfIn" value="${fmt(settings.kerf)}"></span></h2>`;
 
     let total = 0;
     for (const [stockId, list] of partsByStock(parts)) {
@@ -99,7 +100,9 @@ export class CutlistPanel {
       }
     }
     html += `<div class="total"><span>Estimated total</span><span>${money(total)}</span></div><div class="muted note">Prices are placeholders; edit them per stock. Board feet and sheet nesting with grain come later.</div>`;
+    const restoreFocus = keepFocus(el);
     el.innerHTML = html;
+    restoreFocus();
 
     el.querySelectorAll<HTMLSelectElement>('.lenSel').forEach((sel) =>
       sel.addEventListener('change', () => {

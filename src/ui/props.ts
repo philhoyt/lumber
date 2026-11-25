@@ -4,6 +4,7 @@ import { STOCK, stockById } from '../stock';
 import type { Store } from '../store';
 import { fmt, parseLen } from '../units';
 import { esc, onChange, onClick } from './dom';
+import { keepFocus } from './fields';
 
 export class PropsPanel {
   constructor(
@@ -38,16 +39,16 @@ export class PropsPanel {
       html += `<h2>Part</h2>
         <div class="row"><div><label class="small">Name</label><input type="text" id="pName" value="${esc(p.name)}"></div>
         <div><label class="small">Stock</label><select id="pStock">${options}</select></div></div>
-        <div class="row"><div><label class="small">Length (S)</label><input type="text" id="pLen" value="${fmt(p.len)}"></div>
+        <div class="row"><div><label class="small">Length (S)</label><input type="text" class="len" data-min="0.0625" id="pLen" value="${fmt(p.len)}"></div>
         ${
           s.sheet
-            ? `<div><label class="small">Width</label><input type="text" id="pW" value="${fmt(p.w ?? s.sheet[0])}"></div>`
+            ? `<div><label class="small">Width</label><input type="text" class="len" data-min="0.0625" id="pW" value="${fmt(p.w ?? s.sheet[0])}"></div>`
             : `<div><label class="small">Section</label><div class="static">${fmt(s.t)} × ${fmt(s.w ?? 0)}</div></div>`
         }</div>`;
     } else {
       html += `<h2>${list.length} parts</h2>`;
     }
-    html += `<div class="row"><div><label class="small">X (left)</label><input type="text" id="pX" value="${fmt(u.min[0])}"></div><div><label class="small">Y (front)</label><input type="text" id="pY" value="${fmt(u.min[1])}"></div><div><label class="small">Z (bottom)</label><input type="text" id="pZ" value="${fmt(u.min[2])}"></div></div>
+    html += `<div class="row"><div><label class="small">X (left)</label><input type="text" class="len" id="pX" value="${fmt(u.min[0])}"></div><div><label class="small">Y (front)</label><input type="text" class="len" id="pY" value="${fmt(u.min[1])}"></div><div><label class="small">Z (bottom)</label><input type="text" class="len" id="pZ" value="${fmt(u.min[2])}"></div></div>
       <div class="muted footprint">Footprint ${fmt(size[0])} × ${fmt(size[1])}, height ${fmt(size[2])}</div>
       <label class="small">Rotate 90° (R, then axis)</label>
       <div class="row btns"><button id="bRotX" title="R X">About X</button><button id="bRotY" title="R Y">About Y</button><button id="bRotZ" title="R Z">About Z</button></div>
@@ -61,8 +62,10 @@ export class PropsPanel {
       <div class="row btns align">${btn(2, 'min', 'Bottom', 'Flush on the bottom (min Z)')}${btn(2, 'center', 'Center Z', 'Centre on Z')}${btn(2, 'max', 'Top', 'Flush on top (max Z)')}</div>`;
     }
     html += `<div class="row"><div><label class="small">Array along</label><select id="arrAxis"><option value="x">X</option><option value="y">Y</option><option value="z">Z</option></select></div>
-        <div><label class="small">Count</label><input type="number" id="arrN" value="4" min="2" step="1"></div><div><label class="small">On center</label><input type="text" id="arrS" value="16"></div><div class="grow0"><button id="bArr">Array</button></div></div>${hiddenNote}`;
+        <div><label class="small">Count</label><input type="number" id="arrN" value="4" min="2" step="1"></div><div><label class="small">On center</label><input type="text" class="len" data-min="0.0625" id="arrS" value="16"></div><div class="grow0"><button id="bArr">Array</button></div></div>${hiddenNote}`;
+    const restoreFocus = keepFocus(el);
     el.innerHTML = html;
+    restoreFocus();
 
     if (list.length === 1) {
       const p = list[0]!;
