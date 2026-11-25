@@ -73,10 +73,13 @@ theme.
 | Middle-drag, Shift+middle, wheel   | Orbit, pan, zoom (right-drag also pans)                                   |
 | Alt+drag                           | Orbit without a middle button; Shift+Alt pans, Ctrl+Alt zooms             |
 | Trackpad switch (header)           | Two-finger drag orbits, pinch zooms, Shift+two-finger pans                |
+| Corner gizmo                       | Click an axis to look along it, again for the other side; drag orbits     |
 | Numpad 1 / 3 / 7, with Ctrl        | Front / right / top, back / left / bottom (top-row digits too)            |
+| Numpad 9                           | Look from the opposite side                                               |
 | Numpad 5                           | Perspective or orthographic; axis views are ortho, orbiting returns       |
 | E                                  | Exploded view: pull the parts apart to look; slider sets how far          |
-| Numpad 2 / 4 / 6 / 8               | Orbit in 15° steps                                                        |
+| Numpad 2 / 4 / 6 / 8, with Ctrl    | Orbit in 15° steps, pan                                                   |
+| Numpad + / -                       | Zoom in, out                                                              |
 | Numpad . , Home                    | Frame the selection, fit the model                                        |
 | D                                  | Dimension labels on every part and the selection's W × D × H              |
 | M                                  | Measure: click two points (snaps to corners, edges, faces); Esc           |

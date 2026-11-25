@@ -1358,3 +1358,83 @@ svg.drawing text {
     color: #000;
   }
 }
+
+/* ---- navigation gizmo (top-right of the view) ---- */
+.nav-gizmo {
+  --nav-back: rgba(20, 22, 26, 0.9);
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+}
+:root[data-theme='light'] .nav-gizmo {
+  --nav-back: rgba(236, 235, 230, 0.95);
+}
+.nav-ball {
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+.nav-ball:active {
+  cursor: grabbing;
+}
+.nav-disc {
+  fill: var(--text);
+  fill-opacity: 0;
+  transition: fill-opacity 0.12s;
+}
+.nav-ball:hover .nav-disc {
+  fill-opacity: 0.12;
+}
+.nav-handle line {
+  stroke-width: 2;
+}
+.nav-handle circle {
+  stroke-width: 1.5;
+}
+.nav-handle.far {
+  opacity: 0.55;
+}
+.nav-handle.hot circle {
+  stroke: var(--text);
+  stroke-width: 2;
+}
+.nav-handle text {
+  font:
+    700 10px/1 system-ui,
+    sans-serif;
+  fill: #111;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+.nav-handle.neg text {
+  fill: var(--text);
+}
+.nav-gizmo button {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: var(--nav-back);
+  color: var(--text);
+  opacity: 0.85;
+  cursor: grab;
+  touch-action: none;
+}
+.nav-gizmo button:hover,
+.nav-gizmo button.dragging {
+  opacity: 1;
+  border-color: var(--line);
+}
+.nav-gizmo button.dragging {
+  cursor: grabbing;
+}

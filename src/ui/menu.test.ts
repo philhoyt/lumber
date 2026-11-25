@@ -8,6 +8,7 @@ const actions = (): MenuActions => ({
   beginSize: vi.fn(),
   duplicateAndGrab: vi.fn(),
   setView: vi.fn(),
+  flipView: vi.fn(),
   toggleFasten: vi.fn(),
   toggleExplode: vi.fn(),
 });

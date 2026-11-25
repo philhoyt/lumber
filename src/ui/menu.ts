@@ -47,6 +47,7 @@ export interface MenuActions {
   beginSize(): void;
   duplicateAndGrab(): void;
   setView(name: ViewName): void;
+  flipView(): void;
   toggleFasten(): void;
   toggleExplode(): void;
 }
@@ -104,11 +105,14 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
   const views: MenuItem = {
     label: 'View',
     icon: Camera,
-    children: VIEWS.map(([name, label, key]) => ({
-      label,
-      key,
-      action: () => scene.setView(name),
-    })),
+    children: [
+      ...VIEWS.map(([name, label, key]) => ({
+        label,
+        key,
+        action: () => scene.setView(name),
+      })),
+      { label: 'Opposite side', key: '9', action: () => scene.flipView() },
+    ],
   };
   const exploded: MenuItem = {
     label: 'Exploded view',

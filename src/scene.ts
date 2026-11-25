@@ -188,6 +188,8 @@ export class LumberScene {
   private skipAutoPersp = false;
   /** Called when the projection changes, for the view strip. */
   onProjectionChange: ((mode: Projection) => void) | null = null;
+  private cameraWatchers: (() => void)[] = [];
+  private cameraKey = '';
   private controls: OrbitControls;
   /** Trackpad mode: two-finger scroll orbits, pinch zooms, Shift+scroll pans. Remembered per browser. */
   private trackpadOn = false;
@@ -565,6 +567,7 @@ export class LumberScene {
   private animate = (): void => {
     requestAnimationFrame(this.animate);
     this.controls.update();
+    this.noteCamera();
     const center = this.selectionCenter();
     const rotating = this.tf?.kind === 'rotate';
     const vh = center ? this.viewHeightAt(center) : 0;
@@ -581,6 +584,30 @@ export class LumberScene {
     this.updateDims();
     this.updateMeasure();
   };
+
+  /** Tell the camera watchers when the view has turned or changed projection. */
+  private noteCamera(): void {
+    const q = this.camera.quaternion;
+    const key = `${q.x.toFixed(4)},${q.y.toFixed(4)},${q.z.toFixed(4)},${q.w.toFixed(4)},${this.projection}`;
+    if (key === this.cameraKey) return;
+    this.cameraKey = key;
+    for (const fn of this.cameraWatchers) fn();
+  }
+  /** Called whenever the camera turns or switches projection; for the corner gizmo. */
+  watchCamera(fn: () => void): void {
+    this.cameraWatchers.push(fn);
+  }
+  /** The world axes in camera space: x right, y up, z toward the viewer. */
+  cameraAxes(): [Vec3, Vec3, Vec3] {
+    const inv = this.camera.quaternion.clone().invert();
+    const to = (x: number, y: number, z: number): Vec3 =>
+      new THREE.Vector3(x, y, z).applyQuaternion(inv).toArray() as Vec3;
+    return [to(1, 0, 0), to(0, 1, 0), to(0, 0, 1)];
+  }
+  /** The unit vector from the model to the camera. */
+  viewDir(): Vec3 {
+    return this.camera.position.clone().sub(this.controls.target).normalize().toArray() as Vec3;
+  }
 
   private selectionCenter(): THREE.Vector3 | null {
     const list = this.store.selectedParts();
@@ -1026,6 +1053,22 @@ export class LumberScene {
     this.skipAutoPersp = false;
   }
 
+  /** Blender's Numpad 9: look from the opposite side, a half turn about the up axis. */
+  flipView(): void {
+    const dir = this.viewDir();
+    if (Math.abs(dir[2]) > 0.999) this.setView(dir[2] > 0 ? 'bottom' : 'top');
+    else this.orbitStep(180, 0);
+  }
+  /** Blender's Numpad + and -: a step closer or farther. */
+  zoomStep(inward: boolean): void {
+    this.dolly(inward ? 1 / 1.25 : 1.25);
+  }
+  /** Blender's Ctrl+Numpad 2/4/6/8: slide the view by an eighth of its height. */
+  panStep(dx: number, dy: number): void {
+    const step = (this.container.clientHeight || 400) / 8;
+    this.panPixels(dx * step, dy * step);
+  }
+
   // ---- trackpad gestures ----
   get trackpad(): boolean {
     return this.trackpadOn;
@@ -1052,7 +1095,7 @@ export class LumberScene {
     }
   }
   /** Orbit by degrees as a free orbit does: an axis ortho view drops back to perspective. */
-  private orbitFree(az: number, el: number): void {
+  orbitFree(az: number, el: number): void {
     const offset = this.camera.position.clone().sub(this.controls.target);
     if (az) offset.applyAxisAngle(Z_UP, (az * Math.PI) / 180);
     if (el) {
@@ -1067,8 +1110,8 @@ export class LumberScene {
     this.camera.position.copy(this.controls.target).add(offset);
     this.controls.update();
   }
-  /** Slide the view by screen pixels. */
-  private panPixels(dx: number, dy: number): void {
+  /** Slide the view by screen pixels: the camera moves right by `dx` and up by `dy`. */
+  panPixels(dx: number, dy: number): void {
     const h = this.container.clientHeight || 1;
     const perPx = this.viewHeightAt(this.controls.target) / h;
     const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrix, 0);
@@ -1081,7 +1124,7 @@ export class LumberScene {
     this.skipAutoPersp = false;
   }
   /** Move toward or away from the target by a factor; an ortho view changes its zoom instead. */
-  private dolly(scale: number): void {
+  dolly(scale: number): void {
     if (this.camera instanceof THREE.OrthographicCamera) {
       this.camera.zoom = Math.min(
         this.controls.maxZoom,
