@@ -1,21 +1,32 @@
 # Lumber
 
-Build it from the stock you buy. A single-page 3D planner for projects made of
-construction lumber and sheet goods: drag a 2x4 or a sheet of plywood into the
-scene, cut it to length, snap it against the other parts, and read the cut list,
-board and sheet layouts, and a cost estimate off the side panel as you go.
+Build it from the stock you buy. A 3D planner for projects made of construction
+lumber and sheet goods: drag a 2x4 or a sheet of plywood into the scene, cut it
+to length, snap it against the other parts, and read the cut list, board and
+sheet layouts, and a cost estimate off the side panel as you go.
 
 Every part is a piece of stock, so there is no geometry kernel. The model is a
-list of boxes.
+list of boxes. See [ARCHITECTURE.md](ARCHITECTURE.md) for how it is put together.
 
 ## Run it
 
-It is one file, `lumber.html`, loading three.js from a CDN. Open it through any
-static server, for example:
+Needs Node 20 or later.
 
-    python -m http.server 8765
+    npm install
+    npm run dev          # http://localhost:5173
 
-then visit http://localhost:8765/lumber.html.
+`npm run build` writes a static site to `dist/` that runs from any file host,
+with three.js bundled in so it works offline.
+
+## Develop
+
+    npm run check        # typecheck, lint, format check, tests
+    npm run test:watch   # tests on save
+    npm run format       # apply Prettier
+
+Enable the pre-commit hook once per clone so `check` runs before every commit:
+
+    git config core.hooksPath .githooks
 
 ## Controls
 

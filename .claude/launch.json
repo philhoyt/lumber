@@ -3,9 +3,9 @@
   "configurations": [
     {
       "name": "lumber",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8765", "--bind", "127.0.0.1", "--directory", "C:\\Users\\Phil\\Documents\\Projects\\Lumber"],
-      "port": 8765
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5173
     }
   ]
 }

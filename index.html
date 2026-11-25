@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Lumber — build it from the stock you buy</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>Lumber<span>.</span></h1>
+        <button id="bNew" title="Start over">New</button>
+        <button id="bOpen" title="Open a saved .json">Open</button>
+        <button id="bSave" title="Download the model as .json">Save</button>
+        <input id="fileIn" type="file" accept=".json,application/json" hidden />
+        <span class="sep"></span>
+        <button id="bUndo" title="Ctrl+Z">Undo</button>
+        <button id="bRedo" title="Ctrl+Y">Redo</button>
+        <span class="sep"></span>
+        <label class="small" for="gridSel">Grid</label>
+        <select id="gridSel">
+          <option value="0">off</option>
+          <option value="0.0625">1/16"</option>
+          <option value="0.125">1/8"</option>
+          <option value="0.25">1/4"</option>
+          <option value="0.5" selected>1/2"</option>
+          <option value="1">1"</option>
+          <option value="12">12"</option>
+        </select>
+        <label class="small" for="snapChk">Snap to parts</label>
+        <input id="snapChk" type="checkbox" checked />
+        <span class="spacer"></span>
+        <button id="bFocus" title="Hide or show the side panels (Tab)">Panels</button>
+        <button id="bSample" title="Load the sample workbench">Sample</button>
+        <button id="bCsv" title="Download the cut list as CSV">CSV</button>
+        <button id="bPrint" title="Print the cut list and buy list">Print</button>
+      </header>
+
+      <aside id="palette">
+        <h2>Boards</h2>
+        <div id="boards"></div>
+        <h2>Sheets</h2>
+        <div id="sheets"></div>
+        <p class="hint">Drag a stock onto the scene, or click it to add one at the center.</p>
+      </aside>
+
+      <main id="viewport">
+        <div id="hint">
+          Left-drag part: move · Shift+drag: move up/down · Ctrl+click: multi-select<br />
+          R / T / F: rotate 90° about up / side / front · Arrows &amp; PgUp/PgDn: nudge · Ctrl+D:
+          duplicate · Del: delete<br />
+          Empty space: left-drag orbit · right-drag pan · wheel zoom · Tab: hide panels
+        </div>
+      </main>
+
+      <aside id="side">
+        <div id="props"></div>
+        <div id="cutlist">
+          <h2>Cut list</h2>
+          <div id="cutBody"></div>
+        </div>
+      </aside>
+
+      <footer>
+        <span id="stat">0 parts</span>
+        <span>Overall: <b id="overall">—</b></span>
+        <span class="spacer"></span>
+        <span>Autosaves in this browser.</span>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
