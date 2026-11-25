@@ -16,6 +16,8 @@ export interface Stock {
   lengths?: number[];
   /** Full sheet size [width, length], inches. Sheets only. */
   sheet?: [number, number];
+  /** Sheets only: false for stock with no grain to respect (MDF, OSB). Default true. */
+  grain?: boolean;
   /** Price per piece. */
   price: number;
   /** Display colour, 0xRRGGBB. */
@@ -66,8 +68,24 @@ export const DEFAULT_STOCK: readonly Stock[] = [
   { id: 'ply34', name: '3/4" plywood', t: 0.75, sheet: [48, 96], price: 55, color: PLY },
   { id: 'ply12', name: '1/2" plywood', t: 0.5, sheet: [48, 96], price: 40, color: PLY },
   { id: 'ply14', name: '1/4" plywood', t: 0.25, sheet: [48, 96], price: 25, color: PLY },
-  { id: 'osb', name: '7/16" OSB', t: 0.4375, sheet: [48, 96], price: 18, color: 0xc9a978 },
-  { id: 'mdf34', name: '3/4" MDF', t: 0.75, sheet: [49, 97], price: 45, color: 0xb9a27f },
+  {
+    id: 'osb',
+    name: '7/16" OSB',
+    t: 0.4375,
+    sheet: [48, 96],
+    grain: false,
+    price: 18,
+    color: 0xc9a978,
+  },
+  {
+    id: 'mdf34',
+    name: '3/4" MDF',
+    t: 0.75,
+    sheet: [49, 97],
+    grain: false,
+    price: 45,
+    color: 0xb9a27f,
+  },
 ];
 
 /** @deprecated The defaults; the live library is `getStock()`. */
@@ -136,8 +154,10 @@ export function sanitizeStock(list: unknown): Stock[] | null {
       price: typeof x.price === 'number' ? x.price : 0,
       color: typeof x.color === 'number' ? x.color : 0xcfa872,
     };
-    if (sheet) s.sheet = sheet;
-    else {
+    if (sheet) {
+      s.sheet = sheet;
+      if (x.grain === false) s.grain = false;
+    } else {
       s.w = x.w;
       s.lengths = lengths && lengths.length ? lengths : [96];
     }

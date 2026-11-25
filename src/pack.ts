@@ -3,7 +3,7 @@
  * lengths; sheets pack by shelves (rows of parts across the sheet). Both are simple on
  * purpose: good enough to buy the right amount, and easy to check by hand.
  */
-import { miterOf, shortLength, type Part } from './model';
+import { grainOf, miterOf, shortLength, type Grain, type Part } from './model';
 import { getStock, stockById, stockWidth, type Stock } from './stock';
 import { r32 } from './units';
 
@@ -48,6 +48,8 @@ export interface SheetItem {
   w: number;
   l: number;
   name: string;
+  /** How the part's length may run relative to the sheet's length. */
+  grain?: Grain;
 }
 export interface PlacedItem extends SheetItem {
   /** Position along the sheet's length. */
@@ -82,10 +84,17 @@ export function packSheets(
   const sheets: SheetBin[] = [];
   const sorted = [...items].sort((a, b) => Math.min(b.w, b.l) - Math.min(a.w, a.l));
   /** Orientation [along length, across width] that fits a shelf of height h (or a new shelf). */
+  /** Orientations the grain allows, as [along the sheet length, across its width], best first. */
+  const options = (it: SheetItem): [number, number][] => {
+    const along: [number, number] = [it.l, it.w]; // the part's length runs the sheet's long way
+    const across: [number, number] = [it.w, it.l];
+    const g = it.grain ?? 'any';
+    if (g === 'length') return [along];
+    if (g === 'width') return [across];
+    return it.l >= it.w ? [along, across] : [across, along];
+  };
   const orient = (it: SheetItem, h: number | null): [number, number] | null => {
-    const o1: [number, number] = [Math.max(it.w, it.l), Math.min(it.w, it.l)];
-    const o2: [number, number] = [o1[1], o1[0]];
-    for (const o of [o1, o2]) if (o[0] <= SL + 1e-9 && o[1] <= (h ?? SW) + 1e-9) return o;
+    for (const o of options(it)) if (o[0] <= SL + 1e-9 && o[1] <= (h ?? SW) + 1e-9) return o;
     return null;
   };
   for (const it of sorted) {
@@ -133,6 +142,8 @@ export interface CutRow {
   w: number;
   /** Miter angles at each end, 0/0 for square. */
   miter: [number, number];
+  /** Sheet parts: how the length runs relative to the grain. */
+  grain: Grain;
   /** Short-point length when mitered, else the length. */
   short: number;
   qty: number;
@@ -152,10 +163,20 @@ export function cutRows(parts: readonly Part[]): CutRow[] {
     const len = r32(p.len);
     const w = r32(stockWidth(s, p.w));
     const miter = miterOf(p);
-    const key = `${p.stock}|${len}|${w}|${miter.join('/')}`;
+    const grain: Grain = s.sheet && s.grain !== false ? grainOf(p) : 'any';
+    const key = `${p.stock}|${len}|${w}|${miter.join('/')}|${grain}`;
     let r = map.get(key);
     if (!r) {
-      r = { stock: s, len, w, miter, short: r32(shortLength(len, w, miter)), qty: 0, names: [] };
+      r = {
+        stock: s,
+        len,
+        w,
+        miter,
+        grain,
+        short: r32(shortLength(len, w, miter)),
+        qty: 0,
+        names: [],
+      };
       map.set(key, r);
     }
     r.qty++;

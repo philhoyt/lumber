@@ -71,9 +71,9 @@ export class StockEditor {
     let html = `<h3>Boards</h3><table class="stock-table"><tr><th></th><th>Name</th><th>Thick</th><th>Wide</th><th>Sold as</th><th>Price</th><th></th></tr>`;
     for (const s of boards)
       html += `<tr>${common(s)}<td>${len(s.id, 't', s.t)}</td><td>${len(s.id, 'w', s.w ?? 0)}</td><td><input type="text" id="st-${s.id}-lengths" value="${esc((s.lengths ?? []).map(fmtFt).join(', '))}" title="Purchase lengths, e.g. 8 ft, 10 ft, 12 ft"></td>${tail(s)}</tr>`;
-    html += `</table><h3>Sheets</h3><table class="stock-table"><tr><th></th><th>Name</th><th>Thick</th><th>Wide</th><th>Long</th><th>Price</th><th></th></tr>`;
+    html += `</table><h3>Sheets</h3><table class="stock-table"><tr><th></th><th>Name</th><th>Thick</th><th>Wide</th><th>Long</th><th title="Untick for MDF, OSB and other stock with no grain to respect">Grain</th><th>Price</th><th></th></tr>`;
     for (const s of sheets)
-      html += `<tr>${common(s)}<td>${len(s.id, 't', s.t)}</td><td>${len(s.id, 'sw', s.sheet![0], 1)}</td><td>${len(s.id, 'sl', s.sheet![1], 1)}</td>${tail(s)}</tr>`;
+      html += `<tr>${common(s)}<td>${len(s.id, 't', s.t)}</td><td>${len(s.id, 'sw', s.sheet![0], 1)}</td><td>${len(s.id, 'sl', s.sheet![1], 1)}</td><td><input type="checkbox" id="st-${s.id}-grain"${s.grain === false ? '' : ' checked'}></td>${tail(s)}</tr>`;
     html += `</table>`;
     body.innerHTML = html;
     body.querySelectorAll<HTMLButtonElement>('[data-del]').forEach((b) => {
@@ -85,7 +85,7 @@ export class StockEditor {
 
   private onChange = (e: Event): void => {
     const el = e.target as HTMLInputElement;
-    const m = /^st-(.+)-(name|color|t|w|sw|sl|lengths|price)$/.exec(el.id);
+    const m = /^st-(.+)-(name|color|t|w|sw|sl|lengths|price|grain)$/.exec(el.id);
     if (!m) return;
     const [, id, field] = m;
     const s = this.store.stock.find((x) => x.id === id);
@@ -131,6 +131,9 @@ export class StockEditor {
         else this.render();
         break;
       }
+      case 'grain':
+        this.store.updateStock(id!, { grain: el.checked ? undefined : false });
+        break;
       case 'price': {
         const v = parseFloat(el.value);
         if (!isNaN(v) && v >= 0) this.store.updateStock(id!, { price: v });

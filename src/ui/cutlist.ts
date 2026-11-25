@@ -1,5 +1,6 @@
 /** The cut list and buy list panel, with cutting diagrams and a cost estimate. */
 import { cutRows, packBoards, packSheets, partsByStock } from '../pack';
+import { grainOf } from '../model';
 import { stockById } from '../stock';
 import type { Store } from '../store';
 import { fmt, fmtFt, fmtSheet, money, parseLen } from '../units';
@@ -31,8 +32,14 @@ export class CutlistPanel {
     let html = `<table><tr><th>Stock</th><th>Cut</th><th class="r">Qty</th><th>Parts</th></tr>`;
     for (const r of cutRows(parts)) {
       const mitered = r.miter[0] !== 0 || r.miter[1] !== 0;
+      const grainMark =
+        r.grain === 'length'
+          ? ' <span class="muted" title="Length runs with the grain">∥ grain</span>'
+          : r.grain === 'width'
+            ? ' <span class="muted" title="Length runs across the grain">⊥ grain</span>'
+            : '';
       const cut = r.stock.sheet
-        ? `${fmt(r.w)} × ${fmt(r.len)}`
+        ? `${fmt(r.w)} × ${fmt(r.len)}${grainMark}`
         : mitered
           ? `${fmt(r.len)} <span class="muted">long · ${fmt(r.short)} short · ${angleText(r.miter)}</span>`
           : fmt(r.len);
@@ -80,7 +87,12 @@ export class CutlistPanel {
       } else {
         const [SW, SL] = s.sheet;
         const sheets = packSheets(
-          list.map((p) => ({ w: p.w ?? SW, l: p.len, name: p.name })),
+          list.map((p) => ({
+            w: p.w ?? SW,
+            l: p.len,
+            name: p.name,
+            grain: s.grain === false ? 'any' : grainOf(p),
+          })),
           SW,
           SL,
           settings.kerf,
@@ -96,12 +108,19 @@ export class CutlistPanel {
           for (const shelf of sh.shelves)
             for (const it of shelf.items) {
               used += it.a * it.b;
-              svg += `<rect x="${it.x * sc}" y="${1 + it.y * sc}" width="${it.a * sc}" height="${it.b * sc}" fill="${hex(s.color)}" stroke="#1b1c1f" stroke-width="0.6"/><text x="${(it.x + it.a / 2) * sc}" y="${1 + (it.y + it.b / 2) * sc + 3.5}" ${LABEL}>${esc(fmt(it.b) + '×' + fmt(it.a))}</text>`;
+              svg += `<rect x="${it.x * sc}" y="${1 + it.y * sc}" width="${it.a * sc}" height="${it.b * sc}" fill="${hex(s.color)}" stroke="#1b1c1f" stroke-width="0.6"/>`;
+              // Grain lines run the sheet's long way on stock that has grain.
+              if (s.grain !== false)
+                for (let k = 1; k <= 3; k++) {
+                  const y = 1 + (it.y + (it.b * k) / 4) * sc;
+                  svg += `<line x1="${(it.x + 1) * sc}" y1="${y}" x2="${(it.x + it.a - 1) * sc}" y2="${y}" stroke="rgba(0,0,0,.18)" stroke-width="0.6"/>`;
+                }
+              svg += `<text x="${(it.x + it.a / 2) * sc}" y="${1 + (it.y + it.b / 2) * sc + 3.5}" ${LABEL}>${esc(fmt(it.b) + '×' + fmt(it.a))}</text>`;
             }
           svg += `</svg>`;
           const cap = sh.over
             ? `<span class="warn">${esc(sh.over.name)} does not fit on one sheet</span>`
-            : `${Math.round((used / (SW * SL)) * 100)}% used · shelf layout, no grain direction yet`;
+            : `${Math.round((used / (SW * SL)) * 100)}% used · shelf layout${s.grain === false ? ' · no grain' : ' · grain runs the long way'}`;
           html += `<div class="bin">${svg}<div class="cap">${cap}</div></div>`;
         }
       }
@@ -150,6 +169,7 @@ export function cutListCsv(store: Store): string {
       'Short point',
       'Miter A',
       'Miter B',
+      'Grain',
       'Qty',
     ],
   ];
@@ -163,6 +183,7 @@ export function cutListCsv(store: Store): string {
       r.short,
       r.miter[0],
       r.miter[1],
+      r.grain,
       r.qty,
     ]);
   return rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');

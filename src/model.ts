@@ -42,7 +42,17 @@ export interface Part {
    * edge, negative on the −Y edge. `len` stays the long-point length.
    */
   miter?: [number, number];
+  /**
+   * Sheet parts: which way the part's length must run relative to the sheet's grain,
+   * which runs along a plywood sheet's long side. Unset means either way is fine.
+   */
+  grain?: Grain;
 }
+
+/** 'length': the part's length runs with the grain; 'width': across it; 'any': either. */
+export type Grain = 'any' | 'length' | 'width';
+export const GRAINS: Grain[] = ['any', 'length', 'width'];
+export const grainOf = (p: Part): Grain => p.grain ?? 'any';
 
 export const MAX_MITER = 75;
 

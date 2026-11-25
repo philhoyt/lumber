@@ -6,6 +6,8 @@ import { ChevronDown, ChevronRight } from 'lucide';
 import {
   aabbSize,
   clampMiter,
+  grainOf,
+  GRAINS,
   miterOf,
   unionAABB,
   withMinKept,
@@ -97,6 +99,15 @@ export class PropsPanel {
             ? `<div><label class="small">Width</label><input type="text" class="len" data-min="0.0625" id="pW" value="${fmt(p.w ?? s.sheet[0])}"></div>`
             : `<div><label class="small">Section</label><div class="static">${fmt(s.t)} × ${fmt(s.w ?? 0)}</div></div>`
         }</div>`;
+      if (s.sheet && s.grain !== false) {
+        const labels: Record<string, string> = {
+          any: 'Either way',
+          length: 'Along the length',
+          width: 'Across the length',
+        };
+        part += `<div class="row"><div><label class="small">Grain</label><select id="pGrain">${GRAINS.map((g) => `<option value="${g}"${g === grainOf(p) ? ' selected' : ''}>${labels[g]}</option>`).join('')}</select></div></div>
+        <div class="muted note">Plywood grain runs the long way of the sheet. The nesting only turns the part the way you allow.</div>`;
+      }
       if (!s.sheet) {
         const [ma, mb] = miterOf(p);
         part += `<div class="row"><div><label class="small">Miter A (−X end)</label><input type="number" id="pMiterA" value="${ma}" min="-75" max="75" step="0.5"></div><div><label class="small">Miter B (+X end)</label><input type="number" id="pMiterB" value="${mb}" min="-75" max="75" step="0.5"></div></div>
@@ -266,6 +277,12 @@ export class PropsPanel {
           else p.miter = m;
         });
       };
+      onChange(el, 'pGrain', (i) =>
+        store.mutate(() => {
+          if (i.value === 'any') delete p.grain;
+          else p.grain = i.value as (typeof GRAINS)[number];
+        }),
+      );
       onChange(el, 'pMiterA', (i) => setMiter(0, i.value));
       onChange(el, 'pMiterB', (i) => setMiter(1, i.value));
     }

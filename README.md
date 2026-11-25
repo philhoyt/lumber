@@ -81,6 +81,12 @@ arrows and squares. Drag stock in from the left, or click it to add at the
 center. With several parts selected, the Align buttons make them flush or
 centred on any axis. Sizes accept fractions and feet.
 
+Sheet parts can be told which way their length runs relative to the grain
+(Either way, Along the length, Across the length). The sheet nesting only
+turns a part the way you allow, the cut list marks the direction, and the
+diagrams draw grain lines the long way of the sheet. MDF and OSB have no grain,
+which the stock table's Grain tick controls.
+
 Boards can have a miter at each end: two angle fields in the Part section,
 degrees from square, cut across the width, positive for a short point on the
 back edge. The length stays long point to long point; the cut list prints the

@@ -22,7 +22,9 @@ import {
   type AxisIndex,
   type Group,
   type Part,
+  type Grain,
   type Vec3,
+  GRAINS,
   MAX_MITER,
 } from './model';
 
@@ -605,6 +607,8 @@ export function parseDocument(o: unknown): Document | null {
       x.q.length !== 4
     )
       return null;
+    if (x.grain !== undefined && !GRAINS.includes(x.grain as Grain)) delete x.grain;
+    if (x.grain === 'any') delete x.grain;
     // Miters must be a pair of angles within range; anything else reads as square.
     if (x.miter !== undefined) {
       const m = x.miter as unknown;
