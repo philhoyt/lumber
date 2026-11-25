@@ -126,7 +126,10 @@ export function wireKeyboard(store: Store, scene: LumberScene, extras: KeyboardE
     else if (mod && k === 's') saveModel(store);
     else if (mod && k === 'o') $('bOpen').click();
     else if (mod && k === 'd') store.duplicateSelected();
-    else if (mod && e.code === 'Space') togglePanels('both');
+    else if (mod && k === 'g') {
+      if (e.shiftKey) store.ungroupSelected();
+      else store.groupSelected();
+    } else if (mod && e.code === 'Space') togglePanels('both');
     else if (e.shiftKey && k === 'd') scene.duplicateAndGrab();
     else if (e.shiftKey && k === 'a') extras.addMenu();
     else if (e.altKey && k === 'a') store.select([]);

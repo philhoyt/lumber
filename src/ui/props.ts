@@ -46,13 +46,25 @@ export class PropsPanel {
             : `<div><label class="small">Section</label><div class="static">${fmt(s.t)} × ${fmt(s.w ?? 0)}</div></div>`
         }</div>`;
     } else {
-      html += `<h2>${list.length} parts</h2>`;
+      const g = store.selectedGroup();
+      html += g
+        ? `<h2>${esc(g.name)} <span class="count">· ${list.length} parts</span></h2>`
+        : `<h2>${list.length} parts</h2>`;
+    }
+    const inGroup = list.some((p) => p.group !== undefined);
+    const groupBtns =
+      (list.length > 1 && !store.selectedGroup()
+        ? `<button id="bGroup" title="Ctrl+G">Group</button>`
+        : '') + (inGroup ? `<button id="bUngroup" title="Ctrl+Shift+G">Ungroup</button>` : '');
+    if (list.length === 1 && inGroup) {
+      const g = store.groupById(list[0]!.group!);
+      html += `<div class="muted note">In ${esc(g?.name ?? 'a group')} · click the part in the view to select the whole group</div>`;
     }
     html += `<div class="row"><div><label class="small">X (left)</label><input type="text" class="len" id="pX" value="${fmt(u.min[0])}"></div><div><label class="small">Y (front)</label><input type="text" class="len" id="pY" value="${fmt(u.min[1])}"></div><div><label class="small">Z (bottom)</label><input type="text" class="len" id="pZ" value="${fmt(u.min[2])}"></div></div>
       <div class="muted footprint">Footprint ${fmt(size[0])} × ${fmt(size[1])}, height ${fmt(size[2])}</div>
       <label class="small">Rotate 90° (R, then axis)</label>
       <div class="row btns"><button id="bRotX" title="R X">About X</button><button id="bRotY" title="R Y">About Y</button><button id="bRotZ" title="R Z">About Z</button></div>
-      <div class="row btns"><button id="bDrop" title="Alt+G: rest on the floor or the parts below">Drop</button><button id="bDup" title="Shift+D, or Ctrl+D for an offset copy">Duplicate</button><button id="bHide" title="H">Hide</button><button id="bDel" class="danger" title="X or Delete">Delete</button></div>`;
+      <div class="row btns"><button id="bDrop" title="Alt+G: rest on the floor or the parts below">Drop</button><button id="bDup" title="Shift+D, or Ctrl+D for an offset copy">Duplicate</button>${groupBtns}<button id="bHide" title="H">Hide</button><button id="bDel" class="danger" title="X or Delete">Delete</button></div>`;
     if (list.length > 1) {
       const btn = (axis: number, mode: string, label: string, title: string) =>
         `<button data-align="${axis}:${mode}" title="${title}">${label}</button>`;
@@ -109,6 +121,8 @@ export class PropsPanel {
     onClick(el, 'bRotZ', () => store.rotateSelected('z'));
     onClick(el, 'bDrop', () => store.dropSelected());
     onClick(el, 'bHide', () => store.hideSelected());
+    onClick(el, 'bGroup', () => store.groupSelected());
+    onClick(el, 'bUngroup', () => store.ungroupSelected());
     el.querySelectorAll<HTMLButtonElement>('[data-align]').forEach((b) =>
       b.addEventListener('click', () => {
         const [axis, mode] = b.dataset.align!.split(':');

@@ -46,6 +46,8 @@ right, −Y is the front, Z is up.
 | S then a length, Enter             | Set the cut length                                                  |
 | Shift+A                            | Add stock at the pointer                                            |
 | Shift+D                            | Duplicate and grab the copy; Ctrl+D duplicates with an offset       |
+| Ctrl+G, Ctrl+Shift+G               | Group the selection into an assembly, ungroup                       |
+| Double-click a part                | Select just that part inside its group                              |
 | Alt+G                              | Drop onto the floor or the parts beneath                            |
 | H, Alt+H                           | Hide the selection, show everything                                 |
 | X or Delete                        | Delete                                                              |
@@ -60,7 +62,10 @@ right, −Y is the front, Z is up.
 | Up / Down in a length field        | Step by the grid; Shift 1", Ctrl 1/16"                              |
 | Arrows, PgUp / PgDn                | Nudge by the grid step                                              |
 
-The Parts list at the top of the side panel shows every part grouped by
+Groups are assemblies: clicking any part in the view selects the whole
+group, double-click picks the single part, groups nest, and duplicating a
+whole group makes a new group. The Parts list shows groups as expandable
+nodes, then loose parts grouped by
 stock: click to select, Shift+click to extend, double-click (or F2) to rename,
 and the eye to hide or show. Hovering a row highlights the part.
 

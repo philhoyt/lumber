@@ -32,11 +32,21 @@ export interface Part {
   name: string;
   /** Hidden parts are not drawn or picked but stay in the cut list. */
   hidden?: boolean;
+  /** The group this part belongs to, if any. */
+  group?: number;
 }
 
 export interface AABB {
   min: Vec3;
   max: Vec3;
+}
+
+/** An assembly of parts (and of other groups). A part belongs to at most one group. */
+export interface Group {
+  id: number;
+  name: string;
+  /** The enclosing group, for nested assemblies. */
+  parent?: number;
 }
 
 const AX: Record<Axis, Vector3> = {

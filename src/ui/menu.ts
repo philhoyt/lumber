@@ -7,6 +7,7 @@ import {
   type IconNode,
   AlignHorizontalJustifyStart,
   ArrowDownToLine,
+  Boxes,
   Camera,
   ChevronRight,
   Copy,
@@ -20,6 +21,7 @@ import {
   Ruler,
   SquareDashedMousePointer,
   Trash2,
+  Ungroup,
 } from 'lucide';
 import type { AlignMode, AxisIndex, Vec3 } from '../model';
 import type { MenuContext, ViewName } from '../scene';
@@ -149,6 +151,21 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
         action: () => store.alignSelected(axis, mode),
       })),
     });
+  const grouping: MenuItem[] = [];
+  if (store.selected.size > 1 && !store.selectedGroup())
+    grouping.push({
+      label: 'Group',
+      key: 'Ctrl+G',
+      icon: Boxes,
+      action: () => store.groupSelected(),
+    });
+  if (store.selectedParts().some((p) => p.group !== undefined))
+    grouping.push({
+      label: 'Ungroup',
+      key: 'Ctrl+Shift+G',
+      icon: Ungroup,
+      action: () => store.ungroupSelected(),
+    });
   const visibility: MenuItem[] = [
     { label: 'Hide', key: 'H', icon: EyeOff, action: () => store.hideSelected() },
   ];
@@ -159,12 +176,16 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
     icon: Trash2,
     action: () => store.deleteSelected(),
   });
-  return [edit, arrange, visibility, [addStock, selectAll, views]];
+  const sections = [edit, arrange];
+  if (grouping.length) sections.push(grouping);
+  return [...sections, visibility, [addStock, selectAll, views]];
 }
 
 /** A title for the menu: the part's name, or how many parts are selected. */
 export function menuTitle(store: Store): string {
   const n = store.selected.size;
+  const g = store.selectedGroup();
+  if (g) return `${g.name} · ${n} part${n === 1 ? '' : 's'}`;
   if (n === 1) return store.selectedParts()[0]!.name;
   if (n > 1) return `${n} parts`;
   return 'Scene';

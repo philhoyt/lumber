@@ -227,6 +227,12 @@ export class LumberScene {
     el.addEventListener('pointercancel', (e) => this.onPointerUp(e));
     el.addEventListener('pointerleave', () => this.setHover(null));
     el.addEventListener('contextmenu', (e) => this.onContextMenu(e));
+    el.addEventListener('dblclick', (e) => {
+      if (this.tf) return;
+      this.setRay(e.clientX, e.clientY);
+      const hit = this.pickPart();
+      if (hit) this.store.select([hit.object.userData.id as number]);
+    });
     // Keys during a transform take priority over the app's shortcuts.
     window.addEventListener('keydown', (e) => this.onKeyDown(e), { capture: true });
 
@@ -803,11 +809,12 @@ export class LumberScene {
     const hit = this.pickPart();
     if (hit) {
       const id = hit.object.userData.id as number;
+      // A click takes the whole assembly; a double-click (below) narrows to the one part.
       if (e.shiftKey || e.ctrlKey || e.metaKey) {
-        this.store.toggleSelect(id);
+        this.store.toggleSelectMany(this.store.selectionForClick(id));
         return;
       }
-      if (!this.store.selected.has(id)) this.store.select([id]);
+      if (!this.store.selected.has(id)) this.store.select(this.store.selectionForClick(id));
       const t = this.startTransform('grab', false);
       if (!t) return;
       // Slide on a floor-parallel plane through the grabbed point.

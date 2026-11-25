@@ -608,3 +608,27 @@ footer b {
   max-height: calc(100vh - 16px);
   overflow-y: auto;
 }
+
+/* Outliner groups */
+.out-row.group .name {
+  font-weight: 600;
+}
+.out-row .chev,
+.out-row .gicon {
+  display: flex;
+  color: var(--muted);
+  flex: none;
+}
+.out-row .chev {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0 -2px 0 -4px;
+  cursor: pointer;
+}
+.out-row .chev:hover {
+  color: var(--text);
+}
+.out-row .gicon {
+  color: var(--accent);
+}
