@@ -26,7 +26,6 @@ import {
   type Group,
   type Part,
   type Cut,
-  type Grain,
   type Vec3,
   CUT_KINDS,
   GRAINS,
@@ -660,7 +659,7 @@ export function parseDocument(o: unknown): Document | null {
             if (!CUT_KINDS.includes(k)) return false;
             const o = c as Record<string, unknown>;
             const nums = k === 'rabbet' ? ['width', 'depth'] : ['at', 'width', 'depth'];
-            if (!nums.every((f) => typeof o[f] === 'number' && (o[f] as number) >= 0)) return false;
+            if (!nums.every((f) => typeof o[f] === 'number' && o[f] >= 0)) return false;
             if (k === 'notch') return o.edge === 'front' || o.edge === 'back';
             if (o.face !== 'top' && o.face !== 'bottom') return false;
             if (k === 'rabbet') return ['endA', 'endB', 'front', 'back'].includes(o.edge as string);
@@ -682,7 +681,7 @@ export function parseDocument(o: unknown): Document | null {
             const out: Fastener = {
               kind: o.kind,
               face: o.face,
-              at: [at[0] as number, at[1] as number],
+              at: [at[0]!, at[1]!],
             };
             if (typeof o.size === 'string' && o.size.trim()) out.size = o.size.trim();
             return [out];
@@ -691,7 +690,7 @@ export function parseDocument(o: unknown): Document | null {
       if (ok.length) x.fasteners = ok;
       else delete x.fasteners;
     }
-    if (x.grain !== undefined && !GRAINS.includes(x.grain as Grain)) delete x.grain;
+    if (x.grain !== undefined && !GRAINS.includes(x.grain)) delete x.grain;
     if (x.grain === 'any') delete x.grain;
     // Miters must be a pair of angles within range; anything else reads as square.
     if (x.miter !== undefined) {
@@ -721,7 +720,7 @@ export function parseDocument(o: unknown): Document | null {
     version: 2,
     parts,
     groups,
-    stock: stock && stock.length ? stock : undefined,
+    stock: stock?.length ? stock : undefined,
     stockLen: d.stockLen as Record<string, number> | undefined,
     prices: d.prices as Record<string, number> | undefined,
   };

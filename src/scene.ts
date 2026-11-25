@@ -454,7 +454,7 @@ export class LumberScene {
     let g = this.meshes.get(p.id);
     const d = partDims(p);
     const sig = meshSignature(p, d);
-    if (!g || g.userData.sig !== sig) {
+    if (g?.userData.sig !== sig) {
       if (g) this.disposeGroup(g);
       g = this.buildMesh(p);
       this.partsGroup.add(g);
@@ -478,7 +478,7 @@ export class LumberScene {
           (p) => this.store.rootGroupOf(p.id)?.id,
           this.explode,
         )
-      : new Map();
+      : new Map<number, Vec3>();
     const live = new Set(this.store.parts.map((p) => p.id));
     for (const [id, g] of this.meshes)
       if (!live.has(id)) {
@@ -601,12 +601,12 @@ export class LumberScene {
   cameraAxes(): [Vec3, Vec3, Vec3] {
     const inv = this.camera.quaternion.clone().invert();
     const to = (x: number, y: number, z: number): Vec3 =>
-      new THREE.Vector3(x, y, z).applyQuaternion(inv).toArray() as Vec3;
+      new THREE.Vector3(x, y, z).applyQuaternion(inv).toArray();
     return [to(1, 0, 0), to(0, 1, 0), to(0, 0, 1)];
   }
   /** The unit vector from the model to the camera. */
   viewDir(): Vec3 {
-    return this.camera.position.clone().sub(this.controls.target).normalize().toArray() as Vec3;
+    return this.camera.position.clone().sub(this.controls.target).normalize().toArray();
   }
 
   private selectionCenter(): THREE.Vector3 | null {
@@ -920,8 +920,8 @@ export class LumberScene {
     const dims = partDims(p);
     const add = fastenerAt(
       kind,
-      local.toArray() as Vec3,
-      n.toArray() as Vec3,
+      local.toArray(),
+      n.toArray(),
       dims,
       this.store.settings.grid,
       size,
@@ -948,7 +948,7 @@ export class LumberScene {
       this.scene.add(f.ghost);
     }
     f.ghost.visible = true;
-    placeMarker(f.ghost, t.world.toArray() as Vec3, t.normal.toArray() as Vec3);
+    placeMarker(f.ghost, t.world.toArray(), t.normal.toArray());
   }
 
   /** The point under the pointer: a snap point on the part it hits, else the hit, else the floor. */
@@ -1232,9 +1232,9 @@ export class LumberScene {
   /** Turn the selection quarter turns about an axis during rotate mode, keeping the readout. */
   private turn(axis: AxisIndex, turns: number): void {
     const t = this.tf;
-    if (!t || t.kind !== 'rotate' || !turns) return;
+    if (t?.kind !== 'rotate' || !turns) return;
     rotateParts(this.store.selectedParts(), AXIS_NAMES[axis]!, turns);
-    t.turns[axis] = ((((t.turns[axis] + turns) % 4) + 4) % 4) as number;
+    t.turns[axis] = (((t.turns[axis] + turns) % 4) + 4) % 4;
     t.moved = true;
     this.syncAll();
     this.store.notify('drag');
@@ -1242,7 +1242,7 @@ export class LumberScene {
 
   private beginRingDrag(axis: AxisIndex): void {
     const t = this.tf;
-    if (!t || t.kind !== 'rotate') return;
+    if (t?.kind !== 'rotate') return;
     const a = ringAngle(t.origin, axis, this.currentRay());
     if (a === null) return;
     t.ring = { axis, start: a, last: a, applied: 0, moved: false };
@@ -1305,10 +1305,10 @@ export class LumberScene {
    */
   private setConstraint(key: string): void {
     const t = this.tf;
-    if (!t || t.kind !== 'grab') return;
+    if (t?.kind !== 'grab') return;
     const ray = this.currentRay();
     const delta = new THREE.Vector3().fromArray(t.delta);
-    if (key && key === key.toLowerCase()) {
+    if (key !== '' && key === key.toLowerCase()) {
       const axis = AXIS_NAMES.indexOf(key as 'x' | 'y' | 'z') as AxisIndex;
       const dir = Gizmo.axisDir(axis);
       t.constraint = {
@@ -1362,7 +1362,7 @@ export class LumberScene {
 
   private updateGrab(): void {
     const t = this.tf;
-    if (!t || t.kind !== 'grab' || !t.moved || !t.constraint) return;
+    if (t?.kind !== 'grab' || !t.moved || !t.constraint) return;
     const raw = this.rawDelta(t);
     if (!raw) return;
     const axes = t.constraint.kind === 'axis' ? [t.constraint.axis] : t.constraint.axes;

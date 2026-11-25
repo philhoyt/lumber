@@ -4,7 +4,7 @@
  * and status follow along.
  */
 import type { FolderSync } from './folderSync';
-import { ProjectStore, type ProjectMeta } from './projects';
+import { type ProjectStore, type ProjectMeta } from './projects';
 import { sampleWorkbench } from './sample';
 import { parseDocument, type Document, type Store } from './store';
 
@@ -130,7 +130,7 @@ export class ProjectManager {
 
   /** Write every project into the linked folder (after linking one). */
   async mirrorAll(): Promise<number> {
-    if (!this.folder || this.folder.state !== 'ready') return 0;
+    if (this.folder?.state !== 'ready') return 0;
     this.flush();
     let n = 0;
     for (const p of this.projects.list()) {

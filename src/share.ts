@@ -35,7 +35,7 @@ export async function encodeShare(doc: Document, name: string): Promise<string> 
 /** The document in a share link's hash, with the sender's project name, or null. */
 export async function decodeShare(hash: string): Promise<{ doc: Document; name: string } | null> {
   const m = /(?:^|[#&])m=(\d+)\.([A-Za-z0-9_-]+)/.exec(hash);
-  if (!m || m[1] !== VERSION) return null;
+  if (m?.[1] !== VERSION) return null;
   try {
     const packed = fromBase64Url(m[2]!);
     const raw = await pipe(packed, new DecompressionStream('deflate-raw'));

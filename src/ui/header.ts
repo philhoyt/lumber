@@ -267,8 +267,10 @@ export function wireKeyboard(
       else if (!actions.closeOverlays()) store.select([]);
     } else if (e.key === '?' || e.key === 'F1' || (e.shiftKey && e.code === 'Slash'))
       actions.toggleHelp();
-    else if (mod && k === 'z') (e.shiftKey ? store.redo : store.undo).call(store);
-    else if (mod && k === 'y') store.redo();
+    else if (mod && k === 'z') {
+      if (e.shiftKey) store.redo();
+      else store.undo();
+    } else if (mod && k === 'y') store.redo();
     else if (mod && k === 's') pm.exportCurrent(download);
     else if (mod && k === 'o') actions.showProjects();
     else if (mod && k === 'd') store.duplicateSelected();
@@ -298,10 +300,10 @@ export function wireKeyboard(
     else if (e.key === 'Home') scene.setView('fit');
     else if (e.code === 'NumpadDecimal' || e.code === 'Period') scene.setView('selected');
     else if (digit === '5') scene.toggleProjection();
-    else if (VIEW_KEYS[digit]) scene.setView(VIEW_KEYS[digit]![mod ? 1 : 0]);
+    else if (VIEW_KEYS[digit]) scene.setView(VIEW_KEYS[digit][mod ? 1 : 0]);
     else if (digit === '9') scene.flipView();
-    else if (mod && PAN_KEYS[digit]) scene.panStep(...PAN_KEYS[digit]!);
-    else if (ORBIT_KEYS[digit]) scene.orbitStep(...ORBIT_KEYS[digit]!);
+    else if (mod && PAN_KEYS[digit]) scene.panStep(...PAN_KEYS[digit]);
+    else if (ORBIT_KEYS[digit]) scene.orbitStep(...ORBIT_KEYS[digit]);
     else if (!mod && (e.code === 'NumpadAdd' || e.key === '+' || e.key === '='))
       scene.zoomStep(true);
     else if (!mod && (e.code === 'NumpadSubtract' || e.key === '-')) scene.zoomStep(false);

@@ -61,7 +61,10 @@ export class FolderSync {
     } catch {
       this.handle = null;
     }
-    if (!this.handle) return this.set('none');
+    if (!this.handle) {
+      this.set('none');
+      return;
+    }
     const perm = this.handle.queryPermission
       ? await this.handle.queryPermission({ mode: 'readwrite' })
       : 'granted';
@@ -150,7 +153,7 @@ function openDb(): Promise<IDBDatabase> {
     const req = indexedDB.open(DB, 1);
     req.onupgradeneeded = () => req.result.createObjectStore(STORE);
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => reject(req.error ?? new Error('IndexedDB would not open'));
   });
 }
 function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
@@ -159,14 +162,15 @@ function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T
       new Promise<T>((resolve, reject) => {
         const req = fn(db.transaction(STORE, mode).objectStore(STORE));
         req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
+        req.onerror = () => reject(req.error ?? new Error('IndexedDB request failed'));
       }),
   );
 }
 
 /** Keeps the folder handle in IndexedDB, the only place a handle can be stored. */
 export const idbHandleStore: HandleStore = {
-  get: () => tx<DirHandle | undefined>('readonly', (s) => s.get(KEY)).then((h) => h ?? null),
+  get: () =>
+    tx('readonly', (s) => s.get(KEY) as IDBRequest<DirHandle | undefined>).then((h) => h ?? null),
   set: (h) => tx('readwrite', (s) => s.put(h, KEY)).then(() => undefined),
   clear: () => tx('readwrite', (s) => s.delete(KEY)).then(() => undefined),
 };

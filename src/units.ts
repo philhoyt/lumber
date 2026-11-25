@@ -12,7 +12,7 @@
  */
 export function parseLen(str: string | null | undefined): number | null {
   if (str == null) return null;
-  const s = String(str)
+  const s = str
     .toLowerCase()
     .replace(/[”″]/g, '"')
     .replace(/[’′]/g, "'")

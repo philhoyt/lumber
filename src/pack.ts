@@ -143,7 +143,7 @@ function orientations(it: SheetItem): [number, number][] {
  */
 function place(sh: Working, it: SheetItem, kerf: number): boolean {
   let best: { i: number; a: number; b: number; score: [number, number] } | null = null;
-  sh.free.forEach((r, i) => {
+  for (const [i, r] of sh.free.entries()) {
     for (const [a, b] of orientations(it)) {
       if (a > r.w + EPS || b > r.h + EPS) continue;
       const score: [number, number] = [Math.min(r.w - a, r.h - b), Math.max(r.w - a, r.h - b)];
@@ -154,7 +154,7 @@ function place(sh: Working, it: SheetItem, kerf: number): boolean {
       )
         best = { i, a, b, score };
     }
-  });
+  }
   if (!best) return false;
   const { i, a, b } = best;
   const r = sh.free[i]!;

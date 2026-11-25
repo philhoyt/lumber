@@ -61,20 +61,22 @@ export function buildToolbar(
     return b;
   };
 
-  const add = iconButton(Plus, 'Add stock (Shift+A, or open the palette)', actions.togglePalette);
+  const add = iconButton(Plus, 'Add stock (Shift+A, or open the palette)', () =>
+    actions.togglePalette(),
+  );
   const grab = need(iconButton(Move3d, 'Grab (G)', () => scene.beginGrab()));
   const rotate = need(iconButton(RotateCw, 'Rotate (R)', () => scene.beginRotate()));
   const length = need(iconButton(ArrowLeftRight, 'Set length (S)', () => scene.beginSize()));
   const dup = need(
     iconButton(Copy, 'Duplicate and grab (Shift+D)', () => scene.duplicateAndGrab()),
   );
-  const array = need(iconButton(Grid3x3, 'Array', actions.focusArray));
+  const array = need(iconButton(Grid3x3, 'Array', () => actions.focusArray()));
   const group = need(iconButton(Boxes, 'Group (Ctrl+G)', () => store.groupSelected()));
   const ungroup = need(
     iconButton(Ungroup, 'Ungroup (Ctrl+Shift+G)', () => store.ungroupSelected()),
   );
   const mirror = need(
-    iconButton(FlipHorizontal2, 'Mirror (Ctrl+M, then X / Y / Z)', actions.mirror),
+    iconButton(FlipHorizontal2, 'Mirror (Ctrl+M, then X / Y / Z)', () => actions.mirror()),
   );
   const drop = need(
     iconButton(ArrowDownToLine, 'Drop onto what is below (Alt+G)', () => store.dropSelected()),
@@ -110,7 +112,7 @@ export function buildToolbar(
   const proj = viewButton('persp', 'Perspective · 5 for orthographic', () =>
     scene.toggleProjection(),
   );
-  const help = iconButton(CircleHelp, 'All keys (?)', actions.showHelp);
+  const help = iconButton(CircleHelp, 'All keys (?)', () => actions.showHelp());
   const spacer = document.createElement('span');
   spacer.className = 'spacer';
   const spacer2 = document.createElement('span');

@@ -114,9 +114,8 @@ function wireCutsEditor(
       onChange(el, id(f), (inp) => {
         const v = parseLen(inp.value);
         if (v === null) return;
-        update(i, (cut) => ({ ...cut, [f]: v }) as Cut);
+        update(i, (cut) => ({ ...cut, [f]: v }));
       });
-    void c;
   });
   el.querySelectorAll<HTMLButtonElement>('[data-delcut]').forEach((b) =>
     b.addEventListener('click', () =>
@@ -479,7 +478,10 @@ export class PropsPanel {
     }
     const moveTo = (axis: 0 | 1 | 2, text: string) => {
       const v = parseLen(text);
-      if (v === null) return this.render();
+      if (v === null) {
+        this.render();
+        return;
+      }
       const d = v - u.min[axis];
       store.mutate(() => list.forEach((p) => (p.pos[axis] += d)));
     };

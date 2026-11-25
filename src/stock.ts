@@ -184,7 +184,7 @@ export function sanitizeStock(list: unknown): Stock[] | null {
       if (x.grain === false) s.grain = false;
     } else {
       s.w = x.w;
-      s.lengths = lengths && lengths.length ? lengths : [96];
+      s.lengths = lengths?.length ? lengths : [96];
       if (
         Array.isArray(x.nominal) &&
         x.nominal.length === 2 &&

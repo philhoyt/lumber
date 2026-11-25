@@ -281,7 +281,7 @@ export function rot90(axis: Axis, turns = 1): Quaternion {
 export function makeQ(seq: Axis[]): Quat {
   let q = new Quaternion();
   for (const a of seq) q = rot90(a).multiply(q);
-  return q.toArray() as Quat;
+  return q.toArray();
 }
 
 /** Lying flat: length along X, width along Y, thickness up. */
@@ -380,8 +380,8 @@ export function rotateParts(list: Part[], axis: Axis, turns = 1): void {
   const R = rot90(axis, turns);
   for (const p of list) {
     const v = new Vector3().fromArray(p.pos).sub(c).applyQuaternion(R).add(c);
-    p.pos = v.toArray() as Vec3;
-    p.q = R.clone().multiply(new Quaternion().fromArray(p.q)).toArray() as Quat;
+    p.pos = v.toArray();
+    p.q = R.clone().multiply(new Quaternion().fromArray(p.q)).toArray();
   }
   const u2 = unionAABB(list);
   const dz = u.min[UP] - u2.min[UP];
@@ -513,6 +513,6 @@ export function migrateFromYUp(parts: Part[]): Part[] {
   return parts.map((p) => ({
     ...p,
     pos: [p.pos[0], -p.pos[2] || 0, p.pos[1]],
-    q: R.clone().multiply(new Quaternion().fromArray(p.q)).toArray() as Quat,
+    q: R.clone().multiply(new Quaternion().fromArray(p.q)).toArray(),
   }));
 }
