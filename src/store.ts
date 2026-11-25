@@ -4,6 +4,7 @@
  * can be undone, then autosaves and tells subscribers.
  */
 import {
+  aabbSize,
   alignParts,
   clonePart,
   createPart,
@@ -11,6 +12,7 @@ import {
   migrateFromYUp,
   rotateParts,
   translateParts,
+  unionAABB,
   AXIS_INDEX,
   type AlignMode,
   type Axis,
@@ -39,6 +41,7 @@ export interface Document {
   prices?: Record<string, number>;
 }
 
+export type ArraySpacing = 'center' | 'gap';
 export type ChangeKind = 'model' | 'selection' | 'settings' | 'drag';
 export type Listener = (kind: ChangeKind) => void;
 
@@ -323,13 +326,19 @@ export class Store {
     });
     this.select(ids);
   }
-  arraySelected(axis: Axis, count: number, spacing: number): void {
+  /**
+   * Stamp copies along an axis. `spacing` is centre to centre, or, with mode 'gap',
+   * the clear space between copies (the selection's own extent on that axis is added).
+   */
+  arraySelected(axis: Axis, count: number, spacing: number, mode: ArraySpacing = 'center'): void {
     const list = this.selectedParts();
     if (!list.length || count < 2) return;
+    const a = AXIS_INDEX[axis];
+    const step = mode === 'gap' ? spacing + aabbSize(unionAABB(list))[a] : spacing;
     const offsets: Vec3[] = [];
     for (let i = 1; i < count; i++) {
       const offset: Vec3 = [0, 0, 0];
-      offset[AXIS_INDEX[axis]] = spacing * i;
+      offset[a] = step * i;
       offsets.push(offset);
     }
     let ids: number[] = [];

@@ -1,7 +1,7 @@
 /** The Part panel: name, stock, size and position of the selection, plus the part actions. */
 import { aabbSize, unionAABB, withMinKept, type AlignMode, type Axis } from '../model';
 import { STOCK, stockById } from '../stock';
-import type { Store } from '../store';
+import type { ArraySpacing, Store } from '../store';
 import { fmt, parseLen } from '../units';
 import { esc, onChange, onClick } from './dom';
 import { keepFocus } from './fields';
@@ -74,7 +74,8 @@ export class PropsPanel {
       <div class="row btns align">${btn(2, 'min', 'Bottom', 'Flush on the bottom (min Z)')}${btn(2, 'center', 'Center Z', 'Centre on Z')}${btn(2, 'max', 'Top', 'Flush on top (max Z)')}</div>`;
     }
     html += `<div class="row"><div><label class="small">Array along</label><select id="arrAxis"><option value="x">X</option><option value="y">Y</option><option value="z">Z</option></select></div>
-        <div><label class="small">Count</label><input type="number" id="arrN" value="4" min="2" step="1"></div><div><label class="small">On center</label><input type="text" class="len" data-min="0.0625" id="arrS" value="16"></div><div class="grow0"><button id="bArr">Array</button></div></div>${hiddenNote}`;
+        <div><label class="small">Count</label><input type="number" id="arrN" value="4" min="2" step="1"></div>
+        <div><label class="small"><select id="arrMode" class="inline" title="How the spacing is measured"><option value="center">On center</option><option value="gap">Gap</option></select></label><input type="text" class="len" data-min="0" id="arrS" value="16"></div><div class="grow0"><button id="bArr">Array</button></div></div>${hiddenNote}`;
     const restoreFocus = keepFocus(el);
     el.innerHTML = html;
     restoreFocus();
@@ -135,7 +136,8 @@ export class PropsPanel {
       const axis = el.querySelector<HTMLSelectElement>('#arrAxis')!.value as Axis;
       const count = +el.querySelector<HTMLInputElement>('#arrN')!.value;
       const spacing = parseLen(el.querySelector<HTMLInputElement>('#arrS')!.value) ?? 16;
-      store.arraySelected(axis, count, spacing);
+      const mode = el.querySelector<HTMLSelectElement>('#arrMode')!.value as ArraySpacing;
+      store.arraySelected(axis, count, spacing, mode);
     });
   }
 }

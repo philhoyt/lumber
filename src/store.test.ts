@@ -27,6 +27,17 @@ describe('Store', () => {
     expect(s.parts[3]!.pos[1]).toBe(32);
   });
 
+  it('arrays by gap: slats 1 1/2" apart are 5" on center for a flat 2x4', () => {
+    const s = new Store();
+    s.addPart('2x4'); // flat: 3 1/2" across Y
+    s.arraySelected('y', 3, 1.5, 'gap');
+    expect(s.parts.map((p) => p.pos[1])).toEqual([0, 5, 10]);
+    const sheet = new Store();
+    sheet.addPart('ply34'); // 48" across Y
+    sheet.arraySelected('y', 2, 2, 'gap');
+    expect(sheet.parts[1]!.pos[1]).toBe(50);
+  });
+
   it('nudges and rotates only the selection', () => {
     const s = new Store();
     const a = s.addPart('2x4');

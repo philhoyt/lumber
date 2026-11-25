@@ -46,6 +46,7 @@ right, −Y is the front, Z is up.
 | S then a length, Enter             | Set the cut length                                                  |
 | Shift+A                            | Add stock at the pointer                                            |
 | Shift+D                            | Duplicate and grab the copy; Ctrl+D duplicates with an offset       |
+| Array (Part panel)                 | Stamp N copies along an axis, spaced on center or by a clear gap    |
 | Ctrl+G, Ctrl+Shift+G               | Group the selection into an assembly, ungroup                       |
 | Double-click a part                | Select just that part inside its group                              |
 | Alt+G                              | Drop onto the floor or the parts beneath                            |
