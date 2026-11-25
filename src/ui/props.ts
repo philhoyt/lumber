@@ -1,4 +1,8 @@
-/** The Part panel: name, stock, size and position of the selection, plus the part actions. */
+/**
+ * The properties panel: the selection in collapsible sections. Part (name, stock, size),
+ * Transform (position, rotation), Arrange (duplicate, group, hide, align) and Array.
+ */
+import { ChevronDown, ChevronRight } from 'lucide';
 import {
   aabbSize,
   unionAABB,
@@ -12,14 +16,46 @@ import type { Store } from '../store';
 import { fmt, parseLen } from '../units';
 import { esc, onChange, onClick } from './dom';
 import { keepFocus } from './fields';
+import { icon } from './icons';
+
+type SectionId = 'part' | 'transform' | 'arrange' | 'array';
+const SECTIONS_KEY = 'lumber.sections';
 
 export class PropsPanel {
+  private closed = new Set<SectionId>();
+
   constructor(
     private el: HTMLElement,
     private store: Store,
   ) {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SECTIONS_KEY) ?? '[]') as SectionId[];
+      this.closed = new Set(saved);
+    } catch {
+      /* fresh */
+    }
     store.subscribe(() => this.render());
     this.render();
+  }
+
+  /** Expand a section (the toolbar's Array button uses it). */
+  openSection(id: SectionId): void {
+    if (!this.closed.has(id)) return;
+    this.closed.delete(id);
+    this.saveSections();
+    this.render();
+  }
+  private saveSections(): void {
+    try {
+      localStorage.setItem(SECTIONS_KEY, JSON.stringify([...this.closed]));
+    } catch {
+      /* best effort */
+    }
+  }
+
+  private section(id: SectionId, title: string, body: string, count = ''): string {
+    const closed = this.closed.has(id);
+    return `<section class="sec${closed ? ' closed' : ''}" data-sec="${id}"><h3 data-toggle="${id}"><span class="chev"></span>${title}${count ? `<span class="count">${count}</span>` : ''}</h3><div class="sec-body">${body}</div></section>`;
   }
 
   render(): void {
@@ -30,12 +66,18 @@ export class PropsPanel {
       ? `<div class="muted note">${hidden} hidden part${hidden === 1 ? '' : 's'} · Alt+H shows them</div>`
       : '';
     if (!list.length) {
-      el.innerHTML = `<h2>Part</h2><div class="empty">Nothing selected. Click a part, or drag stock in from the left.</div>${hiddenNote}`;
+      el.innerHTML = `<div class="empty">Nothing selected. Click a part, drag stock in from the palette, or press Shift+A.${hiddenNote}</div>`;
       return;
     }
     const u = unionAABB(list);
     const size = aabbSize(u);
-    let html = '';
+    const group = store.selectedGroup();
+    const inGroup = list.some((p) => p.group !== undefined);
+
+    // ---- Part ----
+    let part: string;
+    let partTitle = 'Part';
+    let partCount = '';
     if (list.length === 1) {
       const p = list[0]!;
       const s = stockById(p.stock);
@@ -43,8 +85,7 @@ export class PropsPanel {
         (x) =>
           `<option value="${x.id}" ${x.id === p.stock ? 'selected' : ''}>${esc(x.name)}</option>`,
       ).join('');
-      html += `<h2>Part</h2>
-        <div class="row"><div><label class="small">Name</label><input type="text" id="pName" value="${esc(p.name)}"></div>
+      part = `<div class="row"><div><label class="small">Name</label><input type="text" id="pName" value="${esc(p.name)}"></div>
         <div><label class="small">Stock</label><select id="pStock">${options}</select></div></div>
         <div class="row"><div><label class="small">Length (S)</label><input type="text" class="len" data-min="0.0625" id="pLen" value="${fmt(p.len)}"></div>
         ${
@@ -52,52 +93,68 @@ export class PropsPanel {
             ? `<div><label class="small">Width</label><input type="text" class="len" data-min="0.0625" id="pW" value="${fmt(p.w ?? s.sheet[0])}"></div>`
             : `<div><label class="small">Section</label><div class="static">${fmt(s.t)} × ${fmt(s.w ?? 0)}</div></div>`
         }</div>`;
+      if (inGroup) {
+        const g = store.groupById(p.group!);
+        part += `<div class="muted note">In ${esc(g?.name ?? 'a group')} · click the part in the view to select the whole group</div>`;
+      }
     } else {
-      const g = store.selectedGroup();
-      html += g
-        ? `<h2>${esc(g.name)} <span class="count">· ${list.length} parts</span></h2>`
-        : `<h2>${list.length} parts</h2>`;
+      partTitle = group ? esc(group.name) : 'Selection';
+      partCount = `${list.length} parts`;
+      part = `<div class="muted">${group ? 'An assembly: it moves, rotates and copies as one.' : 'Several parts. Group them with Ctrl+G to keep them together.'}</div>`;
     }
-    const inGroup = list.some((p) => p.group !== undefined);
-    const groupBtns =
-      (list.length > 1 && !store.selectedGroup()
-        ? `<button id="bGroup" title="Ctrl+G">Group</button>`
-        : '') + (inGroup ? `<button id="bUngroup" title="Ctrl+Shift+G">Ungroup</button>` : '');
-    if (list.length === 1 && inGroup) {
-      const g = store.groupById(list[0]!.group!);
-      html += `<div class="muted note">In ${esc(g?.name ?? 'a group')} · click the part in the view to select the whole group</div>`;
-    }
-    html += `<div class="row"><div><label class="small">X (left)</label><input type="text" class="len" id="pX" value="${fmt(u.min[0])}"></div><div><label class="small">Y (front)</label><input type="text" class="len" id="pY" value="${fmt(u.min[1])}"></div><div><label class="small">Z (bottom)</label><input type="text" class="len" id="pZ" value="${fmt(u.min[2])}"></div></div>
+
+    // ---- Transform ----
+    const transform = `<div class="row"><div><label class="small">X (left)</label><input type="text" class="len" id="pX" value="${fmt(u.min[0])}"></div><div><label class="small">Y (front)</label><input type="text" class="len" id="pY" value="${fmt(u.min[1])}"></div><div><label class="small">Z (bottom)</label><input type="text" class="len" id="pZ" value="${fmt(u.min[2])}"></div></div>
       <div class="muted footprint">Footprint ${fmt(size[0])} × ${fmt(size[1])}, height ${fmt(size[2])}</div>
       <label class="small">Rotate 90° (R, then axis)</label>
-      <div class="row btns"><button id="bRotX" title="R X">About X</button><button id="bRotY" title="R Y">About Y</button><button id="bRotZ" title="R Z">About Z</button></div>
-      <div class="row btns"><button id="bDrop" title="Alt+G: rest on the floor or the parts below">Drop</button><button id="bDup" title="Shift+D, or Ctrl+D for an offset copy">Duplicate</button>${groupBtns}<button id="bHide" title="H">Hide</button><button id="bDel" class="danger" title="X or Delete">Delete</button></div>`;
+      <div class="row btns"><button id="bRotX" title="R X">About X</button><button id="bRotY" title="R Y">About Y</button><button id="bRotZ" title="R Z">About Z</button></div>`;
+
+    // ---- Arrange ----
+    const groupBtns =
+      (list.length > 1 && !group ? `<button id="bGroup" title="Ctrl+G">Group</button>` : '') +
+      (inGroup ? `<button id="bUngroup" title="Ctrl+Shift+G">Ungroup</button>` : '');
+    let arrange = `<div class="row btns"><button id="bDrop" title="Alt+G: rest on the floor or the parts below">Drop</button><button id="bDup" title="Shift+D, or Ctrl+D for an offset copy">Duplicate</button>${groupBtns}<button id="bHide" title="H">Hide</button><button id="bDel" class="danger" title="X or Delete">Delete</button></div>`;
     if (list.length > 1) {
       const btn = (axis: number, mode: string, label: string, title: string) =>
         `<button data-align="${axis}:${mode}" title="${title}">${label}</button>`;
-      html += `<label class="small">Align</label>
+      arrange += `<label class="small">Align</label>
       <div class="row btns align">${btn(0, 'min', 'Left', 'Flush on the left (min X)')}${btn(0, 'center', 'Center X', 'Centre on X')}${btn(0, 'max', 'Right', 'Flush on the right (max X)')}</div>
       <div class="row btns align">${btn(1, 'min', 'Front', 'Flush at the front (min Y)')}${btn(1, 'center', 'Center Y', 'Centre on Y')}${btn(1, 'max', 'Back', 'Flush at the back (max Y)')}</div>
       <div class="row btns align">${btn(2, 'min', 'Bottom', 'Flush on the bottom (min Z)')}${btn(2, 'center', 'Center Z', 'Centre on Z')}${btn(2, 'max', 'Top', 'Flush on top (max Z)')}</div>`;
     }
-    const arrayGroup = store.selectedGroup();
-    const arr = arrayGroup?.array;
+
+    // ---- Array ----
+    const arr = group?.array;
     const sel = (id: string, opts: [string, string][], value: string, title?: string) =>
       `<select id="${id}" class="inline"${title ? ` title="${title}"` : ''}>${opts
         .map(([v, l]) => `<option value="${v}"${v === value ? ' selected' : ''}>${l}</option>`)
         .join('')}</select>`;
-    if (arr && arrayGroup) {
-      const byFit = arr.fit !== undefined;
-      html += `<label class="small">Array modifier · ${esc(arrayGroup.name)}</label>
-      <div class="row"><div><label class="small">Along</label>${sel(
+    const axisSel = (value: string) =>
+      sel(
         'arrAxis',
         [
           ['x', 'X'],
           ['y', 'Y'],
           ['z', 'Z'],
         ],
-        arr.axis,
-      )}</div>
+        value,
+      );
+    const modeSel = (value: string) =>
+      sel(
+        'arrMode',
+        [
+          ['center', 'On center'],
+          ['gap', 'Gap'],
+        ],
+        value,
+        'How the spacing is measured',
+      );
+    let array: string;
+    let arrayCount = '';
+    if (arr && group) {
+      const byFit = arr.fit !== undefined;
+      arrayCount = 'live';
+      array = `<div class="row"><div><label class="small">Along</label>${axisSel(arr.axis)}</div>
         <div><label class="small">${sel(
           'arrHow',
           [
@@ -111,40 +168,35 @@ export class PropsPanel {
             ? `<input type="text" class="len" data-min="0" id="arrFit" value="${fmt(arr.fit!)}">`
             : `<input type="number" id="arrN" value="${arr.count ?? 2}" min="1" step="1">`
         }</div>
-        <div><label class="small">${sel(
-          'arrMode',
-          [
-            ['center', 'On center'],
-            ['gap', 'Gap'],
-          ],
-          arr.mode,
-          'How the spacing is measured',
-        )}</label><input type="text" class="len" data-min="0" id="arrS" value="${fmt(arr.spacing)}"></div></div>
+        <div><label class="small">${modeSel(arr.mode)}</label><input type="text" class="len" data-min="0" id="arrS" value="${fmt(arr.spacing)}"></div></div>
       <div class="row btns"><button id="bApplyArr" title="Keep the copies as ordinary parts">Apply</button><button id="bRemoveArr" class="danger" title="Drop the copies, keep the source">Remove array</button></div>`;
     } else {
-      html += `<div class="row"><div><label class="small">Array along</label>${sel(
-        'arrAxis',
-        [
-          ['x', 'X'],
-          ['y', 'Y'],
-          ['z', 'Z'],
-        ],
-        'x',
-      )}</div>
+      array = `<div class="row"><div><label class="small">Along</label>${axisSel('x')}</div>
         <div><label class="small">Count</label><input type="number" id="arrN" value="4" min="1" step="1"></div>
-        <div><label class="small">${sel(
-          'arrMode',
-          [
-            ['center', 'On center'],
-            ['gap', 'Gap'],
-          ],
-          'center',
-          'How the spacing is measured',
-        )}</label><input type="text" class="len" data-min="0" id="arrS" value="16"></div><div class="grow0"><button id="bArr" title="Make a live array you can keep adjusting">Array</button></div></div>`;
+        <div><label class="small">${modeSel('center')}</label><input type="text" class="len" data-min="0" id="arrS" value="16"></div><div class="grow0"><button id="bArr" class="primary" title="Make a live array you can keep adjusting">Array</button></div></div>`;
     }
-    html += hiddenNote;
+
+    const html =
+      this.section('part', partTitle, part, partCount) +
+      this.section('transform', 'Transform', transform) +
+      this.section('arrange', 'Arrange', arrange) +
+      this.section('array', 'Array', array, arrayCount) +
+      hiddenNote;
+
     const restoreFocus = keepFocus(el);
     el.innerHTML = html;
+    el.querySelectorAll<HTMLElement>('.sec > h3').forEach((h) => {
+      const id = h.dataset.toggle as SectionId;
+      h.querySelector('.chev')!.appendChild(
+        icon(this.closed.has(id) ? ChevronRight : ChevronDown, 13),
+      );
+      h.addEventListener('click', () => {
+        if (this.closed.has(id)) this.closed.delete(id);
+        else this.closed.add(id);
+        this.saveSections();
+        this.render();
+      });
+    });
     restoreFocus();
 
     const readArray = (): ArrayParams => {
@@ -162,11 +214,11 @@ export class PropsPanel {
       }
       return params;
     };
-    if (arr && arrayGroup) {
+    if (arr && group) {
       for (const id of ['arrAxis', 'arrHow', 'arrMode', 'arrS', 'arrN', 'arrFit'])
         onChange(el, id, () => store.setArray(readArray()));
-      onClick(el, 'bApplyArr', () => store.applyArray(arrayGroup.id));
-      onClick(el, 'bRemoveArr', () => store.removeArray(arrayGroup.id));
+      onClick(el, 'bApplyArr', () => store.applyArray(group.id));
+      onClick(el, 'bRemoveArr', () => store.removeArray(group.id));
     } else onClick(el, 'bArr', () => store.setArray(readArray()));
 
     if (list.length === 1) {

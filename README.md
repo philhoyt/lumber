@@ -33,6 +33,12 @@ Enable the pre-commit hook once per clone so `check` runs before every commit:
 The keys follow Blender, and the world is Z-up like Blender: X runs left to
 right, −Y is the front, Z is up.
 
+The tool strip on the left holds the same actions as buttons, with the key in
+each tooltip, and the view presets below them. T shows or hides the stock
+palette, N the side panel with its Parts and Cut list tabs and the properties
+sections. ? opens the full key reference; the sun/moon button switches the
+theme.
+
 | Keys                               | What                                                                      |
 | ---------------------------------- | ------------------------------------------------------------------------- |
 | Right-click                        | Menu with every action for the part, selection or scene                   |

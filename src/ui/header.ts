@@ -1,20 +1,74 @@
-/** Header buttons, settings controls, view buttons and the Blender-style key map. */
+/** Header buttons, settings controls, panel toggles and the Blender-style key map. */
+import {
+  Download,
+  FilePlus,
+  FolderOpen,
+  Moon,
+  PanelLeft,
+  PanelRight,
+  Printer,
+  Redo2,
+  Save,
+  Sun,
+  Undo2,
+} from 'lucide';
 import { sampleWorkbench } from '../sample';
 import { parseDocument, type Store } from '../store';
 import type { LumberScene, ViewName } from '../scene';
 import { cutListCsv } from './cutlist';
 import { $, download } from './dom';
+import { setIcon } from './icons';
 import { DRAG_TYPE } from './palette';
+import { currentTheme, toggleTheme, type Theme } from './theme';
 
-export function wireHeader(store: Store): void {
+export interface AppActions {
+  /** Shift+A: open the add-stock menu at the pointer. */
+  addMenu(): void;
+  /** ? or F1: the key reference. */
+  toggleHelp(): void;
+  /** Close any overlay or menu; returns whether one was open. */
+  closeOverlays(): boolean;
+  onTheme(theme: Theme): void;
+}
+
+export function wireHeader(store: Store, actions: AppActions): void {
+  setIcon($('bNew'), FilePlus);
+  setIcon($('bOpen'), FolderOpen);
+  setIcon($('bSave'), Save);
+  setIcon($('bUndo'), Undo2);
+  setIcon($('bRedo'), Redo2);
+  setIcon($('bCsv'), Download);
+  setIcon($('bPrint'), Printer);
+  setIcon($('bPalette'), PanelLeft);
+  setIcon($('bSide'), PanelRight);
+  const themeBtn = $('bTheme');
+  const showTheme = (t: Theme) => {
+    setIcon(themeBtn, t === 'light' ? Moon : Sun);
+    themeBtn.title = t === 'light' ? 'Switch to the dark theme' : 'Switch to the light theme';
+  };
+  showTheme(currentTheme());
+  themeBtn.onclick = () => {
+    const t = toggleTheme();
+    showTheme(t);
+    actions.onTheme(t);
+  };
+
   $<HTMLSelectElement>('gridSel').addEventListener('change', (e) =>
     store.setSetting('grid', parseFloat((e.target as HTMLSelectElement).value)),
   );
   $<HTMLInputElement>('snapChk').addEventListener('change', (e) =>
     store.setSetting('snapParts', (e.target as HTMLInputElement).checked),
   );
-  $('bUndo').onclick = () => store.undo();
-  $('bRedo').onclick = () => store.redo();
+  const undo = $<HTMLButtonElement>('bUndo');
+  const redo = $<HTMLButtonElement>('bRedo');
+  undo.onclick = () => store.undo();
+  redo.onclick = () => store.redo();
+  const syncHistory = () => {
+    undo.disabled = !store.canUndo;
+    redo.disabled = !store.canRedo;
+  };
+  store.subscribe(syncHistory);
+  syncHistory();
   $('bNew').onclick = () => newModel(store);
   $('bSample').onclick = () => {
     if (!store.parts.length || confirm('Replace the model with the sample workbench?'))
@@ -38,7 +92,9 @@ export function wireHeader(store: Store): void {
   });
   $('bCsv').onclick = () => download('cut-list.csv', cutListCsv(store), 'text/csv');
   $('bPrint').onclick = () => window.print();
-  $('bFocus').onclick = () => togglePanels('both');
+  $('bPalette').onclick = () => togglePanels('palette');
+  $('bSide').onclick = () => togglePanels('side');
+  syncPanelButtons();
 }
 
 function newModel(store: Store): void {
@@ -48,7 +104,7 @@ function saveModel(store: Store): void {
   download('lumber-model.json', JSON.stringify(store.toDocument(), null, 1), 'application/json');
 }
 
-/** N toggles the side panel, T the palette (Blender's N and T panels), Ctrl+Space both. */
+/** T toggles the palette, N the side panel (Blender's T and N panels), Tab both. */
 export function togglePanels(which: 'side' | 'palette' | 'both'): void {
   const app = $('app');
   if (which === 'both') {
@@ -56,18 +112,25 @@ export function togglePanels(which: 'side' | 'palette' | 'both'): void {
     app.classList.toggle('no-side', on);
     app.classList.toggle('no-palette', on);
   } else app.classList.toggle(which === 'side' ? 'no-side' : 'no-palette');
+  syncPanelButtons();
+}
+function syncPanelButtons(): void {
+  const app = $('app');
+  $('bPalette').classList.toggle('on', !app.classList.contains('no-palette'));
+  $('bSide').classList.toggle('on', !app.classList.contains('no-side'));
 }
 
-export function wireViews(scene: LumberScene): void {
-  document
-    .querySelectorAll<HTMLButtonElement>('[data-view]')
-    .forEach((b) => b.addEventListener('click', () => scene.setView(b.dataset.view as ViewName)));
-  const proj = $('bProj');
-  proj.onclick = () => scene.toggleProjection();
-  scene.onProjectionChange = (mode) => {
-    proj.textContent = mode === 'ortho' ? 'Ortho' : 'Persp';
-    proj.classList.toggle('on', mode === 'ortho');
-  };
+/** The Parts / Cut list tabs in the side panel. */
+export function wireTabs(): void {
+  const tabs = document.querySelectorAll<HTMLButtonElement>('.tabs [data-tab]');
+  tabs.forEach((b) =>
+    b.addEventListener('click', () => {
+      tabs.forEach((x) => x.classList.toggle('on', x === b));
+      document.querySelectorAll<HTMLElement>('#side .pane').forEach((p) => {
+        p.hidden = p.id !== `tab-${b.dataset.tab}`;
+      });
+    }),
+  );
 }
 
 export function wireDrop(viewport: HTMLElement, scene: LumberScene, store: Store): void {
@@ -103,12 +166,7 @@ const ORBIT_KEYS: Record<string, [number, number]> = {
   '2': [0, -15],
 };
 
-export interface KeyboardExtras {
-  /** Shift+A: open the add-stock menu at the pointer. */
-  addMenu(): void;
-}
-
-export function wireKeyboard(store: Store, scene: LumberScene, extras: KeyboardExtras): void {
+export function wireKeyboard(store: Store, scene: LumberScene, actions: AppActions): void {
   window.addEventListener('keydown', (e) => {
     const t = e.target as HTMLElement | null;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) {
@@ -121,7 +179,11 @@ export function wireKeyboard(store: Store, scene: LumberScene, extras: KeyboardE
     const step = store.settings.grid || 0.0625;
     const digit = e.code.startsWith('Numpad') ? e.code.slice(6) : e.code.replace('Digit', '');
 
-    if (mod && k === 'z') (e.shiftKey ? store.redo : store.undo).call(store);
+    if (e.key === 'Escape') {
+      if (!actions.closeOverlays()) store.select([]);
+    } else if (e.key === '?' || e.key === 'F1' || (e.shiftKey && e.code === 'Slash'))
+      actions.toggleHelp();
+    else if (mod && k === 'z') (e.shiftKey ? store.redo : store.undo).call(store);
     else if (mod && k === 'y') store.redo();
     else if (mod && k === 's') saveModel(store);
     else if (mod && k === 'o') $('bOpen').click();
@@ -131,7 +193,7 @@ export function wireKeyboard(store: Store, scene: LumberScene, extras: KeyboardE
       else store.groupSelected();
     } else if (mod && e.code === 'Space') togglePanels('both');
     else if (e.shiftKey && k === 'd') scene.duplicateAndGrab();
-    else if (e.shiftKey && k === 'a') extras.addMenu();
+    else if (e.shiftKey && k === 'a') actions.addMenu();
     else if (e.altKey && k === 'a') store.select([]);
     else if (e.altKey && k === 'h') store.unhideAll();
     else if (e.altKey && k === 'g') store.dropSelected();
@@ -143,7 +205,6 @@ export function wireKeyboard(store: Store, scene: LumberScene, extras: KeyboardE
     else if (k === 'n') togglePanels('side');
     else if (k === 't') togglePanels('palette');
     else if (k === 'x' || e.key === 'Delete') store.deleteSelected();
-    else if (e.key === 'Escape') store.select([]);
     else if (e.key === 'Tab') togglePanels('both');
     else if (e.key === 'Home') scene.setView('fit');
     else if (e.code === 'NumpadDecimal' || e.code === 'Period') scene.setView('selected');

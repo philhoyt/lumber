@@ -145,6 +145,7 @@ export class LumberScene {
   private lastPointer: [number, number] | null = null;
   private downPos: [number, number] | null = null;
   private hoverId: number | null = null;
+  private grids: THREE.GridHelper[] = [];
   private rightDown: [number, number] | null = null;
   private suppressMenu = false;
   /** Set by the app to open the right-click menu. */
@@ -204,6 +205,7 @@ export class LumberScene {
     // The floor grid is translucent so the model still reads when viewed from below.
     const minor = new THREE.GridHelper(240, 240, 0x33363b, 0x2a2d31);
     const major = new THREE.GridHelper(240, 20, 0x4a4e55, 0x4a4e55);
+    this.grids = [minor, major];
     major.position.z = 0.01;
     for (const g of [minor, major]) {
       g.rotation.x = Math.PI / 2; // GridHelper is built in XZ; lay it in XY
@@ -241,6 +243,29 @@ export class LumberScene {
     });
     this.syncAll();
     this.animate();
+  }
+
+  /** Match the page theme: background and grid colors. */
+  setTheme(theme: 'dark' | 'light'): void {
+    const dark = theme === 'dark';
+    this.scene.background = new THREE.Color(dark ? 0x202226 : 0xe4e2dc);
+    const [minor, major] = this.grids;
+    const set = (g: THREE.GridHelper | undefined, c1: number, c2: number) => {
+      if (!g) return;
+      const colors = g.geometry.getAttribute('color') as THREE.BufferAttribute;
+      const a = new THREE.Color(c1);
+      const b = new THREE.Color(c2);
+      // GridHelper colors its centre lines with c1 and the rest with c2, two vertices per line.
+      const n = colors.count;
+      for (let i = 0; i < n; i++) {
+        const centre = i < 4 || (i >= n / 2 && i < n / 2 + 4);
+        const c = centre ? a : b;
+        colors.setXYZ(i, c.r, c.g, c.b);
+      }
+      colors.needsUpdate = true;
+    };
+    set(minor, dark ? 0x33363b : 0xc9c6bd, dark ? 0x2a2d31 : 0xd3d0c8);
+    set(major, dark ? 0x4a4e55 : 0xb5b1a7, dark ? 0x4a4e55 : 0xb5b1a7);
   }
 
   get transforming(): boolean {

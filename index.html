@@ -9,82 +9,100 @@
     <div id="app">
       <header>
         <h1>Lumber<span>.</span></h1>
-        <button id="bNew" title="Start over">New</button>
-        <button id="bOpen" title="Open a saved .json">Open</button>
-        <button id="bSave" title="Download the model as .json">Save</button>
-        <input id="fileIn" type="file" accept=".json,application/json" hidden />
-        <span class="sep"></span>
-        <button id="bUndo" title="Ctrl+Z">Undo</button>
-        <button id="bRedo" title="Ctrl+Y">Redo</button>
-        <span class="sep"></span>
-        <label class="small" for="gridSel">Grid</label>
-        <select id="gridSel">
-          <option value="0">off</option>
-          <option value="0.0625">1/16"</option>
-          <option value="0.125">1/8"</option>
-          <option value="0.25">1/4"</option>
-          <option value="0.5" selected>1/2"</option>
-          <option value="1">1"</option>
-          <option value="12">12"</option>
-        </select>
-        <label class="small" for="snapChk">Snap to parts</label>
-        <input id="snapChk" type="checkbox" checked />
+        <div class="group">
+          <button id="bNew" class="icon" title="New model"></button>
+          <button id="bOpen" class="icon" title="Open a saved model (Ctrl+O)"></button>
+          <button id="bSave" class="icon" title="Save the model as JSON (Ctrl+S)"></button>
+          <input id="fileIn" type="file" accept=".json,application/json" hidden />
+        </div>
+        <div class="group">
+          <button id="bUndo" class="icon" title="Undo (Ctrl+Z)"></button>
+          <button id="bRedo" class="icon" title="Redo (Ctrl+Shift+Z)"></button>
+        </div>
+        <div class="group">
+          <label class="field" for="gridSel"
+            ><span class="small">Grid</span>
+            <select id="gridSel">
+              <option value="0">off</option>
+              <option value="0.0625">1/16"</option>
+              <option value="0.125">1/8"</option>
+              <option value="0.25">1/4"</option>
+              <option value="0.5" selected>1/2"</option>
+              <option value="1">1"</option>
+              <option value="12">12"</option>
+            </select>
+          </label>
+          <label class="switch" for="snapChk" title="Snap to other parts' faces and the floor">
+            <input id="snapChk" type="checkbox" checked />
+            <span class="small">Snap</span>
+          </label>
+        </div>
         <span class="spacer"></span>
-        <button id="bFocus" title="Hide or show the side panels (Tab)">Panels</button>
-        <button id="bSample" title="Load the sample workbench">Sample</button>
-        <button id="bCsv" title="Download the cut list as CSV">CSV</button>
-        <button id="bPrint" title="Print the cut list and buy list">Print</button>
+        <div class="group">
+          <button id="bSample" title="Load the sample workbench">Sample</button>
+          <button id="bCsv" class="icon" title="Download the cut list as CSV"></button>
+          <button id="bPrint" class="icon" title="Print the cut list and buy list"></button>
+        </div>
+        <div class="group">
+          <button id="bTheme" class="icon" title="Light or dark theme"></button>
+          <button id="bPalette" class="icon" title="Stock palette (T)"></button>
+          <button id="bSide" class="icon" title="Side panel (N)"></button>
+        </div>
       </header>
 
+      <nav id="toolbar" aria-label="Tools"></nav>
+
       <aside id="palette">
-        <h2>Boards</h2>
-        <div id="boards"></div>
-        <h2>Sheets</h2>
-        <div id="sheets"></div>
-        <p class="hint">Drag a stock onto the scene, or click it to add one at the center.</p>
+        <div class="pal-head">
+          <h2>Stock</h2>
+          <input id="palSearch" type="search" placeholder="Search" aria-label="Search stock" />
+        </div>
+        <div class="pal-body">
+          <h3>Boards</h3>
+          <div id="boards"></div>
+          <h3>Sheets</h3>
+          <div id="sheets"></div>
+          <p class="hint">
+            Drag onto the scene, or click to add at the center. Shift+A adds at the pointer.
+          </p>
+        </div>
       </aside>
 
-      <main id="viewport">
-        <div class="views">
-          <button data-view="iso" title="Isometric view">Iso</button>
-          <button data-view="top" title="Numpad 7">Top</button>
-          <button data-view="front" title="Numpad 1">Front</button>
-          <button data-view="right" title="Numpad 3">Right</button>
-          <button data-view="fit" title="Home: fit the model">Fit</button>
-          <button id="bProj" title="Numpad 5: perspective or orthographic">Persp</button>
-        </div>
-        <div id="hint">
-          G grab · then X / Y / Z for one axis, Shift+X / Y / Z for a plane · type a distance ·
-          Enter or click confirms, Esc cancels<br />
-          R then X / Y / Z: quarter turn (Shift reverses) · S then a length: cut length · Shift+D
-          duplicate · H hide, Alt+H show · X delete · A all, Alt+A none · Alt+G drop<br />
-          Right-click: menu · Middle-drag orbit · Shift+middle pan · wheel zoom · numpad 1 / 3 / 7
-          front / right / top (Ctrl for the opposite), 2 4 6 8 orbit, 5 ortho, . frame selected,
-          Home fit · N / T panels
-        </div>
-      </main>
+      <main id="viewport"></main>
 
       <aside id="side">
-        <div id="outliner">
-          <div class="out-head">
-            <h2>Parts <span id="outCount" class="count"></span></h2>
-            <input id="outFilter" type="search" placeholder="Filter" aria-label="Filter parts" />
+        <div class="tabs" role="tablist">
+          <button data-tab="parts" class="on" role="tab">
+            Parts <span id="outCount" class="count"></span>
+          </button>
+          <button data-tab="cut" role="tab">Cut list</button>
+        </div>
+        <div id="tab-parts" class="pane">
+          <div class="pane-head">
+            <input
+              id="outFilter"
+              type="search"
+              placeholder="Filter parts"
+              aria-label="Filter parts"
+            />
           </div>
-          <div id="outBody"></div>
+          <div id="outBody" class="pane-body"></div>
+        </div>
+        <div id="tab-cut" class="pane" hidden>
+          <div id="cutBody" class="pane-body"></div>
         </div>
         <div id="props"></div>
-        <div id="cutlist">
-          <h2>Cut list</h2>
-          <div id="cutBody"></div>
-        </div>
       </aside>
 
       <footer>
         <span id="stat">0 parts</span>
-        <span>Overall: <b id="overall">—</b></span>
+        <span id="hints" class="hints"></span>
         <span class="spacer"></span>
-        <span>Autosaves in this browser.</span>
+        <span>Overall <b id="overall">—</b></span>
+        <span class="muted">Autosaves in this browser</span>
       </footer>
+
+      <div id="help" class="overlay" hidden></div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
