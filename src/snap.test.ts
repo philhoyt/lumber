@@ -28,9 +28,9 @@ describe('snapDelta', () => {
   });
 
   it('snaps to the floor on the vertical axis', () => {
-    const lifted = box([0, 0.9, 0], [10, 2.9, 4]);
-    const d = snapDelta(lifted, [0, 0, 0], [1], [], opts);
-    expect(d[1]).toBeCloseTo(-0.9);
+    const lifted = box([0, 0, 0.9], [10, 4, 2.9]);
+    const d = snapDelta(lifted, [0, 0, 0], [2], [], opts);
+    expect(d[2]).toBeCloseTo(-0.9);
   });
 
   it('falls back to the grid when no face is in reach', () => {

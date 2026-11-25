@@ -47,11 +47,24 @@ body {
   grid-column: 3;
   grid-row: 2;
 }
-#app.focus {
+#app.no-palette {
+  grid-template-columns: 0 1fr 340px;
+}
+#app.no-side {
+  grid-template-columns: 190px 1fr 0;
+}
+#app.no-palette.no-side {
   grid-template-columns: 0 1fr 0;
 }
-#app.focus #palette,
-#app.focus #side {
+#app.no-palette #palette,
+#app.no-side #side {
+  display: none;
+}
+.box-select {
+  position: absolute;
+  pointer-events: none;
+  border: 1px dashed var(--sel);
+  background: rgba(95, 179, 255, 0.12);
   display: none;
 }
 
@@ -198,6 +211,36 @@ label.small {
   white-space: nowrap;
   transform: translate(-50%, -120%);
   display: none;
+}
+.drag-label {
+  position: absolute;
+  pointer-events: none;
+  background: var(--accent);
+  color: #1b1c1f;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: pre;
+  transform: translate(14px, 14px);
+  display: none;
+  font-variant-numeric: tabular-nums;
+}
+.views {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  gap: 4px;
+}
+.views button {
+  padding: 2px 8px;
+  font-size: 12px;
+  background: rgba(36, 38, 41, 0.85);
+}
+.row.btns.align button {
+  padding: 3px 4px;
+  font-size: 12px;
 }
 #hint {
   position: absolute;

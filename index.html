@@ -45,11 +45,20 @@
       </aside>
 
       <main id="viewport">
+        <div class="views">
+          <button data-view="iso" title="Isometric view">Iso</button>
+          <button data-view="top" title="Numpad 7">Top</button>
+          <button data-view="front" title="Numpad 1">Front</button>
+          <button data-view="right" title="Numpad 3">Right</button>
+          <button data-view="fit" title="Home: fit the model">Fit</button>
+        </div>
         <div id="hint">
-          Left-drag part: move · Shift+drag: move up/down · Ctrl+click: multi-select<br />
-          R / T / F: rotate 90° about up / side / front · Arrows &amp; PgUp/PgDn: nudge · Ctrl+D:
-          duplicate · Del: delete<br />
-          Empty space: left-drag orbit · right-drag pan · wheel zoom · Tab: hide panels
+          G grab · then X / Y / Z for one axis, Shift+X / Y / Z for a plane · type a distance ·
+          Enter or click confirms, Esc cancels<br />
+          R then X / Y / Z: quarter turn (Shift reverses) · S then a length: cut length · Shift+D
+          duplicate · H hide, Alt+H show · X delete · A all, Alt+A none · Alt+G drop<br />
+          Middle-drag orbit · Shift+middle pan · wheel zoom · numpad 1 / 3 / 7 front / right / top
+          (Ctrl for the opposite), 2 4 6 8 orbit, . frame selected, Home fit · N / T panels
         </div>
       </main>
 

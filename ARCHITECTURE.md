@@ -42,18 +42,29 @@ Rules of the layering:
 
 - Inches everywhere internally. `units.ts` parses what people type and formats
   sixteenths for display.
-- World Y is up. A part's local frame is length along X, width along Y,
-  thickness along Z; the default orientation (`DEFAULT_Q`) lays it flat with its
-  width along world Z.
+- The world is Z-up, as in Blender: X left-right, −Y the front, Z up. `UP` in
+  `model.ts` is the one place that knows which axis index is up.
+- A part's local frame is length along X, width along Y, thickness along Z, so
+  the identity orientation lies flat on the floor.
 - Rotations are quaternions composed from quarter turns about world axes
   (`makeQ(['x', 'z'])`), so a part's axis-aligned bounding box is exact and is
   used for snapping, resizing (keep the min corner) and the overall size.
 
+## Transforms
+
+The scene owns one `Transform` at a time: a grab (from G, the gizmo or a part's
+body), a rotate (R) or a size (S). A grab has a constraint, either one axis or
+a plane, and converts the mouse ray into a delta along it; changing the
+constraint mid-drag re-anchors so the parts do not jump. Typed digits are kept
+on the transform and applied on Enter. Confirm commits the pre-transform
+snapshot to the store; cancel restores it.
+
 ## File format
 
-`Store.toDocument()` writes `{ version: 1, parts, stockLen, prices }`.
-`parseDocument` validates the shape before loading. Bump `version` and add a
-migration in `parseDocument` when the part shape changes.
+`Store.toDocument()` writes `{ version: 2, parts, stockLen, prices }`.
+`parseDocument` validates the shape before loading and migrates version 1
+(Y-up) files with `migrateFromYUp`. Bump `version` and add a migration there
+when the part shape changes.
 
 ## Tooling
 

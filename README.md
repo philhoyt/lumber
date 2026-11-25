@@ -30,13 +30,37 @@ Enable the pre-commit hook once per clone so `check` runs before every commit:
 
 ## Controls
 
-- Drag stock in from the left, or click it to add at the center.
-- Left-drag a part to move it on the floor. Shift+drag moves it up and down.
-- R / T / F rotate 90 degrees about the up, side and front axes.
-- Arrows and PgUp/PgDn nudge by the grid step. Ctrl+click multi-selects.
-- Ctrl+D duplicates. Array stamps copies at a spacing. Del deletes.
-- Ctrl+Z / Ctrl+Y undo and redo. Tab hides the side panels.
-- Sizes accept fractions and feet: `33 1/4`, `2'6 1/2`, `3/4`, `38mm`.
+The keys follow Blender, and the world is Z-up like Blender: X runs left to
+right, −Y is the front, Z is up.
 
-Models autosave in the browser and can be saved and opened as JSON. The cut
-list exports to CSV and prints.
+| Keys                               | What                                                                |
+| ---------------------------------- | ------------------------------------------------------------------- |
+| Click, Shift+click, drag on empty  | Select, extend the selection, box select                            |
+| A, Alt+A                           | Select all, select none                                             |
+| G                                  | Grab: the selection follows the mouse on the floor plane            |
+| X / Y / Z during a grab            | Move along that axis only; Shift+X / Y / Z: in the plane without it |
+| Type a length during a grab, Enter | Move exactly that far (`16`, `3/4`, `2'6`)                          |
+| Enter / click, Esc / right-click   | Confirm or cancel a transform                                       |
+| R then X / Y / Z                   | Quarter turn about that axis; Shift reverses                        |
+| S then a length, Enter             | Set the cut length                                                  |
+| Shift+D                            | Duplicate and grab the copy; Ctrl+D duplicates with an offset       |
+| Alt+G                              | Drop onto the floor or the parts beneath                            |
+| H, Alt+H                           | Hide the selection, show everything                                 |
+| X or Delete                        | Delete                                                              |
+| Ctrl+Z, Ctrl+Shift+Z               | Undo, redo                                                          |
+| Ctrl+S, Ctrl+O                     | Save, open                                                          |
+| Middle-drag, Shift+middle, wheel   | Orbit, pan, zoom (right-drag also pans)                             |
+| Numpad 1 / 3 / 7, with Ctrl        | Front / right / top, back / left / bottom (top-row digits too)      |
+| Numpad 2 / 4 / 6 / 8               | Orbit in 15° steps                                                  |
+| Numpad . , Home                    | Frame the selection, fit the model                                  |
+| N, T, Tab                          | Toggle the side panel, the palette, both                            |
+| Arrows, PgUp / PgDn                | Nudge by the grid step                                              |
+
+You can also drag a part's body to slide it on the floor, or drag the gizmo's
+arrows and squares. Drag stock in from the left, or click it to add at the
+center. With several parts selected, the Align buttons make them flush or
+centred on any axis. Sizes accept fractions and feet.
+
+Models autosave in the browser and can be saved and opened as JSON; files from
+the earlier Y-up version are converted on open. The cut list exports to CSV and
+prints.

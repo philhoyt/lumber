@@ -4,12 +4,17 @@
  * then autosaves and tells subscribers.
  */
 import {
+  alignParts,
   clonePart,
   createPart,
+  dropDistance,
+  migrateFromYUp,
   rotateParts,
   translateParts,
   AXIS_INDEX,
+  type AlignMode,
   type Axis,
+  type AxisIndex,
   type Part,
   type Vec3,
 } from './model';
@@ -24,9 +29,9 @@ export interface Settings {
   prices: Record<string, number>;
 }
 
-/** The saved file format. */
+/** The saved file format. Version 1 was Y-up; version 2 is Z-up. */
 export interface Document {
-  version: 1;
+  version: 2;
   parts: Part[];
   stockLen?: Record<string, number>;
   prices?: Record<string, number>;
@@ -35,7 +40,7 @@ export interface Document {
 export type ChangeKind = 'model' | 'selection' | 'settings' | 'drag';
 export type Listener = (kind: ChangeKind) => void;
 
-const AUTOSAVE_KEY = 'lumber.autosave';
+const AUTOSAVE_KEY = 'lumber.autosave.v2';
 
 export class Store {
   parts: Part[] = [];
@@ -63,7 +68,9 @@ export class Store {
     const o = JSON.parse(s) as { parts: Part[]; nextId: number };
     this.parts = o.parts;
     this.nextId = o.nextId;
-    this.selected = new Set([...this.selected].filter((id) => this.parts.some((p) => p.id === id)));
+    this.selected = new Set(
+      [...this.selected].filter((id) => this.parts.some((p) => p.id === id && !p.hidden)),
+    );
     this.notify('model');
   }
   /** Record `before` as the undo point for a change that has already been applied. */
@@ -106,7 +113,7 @@ export class Store {
 
   // ---- selection ----
   select(ids: Iterable<number>): void {
-    this.selected = new Set(ids);
+    this.selected = new Set([...ids].filter((id) => !this.partById(id)?.hidden));
     this.notify('selection');
   }
   toggleSelect(id: number): void {
@@ -115,8 +122,14 @@ export class Store {
     else s.add(id);
     this.select(s);
   }
+  selectAll(): void {
+    this.select(this.visibleParts().map((p) => p.id));
+  }
   selectedParts(): Part[] {
     return this.parts.filter((p) => this.selected.has(p.id));
+  }
+  visibleParts(): Part[] {
+    return this.parts.filter((p) => !p.hidden);
   }
   partById(id: number): Part | undefined {
     return this.parts.find((p) => p.id === id);
@@ -145,6 +158,7 @@ export class Store {
     });
     this.select([]);
   }
+  /** Copy the selection, offset, and select the copies. */
   duplicateSelected(offset: Vec3 = [16, 0, 0]): void {
     const list = this.selectedParts();
     if (!list.length) return;
@@ -174,15 +188,41 @@ export class Store {
     });
     this.select(ids);
   }
-  rotateSelected(axis: Axis): void {
+  rotateSelected(axis: Axis, turns = 1): void {
     const list = this.selectedParts();
     if (!list.length) return;
-    this.mutate(() => rotateParts(list, axis));
+    this.mutate(() => rotateParts(list, axis, turns));
   }
   nudge(d: Vec3): void {
     const list = this.selectedParts();
     if (!list.length) return;
     this.mutate(() => translateParts(list, d));
+  }
+  alignSelected(axis: AxisIndex, mode: AlignMode): void {
+    const list = this.selectedParts();
+    if (list.length < 2) return;
+    this.mutate(() => alignParts(list, axis, mode));
+  }
+  /** Lower the selection until it rests on the floor or on the parts beneath it. */
+  dropSelected(): void {
+    const list = this.selectedParts();
+    if (!list.length) return;
+    const others = this.parts.filter((p) => !this.selected.has(p.id));
+    const dz = dropDistance(list, others);
+    if (dz === 0) return;
+    this.mutate(() => translateParts(list, [0, 0, dz]));
+  }
+  hideSelected(): void {
+    const list = this.selectedParts();
+    if (!list.length) return;
+    this.mutate(() => list.forEach((p) => (p.hidden = true)));
+    this.select([]);
+  }
+  unhideAll(): void {
+    const hidden = this.parts.filter((p) => p.hidden);
+    if (!hidden.length) return;
+    this.mutate(() => hidden.forEach((p) => delete p.hidden));
+    this.select(hidden.map((p) => p.id));
   }
   /** Replace the whole model (new file, sample, open). */
   replaceParts(parts: Part[]): void {
@@ -196,7 +236,7 @@ export class Store {
   // ---- files ----
   toDocument(): Document {
     return {
-      version: 1,
+      version: 2,
       parts: this.parts,
       stockLen: this.settings.stockLen,
       prices: this.settings.prices,
@@ -210,19 +250,17 @@ export class Store {
   }
 
   autosave(): void {
-    if (typeof localStorage === 'undefined') return;
     try {
       localStorage.setItem(AUTOSAVE_KEY, this.snapshot());
     } catch {
-      /* storage full or disabled: autosave is best effort */
+      /* no storage here (tests), or storage full: autosave is best effort */
     }
   }
   /** Restore the autosaved model, if any. Returns whether something was restored. */
   loadAutosave(): boolean {
-    if (typeof localStorage === 'undefined') return false;
-    const s = localStorage.getItem(AUTOSAVE_KEY);
-    if (!s) return false;
     try {
+      const s = localStorage.getItem(AUTOSAVE_KEY);
+      if (!s) return false;
       this.restore(s);
       return true;
     } catch {
@@ -231,24 +269,31 @@ export class Store {
   }
 }
 
-/** Check a parsed JSON value is a saved model. */
+/** Check a parsed JSON value is a saved model, migrating older versions. */
 export function parseDocument(o: unknown): Document | null {
   if (!o || typeof o !== 'object') return null;
-  const d = o as Partial<Document>;
+  const d = o as { version?: unknown; parts?: unknown; stockLen?: unknown; prices?: unknown };
   if (!Array.isArray(d.parts)) return null;
-  for (const p of d.parts) {
+  for (const p of d.parts as unknown[]) {
+    if (!p || typeof p !== 'object') return null;
+    const x = p as Partial<Part>;
     if (
-      typeof p !== 'object' ||
-      p === null ||
-      typeof p.id !== 'number' ||
-      typeof p.stock !== 'string' ||
-      typeof p.len !== 'number' ||
-      !Array.isArray(p.pos) ||
-      p.pos.length !== 3 ||
-      !Array.isArray(p.q) ||
-      p.q.length !== 4
+      typeof x.id !== 'number' ||
+      typeof x.stock !== 'string' ||
+      typeof x.len !== 'number' ||
+      !Array.isArray(x.pos) ||
+      x.pos.length !== 3 ||
+      !Array.isArray(x.q) ||
+      x.q.length !== 4
     )
       return null;
   }
-  return { version: 1, parts: d.parts, stockLen: d.stockLen, prices: d.prices };
+  let parts = d.parts as Part[];
+  if (d.version !== 2) parts = migrateFromYUp(parts);
+  return {
+    version: 2,
+    parts,
+    stockLen: d.stockLen as Record<string, number> | undefined,
+    prices: d.prices as Record<string, number> | undefined,
+  };
 }

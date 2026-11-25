@@ -13,7 +13,7 @@ export function wireStatus(countEl: HTMLElement, overallEl: HTMLElement, store: 
       return;
     }
     const s = aabbSize(unionAABB(store.parts));
-    overallEl.textContent = `${fmt(s[0])} W × ${fmt(s[2])} D × ${fmt(s[1])} H`;
+    overallEl.textContent = `${fmt(s[0])} W × ${fmt(s[1])} D × ${fmt(s[2])} H`;
   };
   store.subscribe(render);
   render();

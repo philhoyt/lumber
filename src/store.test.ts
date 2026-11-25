@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { partAABB } from './model';
+import { aabbSize, makeQ, partAABB } from './model';
 import { parseDocument, Store } from './store';
 
 describe('Store', () => {
@@ -22,9 +22,9 @@ describe('Store', () => {
     expect(s.parts.map((p) => p.id)).toEqual([1, 2]);
     expect(s.parts[1]!.pos[0]).toBe(16);
     s.select([1]);
-    s.arraySelected('z', 3, 16);
+    s.arraySelected('y', 3, 16);
     expect(s.parts).toHaveLength(4);
-    expect(s.parts[3]!.pos[2]).toBe(32);
+    expect(s.parts[3]!.pos[1]).toBe(32);
   });
 
   it('nudges and rotates only the selection', () => {
@@ -32,9 +32,25 @@ describe('Store', () => {
     const a = s.addPart('2x4');
     const b = s.addPart('2x4');
     s.select([b.id]);
-    s.nudge([0, 1, 0]);
-    expect(partAABB(s.partById(a.id)!).min[1]).toBe(0);
-    expect(partAABB(s.partById(b.id)!).min[1]).toBe(1);
+    s.nudge([0, 0, 1]);
+    expect(partAABB(s.partById(a.id)!).min[2]).toBe(0);
+    expect(partAABB(s.partById(b.id)!).min[2]).toBe(1);
+  });
+
+  it('hides parts, drops them from the selection, and shows them again', () => {
+    const s = new Store();
+    const a = s.addPart('2x4');
+    s.addPart('2x4');
+    s.select([a.id]);
+    s.hideSelected();
+    expect(s.partById(a.id)!.hidden).toBe(true);
+    expect(s.selected.size).toBe(0);
+    expect(s.visibleParts()).toHaveLength(1);
+    s.select([a.id]); // hidden parts cannot be selected
+    expect(s.selected.size).toBe(0);
+    s.unhideAll();
+    expect(s.partById(a.id)!.hidden).toBeUndefined();
+    expect(s.selected.has(a.id)).toBe(true);
   });
 
   it('notifies subscribers with the kind of change', () => {
@@ -65,5 +81,24 @@ describe('parseDocument', () => {
     expect(parseDocument(null)).toBeNull();
     expect(parseDocument({})).toBeNull();
     expect(parseDocument({ parts: [{ id: 1 }] })).toBeNull();
+  });
+
+  it('migrates a version 1 (Y-up) file to Z-up', () => {
+    const v1 = {
+      version: 1,
+      parts: [{ id: 1, stock: '2x4', len: 96, pos: [0, 5, 0], q: makeQ(['x']), name: 'a' }],
+    };
+    const doc = parseDocument(v1)!;
+    expect(doc.version).toBe(2);
+    expect(doc.parts[0]!.pos).toEqual([0, 0, 5]);
+    expect(aabbSize(partAABB(doc.parts[0]!))).toEqual([96, 3.5, 1.5]);
+  });
+
+  it('leaves a version 2 file alone', () => {
+    const v2 = {
+      version: 2,
+      parts: [{ id: 1, stock: '2x4', len: 96, pos: [1, 2, 3], q: [0, 0, 0, 1], name: 'a' }],
+    };
+    expect(parseDocument(v2)!.parts[0]!.pos).toEqual([1, 2, 3]);
   });
 });
