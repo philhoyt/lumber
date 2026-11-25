@@ -4,8 +4,10 @@
  * can be undone, then tells subscribers (the project manager saves on those).
  */
 import { cloneStock, DEFAULT_STOCK, getStock, sanitizeStock, setStock, type Stock } from './stock';
+import { clampFastener, isFace, isFastenerKind, type Fastener } from './fastener';
 import {
   aabbSize,
+  partDims,
   alignParts,
   clonePart,
   createPart,
@@ -37,6 +39,8 @@ export interface Settings {
   kerf: number;
   /** Chosen purchase length per board stock id. */
   stockLen: Record<string, number>;
+  /** What the fastener tool places next. */
+  fastener: { kind: Fastener['kind']; size: string };
 }
 
 /** The saved file format. Version 1 was Y-up; version 2 is Z-up and may carry groups. */
@@ -69,7 +73,13 @@ export class Store {
   nextId = 1;
   nextGroupId = 1;
   selected = new Set<number>();
-  settings: Settings = { grid: 0.5, snapParts: true, kerf: 0.125, stockLen: {} };
+  settings: Settings = {
+    grid: 0.5,
+    snapParts: true,
+    kerf: 0.125,
+    stockLen: {},
+    fastener: { kind: 'screw', size: '' },
+  };
 
   private undoStack: string[] = [];
   private redoStack: string[] = [];
@@ -503,6 +513,33 @@ export class Store {
     if (!list.length) return;
     this.mutate(() => rotateParts(list, axis, turns));
   }
+  // ---- fasteners ----
+  addFastener(partId: number, f: Fastener): void {
+    const p = this.partById(partId);
+    if (!p) return;
+    this.mutate(() => {
+      p.fasteners = [...(p.fasteners ?? []), clampFastener(f, partDims(p))];
+    });
+  }
+  /** Replace a part's markers; an empty list clears them. */
+  setFasteners(partId: number, list: Fastener[]): void {
+    const p = this.partById(partId);
+    if (!p) return;
+    this.mutate(() => {
+      const dims = partDims(p);
+      const next = list.map((f) => clampFastener(f, dims));
+      if (next.length) p.fasteners = next;
+      else delete p.fasteners;
+    });
+  }
+  removeFastener(partId: number, index: number): void {
+    const p = this.partById(partId);
+    if (!p?.fasteners || index < 0 || index >= p.fasteners.length) return;
+    this.setFasteners(
+      partId,
+      p.fasteners.filter((_, i) => i !== index),
+    );
+  }
   mirrorSelected(axis: Axis): void {
     const list = this.selectedParts();
     if (!list.length) return;
@@ -632,6 +669,27 @@ export function parseDocument(o: unknown): Document | null {
         : [];
       if (ok.length) x.cuts = ok;
       else delete x.cuts;
+    }
+    if (x.fasteners !== undefined) {
+      const ok = Array.isArray(x.fasteners)
+        ? (x.fasteners as unknown[]).flatMap((f): Fastener[] => {
+            if (!f || typeof f !== 'object') return [];
+            const o = f as Record<string, unknown>;
+            if (!isFastenerKind(o.kind) || !isFace(o.face)) return [];
+            const at = o.at;
+            if (!Array.isArray(at) || at.length !== 2 || !at.every((n) => typeof n === 'number'))
+              return [];
+            const out: Fastener = {
+              kind: o.kind,
+              face: o.face,
+              at: [at[0] as number, at[1] as number],
+            };
+            if (typeof o.size === 'string' && o.size.trim()) out.size = o.size.trim();
+            return [out];
+          })
+        : [];
+      if (ok.length) x.fasteners = ok;
+      else delete x.fasteners;
     }
     if (x.grain !== undefined && !GRAINS.includes(x.grain as Grain)) delete x.grain;
     if (x.grain === 'any') delete x.grain;

@@ -1,6 +1,7 @@
 /**
  * The properties panel: the selection in collapsible sections. Part (name, stock, size),
- * Transform (position, rotation), Arrange (duplicate, group, hide, align) and Array.
+ * Transform (position, rotation), Arrange (duplicate, group, hide, align), Fasteners and
+ * Array.
  */
 import { ChevronDown, ChevronRight } from 'lucide';
 import {
@@ -20,7 +21,19 @@ import {
   type AlignMode,
   type ArrayParams,
   type Axis,
+  type AxisIndex,
+  type Part,
 } from '../model';
+import {
+  FACES as FASTENER_FACES,
+  FASTENER_KINDS,
+  faceFrame,
+  fastenersOf,
+  kindInfo,
+  type Face,
+  type Fastener,
+  type FastenerKind,
+} from '../fastener';
 import { getStock, stockById } from '../stock';
 import type { Store } from '../store';
 import { fmt, parseLen } from '../units';
@@ -28,7 +41,7 @@ import { esc, onChange, onClick } from './dom';
 import { keepFocus } from './fields';
 import { icon } from './icons';
 
-type SectionId = 'part' | 'transform' | 'arrange' | 'array';
+type SectionId = 'part' | 'transform' | 'arrange' | 'fasteners' | 'array';
 
 const FACES: [string, string][] = [
   ['top', 'Top face'],
@@ -119,6 +132,71 @@ function wireCutsEditor(
     }),
   );
 }
+/** One row per marker: kind, face, where on the face, size; plus Place and Add. */
+function fastenersHtml(p: Part): string {
+  const from = (a: AxisIndex) =>
+    a === 0 ? 'From end A' : a === 1 ? 'From the front edge' : 'From the bottom';
+  let html = '';
+  fastenersOf(p).forEach((f, i) => {
+    const id = (x: string) => `fast-${i}-${x}`;
+    const { u, v } = faceFrame(f.face);
+    html += `<div class="fast-row">${select(
+      id('kind'),
+      FASTENER_KINDS.map((k) => [k.id, k.label]),
+      f.kind,
+    )}${select(
+      id('face'),
+      FASTENER_FACES.map((x) => [x.id, x.label]),
+      f.face,
+    )}${lenField(id('u'), f.at[0], from(u))}${lenField(id('v'), f.at[1], from(v))}<input type="text" id="${id('size')}" value="${esc(f.size ?? '')}" placeholder="${esc(kindInfo(f.kind).size)}" title="Size to buy; blank means the usual size"><button class="icon ghost danger" data-delfast="${i}" title="Remove this marker">×</button></div>`;
+  });
+  html += `<div class="row btns"><button id="bPlaceFast" title="F: click faces in the view to place markers, click a marker to remove it">Place (F)</button><button id="bAddFast" title="Add a marker in the middle of the top face">Add</button></div>
+  <div class="muted note">Markers count as hardware in the buy list; they do not change the part.</div>`;
+  return html;
+}
+
+function wireFastenersEditor(el: HTMLElement, p: Part, store: Store, place: () => void): void {
+  const update = (i: number, change: (f: Fastener) => Fastener) =>
+    store.setFasteners(
+      p.id,
+      fastenersOf(p).map((f, k) => (k === i ? change(f) : f)),
+    );
+  fastenersOf(p).forEach((_, i) => {
+    const id = (x: string) => `fast-${i}-${x}`;
+    onChange(el, id('kind'), (inp) =>
+      update(i, (f) => ({ ...f, kind: inp.value as FastenerKind })),
+    );
+    onChange(el, id('face'), (inp) => update(i, (f) => ({ ...f, face: inp.value as Face })));
+    onChange(el, id('u'), (inp) => {
+      const v = parseLen(inp.value);
+      if (v !== null) update(i, (f) => ({ ...f, at: [v, f.at[1]] }));
+    });
+    onChange(el, id('v'), (inp) => {
+      const v = parseLen(inp.value);
+      if (v !== null) update(i, (f) => ({ ...f, at: [f.at[0], v] }));
+    });
+    onChange(el, id('size'), (inp) =>
+      update(i, (f) => {
+        const n = { ...f };
+        if (inp.value.trim()) n.size = inp.value.trim();
+        else delete n.size;
+        return n;
+      }),
+    );
+  });
+  el.querySelectorAll<HTMLButtonElement>('[data-delfast]').forEach((b) =>
+    b.addEventListener('click', () => store.removeFastener(p.id, +b.dataset.delfast!)),
+  );
+  onClick(el, 'bAddFast', () => {
+    const d = partDims(p);
+    const { kind, size } = store.settings.fastener;
+    const f: Fastener = { kind, face: 'top', at: [d[0] / 2, d[1] / 2] };
+    if (size.trim()) f.size = size.trim();
+    store.addFastener(p.id, f);
+  });
+  onClick(el, 'bPlaceFast', place);
+}
+
 const SECTIONS_KEY = 'lumber.sections';
 
 export class PropsPanel {
@@ -127,6 +205,8 @@ export class PropsPanel {
   constructor(
     private el: HTMLElement,
     private store: Store,
+    /** Start placing fastener markers in the view. */
+    private place: () => void = () => {},
   ) {
     try {
       const saved = JSON.parse(localStorage.getItem(SECTIONS_KEY) ?? '[]') as SectionId[];
@@ -242,6 +322,15 @@ export class PropsPanel {
       <div class="row btns align">${btn(2, 'min', 'Bottom', 'Flush on the bottom (min Z)')}${btn(2, 'center', 'Center Z', 'Centre on Z')}${btn(2, 'max', 'Top', 'Flush on top (max Z)')}</div>`;
     }
 
+    // ---- Fasteners ----
+    const nFast = list.reduce((n, p) => n + fastenersOf(p).length, 0);
+    const fastCount = nFast ? `${nFast}` : '';
+    const fasteners =
+      list.length === 1
+        ? fastenersHtml(list[0]!)
+        : `<div class="muted">${nFast ? `${nFast} marker${nFast === 1 ? '' : 's'} on these parts.` : 'No markers on these parts yet.'}</div>
+      <div class="row btns"><button id="bPlaceFast" title="F: click faces in the view to place markers">Place (F)</button></div>`;
+
     // ---- Array ----
     const arr = group?.array;
     const sel = (id: string, opts: [string, string][], value: string, title?: string) =>
@@ -299,6 +388,7 @@ export class PropsPanel {
       this.section('part', partTitle, part, partCount) +
       this.section('transform', 'Transform', transform) +
       this.section('arrange', 'Arrange', arrange) +
+      this.section('fasteners', 'Fasteners', fasteners, fastCount) +
       this.section('array', 'Array', array, arrayCount) +
       hiddenNote;
 
@@ -383,6 +473,7 @@ export class PropsPanel {
         }),
       );
       wireCutsEditor(el, p, store);
+      wireFastenersEditor(el, p, store, this.place);
       onChange(el, 'pMiterA', (i) => setMiter(0, i.value));
       onChange(el, 'pMiterB', (i) => setMiter(1, i.value));
     }
@@ -411,6 +502,7 @@ export class PropsPanel {
         store.alignSelected(+axis! as 0 | 1 | 2, mode as AlignMode);
       }),
     );
+    if (list.length > 1) onClick(el, 'bPlaceFast', this.place);
     onClick(el, 'bDup', () => store.duplicateSelected());
     onClick(el, 'bDel', () => store.deleteSelected());
   }

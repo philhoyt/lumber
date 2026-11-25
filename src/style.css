@@ -840,6 +840,71 @@ label.small select.inline {
   font-size: 15px;
   line-height: 1;
 }
+.fast-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 0.8fr 0.8fr 1.2fr auto;
+  gap: 4px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.fast-row select,
+.fast-row input {
+  min-width: 0;
+  padding: 3px 4px;
+  font-size: 12px;
+}
+.fast-row button {
+  width: 24px;
+  height: 24px;
+  font-size: 15px;
+  line-height: 1;
+}
+.hw-head {
+  font-size: 13px;
+  margin: 12px 0 4px;
+}
+.fasten-bar {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  box-shadow: var(--shadow);
+  max-width: calc(100% - 24px);
+  white-space: nowrap;
+}
+.fasten-bar[hidden] {
+  display: none;
+}
+.fasten-bar select,
+.fasten-bar input {
+  padding: 3px 6px;
+  font-size: 12px;
+}
+.fasten-bar select,
+.fasten-bar input,
+.fasten-bar button,
+.fasten-bar strong {
+  flex: 0 0 auto;
+}
+.fasten-bar input {
+  width: 130px;
+}
+.fasten-bar .muted {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .joinery {
   font-size: 11px;
   margin-top: 2px;

@@ -7,6 +7,7 @@ import {
   ArrowDownToLine,
   ArrowLeftRight,
   DraftingCompass,
+  Drill,
   Boxes,
   CircleHelp,
   Copy,
@@ -88,6 +89,12 @@ export function buildToolbar(
     scene.toggleMeasure(),
   );
   scene.onMeasureChange = (on) => measure.classList.toggle('on', on);
+  const fasten = iconButton(
+    Drill,
+    'Fastener markers (F): click a face to place a screw, pocket hole, nail, bolt or dowel',
+    () => scene.toggleFasten(),
+  );
+  scene.watchFasten((on) => fasten.classList.toggle('on', on));
   const iso = viewButton('iso', 'Isometric view', () => scene.setView('iso'));
   const top = viewButton('top', 'Top view (7) · Ctrl for bottom', () => scene.setView('top'));
   const front = viewButton('front', 'Front view (1) · Ctrl for back', () => scene.setView('front'));
@@ -122,6 +129,7 @@ export function buildToolbar(
     sep(),
     dims,
     measure,
+    fasten,
     spacer,
     iso,
     top,

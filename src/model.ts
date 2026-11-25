@@ -7,6 +7,7 @@
  * box describes a part exactly.
  */
 import { Quaternion, Vector3 } from 'three';
+import { mirrorFastener, type Fastener } from './fastener';
 import { stockById, stockWidth } from './stock';
 
 export type Vec3 = [number, number, number];
@@ -49,6 +50,8 @@ export interface Part {
   grain?: Grain;
   /** Joinery removed from the part: dados, grooves, rabbets and notches. */
   cuts?: Cut[];
+  /** Screws, pocket holes and the like marked on the part's faces; counted as hardware. */
+  fasteners?: Fastener[];
 }
 
 /**
@@ -440,6 +443,10 @@ export function mirrorParts(list: Part[], axis: Axis): void {
     if (p.cuts?.length) {
       const dims = partDims(p);
       p.cuts = p.cuts.map((cut) => mirrorCut(cut, local, dims));
+    }
+    if (p.fasteners?.length) {
+      const dims = partDims(p);
+      p.fasteners = p.fasteners.map((f) => mirrorFastener(f, local, dims));
     }
   }
 }

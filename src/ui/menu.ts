@@ -11,6 +11,7 @@ import {
   Camera,
   ChevronRight,
   Copy,
+  Drill,
   Eye,
   EyeOff,
   FlipHorizontal2,
@@ -45,6 +46,7 @@ export interface MenuActions {
   beginSize(): void;
   duplicateAndGrab(): void;
   setView(name: ViewName): void;
+  toggleFasten(): void;
 }
 
 const VIEWS: [ViewName, string, string][] = [
@@ -119,8 +121,14 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
     action: () => store.unhideAll(),
   };
 
+  const fasteners: MenuItem = {
+    label: 'Fasteners',
+    key: 'F',
+    icon: Drill,
+    action: () => scene.toggleFasten(),
+  };
   if (!hasSelection) {
-    const first: MenuItem[] = [addStock, selectAll];
+    const first: MenuItem[] = [addStock, selectAll, fasteners];
     if (hidden) first.push(showAll);
     return [
       first,
@@ -135,6 +143,7 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
     { label: 'Grab', key: 'G', icon: Move3d, action: () => scene.beginGrab() },
     { label: 'Rotate', key: 'R', icon: RotateCw, action: () => scene.beginRotate() },
     { label: 'Set length', key: 'S', icon: Ruler, action: () => scene.beginSize() },
+    fasteners,
   ];
   const arrange: MenuItem[] = [
     { label: 'Duplicate', key: 'Shift+D', icon: Copy, action: () => scene.duplicateAndGrab() },

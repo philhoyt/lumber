@@ -8,6 +8,7 @@ const HINTS = {
     ['Click', 'select'],
     ['Shift+A', 'add stock'],
     ['M', 'measure'],
+    ['F', 'fasteners'],
     ['Right-click', 'menu'],
     ['?', 'keys'],
   ],

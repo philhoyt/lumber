@@ -36,6 +36,7 @@ const SECTIONS: [string, [string, string][]][] = [
       ['Shift+D', 'Duplicate and grab the copy'],
       ['Ctrl+D', 'Duplicate with an offset'],
       ['Ctrl+G / Ctrl+Shift+G', 'Group / ungroup'],
+      ['F', 'Fastener markers: click a face to place one, a marker to remove it'],
       ['H / Alt+H', 'Hide / show all'],
       ['X or Delete', 'Delete'],
       ['Ctrl+Z / Ctrl+Shift+Z', 'Undo / redo'],

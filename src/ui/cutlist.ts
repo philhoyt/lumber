@@ -1,5 +1,6 @@
 /** The cut list and buy list panel, with cutting diagrams and a cost estimate. */
 import { cutRows, packBoards, packBoardsAuto, packSheets, partsByStock } from '../pack';
+import { hardwareRows, kindInfo } from '../fastener';
 import { describeCut, grainOf } from '../model';
 import { boardFeet, stockById } from '../stock';
 import type { Store } from '../store';
@@ -149,6 +150,18 @@ export class CutlistPanel {
         }
       }
     }
+    const hardware = hardwareRows(parts);
+    if (hardware.length) {
+      html += `<h3 class="hw-head">Hardware</h3>`;
+      for (const r of hardware) {
+        // The usual sizes already name the kind ("1 1/4\" pocket screw"); custom ones may not.
+        const label = kindInfo(r.kind).label.toLowerCase();
+        const kind = r.size.toLowerCase().includes(label.split(' ').pop()!)
+          ? ''
+          : ` <span class="muted">${esc(label)}</span>`;
+        html += `<div class="grp"><span>${r.qty} × ${esc(r.size)}${kind}</span><span class="muted names">${esc(r.names.join(', '))}</span></div>`;
+      }
+    }
     const totals: string[] = [];
     if (totalBf) totals.push(`${totalBf.toFixed(1)} board feet of lumber`);
     if (totalSqFt) totals.push(`${totalSqFt.toFixed(0)} sq ft of sheet goods`);
@@ -217,5 +230,11 @@ export function cutListCsv(store: Store): string {
       r.qty,
       r.stock.sheet ? '' : (boardFeet(r.stock, r.len) * r.qty).toFixed(2),
     ]);
+  const hardware = hardwareRows(store.parts);
+  if (hardware.length) {
+    rows.push([], ['Hardware', 'Size', 'Qty', 'Parts']);
+    for (const r of hardware)
+      rows.push([kindInfo(r.kind).label, r.size, r.qty, r.names.join('; ')]);
+  }
   return rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
 }

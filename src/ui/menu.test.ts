@@ -8,6 +8,7 @@ const actions = (): MenuActions => ({
   beginSize: vi.fn(),
   duplicateAndGrab: vi.fn(),
   setView: vi.fn(),
+  toggleFasten: vi.fn(),
 });
 const labels = (sections: ReturnType<typeof buildMenu>) =>
   sections.map((s) => s.map((i) => i.label));
@@ -17,7 +18,7 @@ describe('buildMenu', () => {
     const store = new Store();
     const m = buildMenu({ x: 0, y: 0, partId: null, ground: [10, 5, 0] }, store, actions());
     expect(labels(m)).toEqual([
-      ['Add stock', 'Select all'],
+      ['Add stock', 'Select all', 'Fasteners'],
       ['View', 'Fit all'],
     ]);
     const stock = m[0]![0]!.children!;
@@ -33,7 +34,7 @@ describe('buildMenu', () => {
     const a = actions();
     const m = buildMenu({ x: 0, y: 0, partId: 1, ground: null }, store, a);
     expect(labels(m)).toEqual([
-      ['Grab', 'Rotate', 'Set length'],
+      ['Grab', 'Rotate', 'Set length', 'Fasteners'],
       ['Duplicate', 'Array…', 'Drop', 'Mirror'],
       ['Hide', 'Delete'],
       ['Add stock', 'Select all', 'View'],

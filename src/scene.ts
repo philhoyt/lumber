@@ -36,6 +36,8 @@ import {
   type Part,
   type Vec3,
 } from './model';
+import { fastenerAt, fastenerLocal, fastenersKey, fastenersOf, type Fastener } from './fastener';
+import { buildMarkers, markerMesh, placeMarker } from './markers';
 import { measureBetween, measureText, nearestSnap, snapPoints } from './measure';
 import { snapDelta } from './snap';
 import { stockById, type Stock } from './stock';
@@ -125,7 +127,7 @@ const VIEW_DIRS: Record<Exclude<ViewName, 'fit' | 'selected'>, THREE.Vector3> = 
 };
 
 const meshSignature = (p: Part, d: Vec3): string =>
-  `${d.join(',')},${p.stock},${miterOf(p).join('/')},${cutsKey(cutsOf(p))}`;
+  `${d.join(',')},${p.stock},${miterOf(p).join('/')},${cutsKey(cutsOf(p))},${fastenersKey(fastenersOf(p))}`;
 
 const csg = new Evaluator();
 csg.useGroups = false;
@@ -216,6 +218,9 @@ export class LumberScene {
   private measureLabel: HTMLElement;
   private snapDot: THREE.Mesh;
   onMeasureChange: ((on: boolean) => void) | null = null;
+  /** F: placing fastener markers. The ghost shows where the next one would go. */
+  private fasten: { ghost: THREE.Group | null; ghostKind: string } | null = null;
+  private fastenWatchers: ((on: boolean) => void)[] = [];
 
   constructor(
     private container: HTMLElement,
@@ -359,6 +364,10 @@ export class LumberScene {
     return this.measure !== null;
   }
 
+  get fastening(): boolean {
+    return this.fasten !== null;
+  }
+
   get transforming(): boolean {
     return this.tf !== null;
   }
@@ -385,14 +394,14 @@ export class LumberScene {
     const mesh = new THREE.Mesh(geo, this.materialFor(stockById(p.stock), 'normal'));
     mesh.userData.id = p.id;
     const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), this.edgeMats.normal);
-    g.add(mesh, edges);
+    g.add(mesh, edges, buildMarkers(fastenersOf(p), d));
     g.userData.id = p.id;
     g.userData.sig = meshSignature(p, d);
     return g;
   }
   private disposeGroup(g: THREE.Group): void {
     this.partsGroup.remove(g);
-    for (const c of g.children) (c as THREE.Mesh).geometry.dispose();
+    for (const c of g.children) (c as Partial<THREE.Mesh>).geometry?.dispose(); // markers share theirs
   }
   private syncMesh(p: Part): void {
     let g = this.meshes.get(p.id);
@@ -508,6 +517,7 @@ export class LumberScene {
     const vh = center ? this.viewHeightAt(center) : 0;
     this.gizmo.update(rotating ? null : center, vh);
     this.rotateGizmo.update(rotating ? center : null, vh);
+    this.scaleMarkers();
     this.renderer.render(this.scene, this.camera);
     this.updateLabels();
     this.updateDims();
@@ -686,6 +696,99 @@ export class LumberScene {
     this.measureLabel.style.display = 'none';
     this.container.style.cursor = '';
     this.onMeasureChange?.(false);
+  }
+
+  // ---- fastener markers ----
+  /** Markers are real size, but never shrink below a few pixels on screen. */
+  private scaleMarkers(): void {
+    const minScale = (at: THREE.Vector3) => Math.max(1, (this.viewHeightAt(at) * 0.016) / 0.44);
+    for (const g of this.meshes.values()) {
+      const markers = g.children[2];
+      if (!g.visible || !markers?.children.length) continue;
+      const s = minScale(g.position);
+      for (const m of markers.children) m.scale.setScalar(s);
+    }
+    const ghost = this.fasten?.ghost;
+    if (ghost?.visible) ghost.scale.setScalar(minScale(ghost.position));
+  }
+  /** F: click a face to add a marker there, click a marker to take it away. */
+  toggleFasten(): void {
+    if (this.fasten) this.endFasten();
+    else {
+      if (this.measure) this.endMeasure();
+      this.fasten = { ghost: null, ghostKind: '' };
+      this.container.style.cursor = 'crosshair';
+      for (const w of this.fastenWatchers) w(true);
+    }
+  }
+  endFasten(): void {
+    if (!this.fasten) return;
+    if (this.fasten.ghost) this.scene.remove(this.fasten.ghost);
+    this.fasten = null;
+    this.container.style.cursor = '';
+    for (const w of this.fastenWatchers) w(false);
+  }
+  /** Be told when fastener placing starts and stops (toolbar, the bar over the view). */
+  watchFasten(fn: (on: boolean) => void): void {
+    this.fastenWatchers.push(fn);
+  }
+  /** What a click would do while placing: take a marker away, or add one on a face. */
+  private fastenTarget(
+    clientX: number,
+    clientY: number,
+  ):
+    | { partId: number; remove: number }
+    | { partId: number; add: Fastener; world: THREE.Vector3; normal: THREE.Vector3 }
+    | null {
+    this.setRay(clientX, clientY);
+    const hit = this.pickPart();
+    if (!hit) return null;
+    const partId = hit.object.userData.id as number;
+    const p = this.store.partById(partId);
+    const g = this.meshes.get(partId);
+    if (!p || !g) return null;
+    const markers = g.children[2];
+    if (markers) {
+      const heads = markers.children.map((m) => m.children[0]!);
+      const mh = this.ray.intersectObjects(heads, false)[0];
+      if (mh && mh.distance <= hit.distance + 0.05)
+        return { partId, remove: mh.object.userData.fastener as number };
+    }
+    const local = g.worldToLocal(hit.point.clone());
+    const n = hit.face?.normal ?? new THREE.Vector3(0, 0, 1);
+    const { kind, size } = this.store.settings.fastener;
+    const dims = partDims(p);
+    const add = fastenerAt(
+      kind,
+      local.toArray() as Vec3,
+      n.toArray() as Vec3,
+      dims,
+      this.store.settings.grid,
+      size,
+    );
+    const { point, normal } = fastenerLocal(add, dims);
+    const world = g.localToWorld(new THREE.Vector3().fromArray(point));
+    const wn = new THREE.Vector3().fromArray(normal).applyQuaternion(g.quaternion);
+    return { partId, add, world, normal: wn };
+  }
+  private updateFastenGhost(clientX: number, clientY: number): void {
+    const f = this.fasten;
+    if (!f) return;
+    const t = this.fastenTarget(clientX, clientY);
+    if (!t || 'remove' in t) {
+      if (f.ghost) f.ghost.visible = false;
+      this.container.style.cursor = t ? 'pointer' : 'crosshair';
+      return;
+    }
+    this.container.style.cursor = 'crosshair';
+    if (!f.ghost || f.ghostKind !== t.add.kind) {
+      if (f.ghost) this.scene.remove(f.ghost);
+      f.ghost = markerMesh(t.add.kind, [0, 0, 0], [0, 0, 1], true);
+      f.ghostKind = t.add.kind;
+      this.scene.add(f.ghost);
+    }
+    f.ghost.visible = true;
+    placeMarker(f.ghost, t.world.toArray() as Vec3, t.normal.toArray() as Vec3);
   }
 
   /** The point under the pointer: a snap point on the part it hits, else the hit, else the floor. */
@@ -1072,6 +1175,20 @@ export class LumberScene {
       else if (e.button === 2) this.finishTransform(false);
       return;
     }
+    if (this.fasten) {
+      if (e.button === 2) {
+        this.suppressMenu = true;
+        this.endFasten();
+        return;
+      }
+      if (e.button !== 0) return;
+      const t = this.fastenTarget(e.clientX, e.clientY);
+      if (!t) return;
+      if ('remove' in t) this.store.removeFastener(t.partId, t.remove);
+      else this.store.addFastener(t.partId, t.add);
+      this.updateFastenGhost(e.clientX, e.clientY);
+      return;
+    }
     if (this.measure) {
       if (e.button === 2) {
         this.suppressMenu = true;
@@ -1168,6 +1285,12 @@ export class LumberScene {
       if (!this.box.active && Math.hypot(e.clientX - this.box.x0, e.clientY - this.box.y0) > 3)
         this.box.active = true;
       if (this.box.active) this.drawBox();
+      return;
+    }
+    if (this.fasten) {
+      this.updateFastenGhost(e.clientX, e.clientY);
+      const hit = this.pickPart();
+      this.setHover(hit ? (hit.object.userData.id as number) : null);
       return;
     }
     if (this.measure) {
