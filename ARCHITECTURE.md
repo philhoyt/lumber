@@ -27,6 +27,20 @@ units      stock        pure data and conversions, no dependencies
      main              wires it together
 ```
 
+The scene keeps the interaction (picking, the modal transforms, box select,
+the pointer and key handlers) and delegates the rest to `view/`:
+
+- `view/camera.ts` `CameraRig`: the perspective and orthographic cameras on
+  one orbit, the named views, Blender's view keys and auto-perspective, and
+  the Alt+drag and trackpad gestures. The scene forwards its API so the
+  panels have one handle.
+- `view/snapFeedback.ts`: the quads over the faces a grab snapped to.
+- `view/dimLabels.ts`, `view/measureTool.ts`, `view/fastenMode.ts`: the D, M
+  and F tools, each owning its own overlay objects and HTML labels.
+- `view/partMesh.ts`: a part's geometry (box, miter outline, cuts subtracted)
+  and the signature that says when to rebuild it.
+- `view/labels.ts`: pinning HTML labels to world points.
+
 Rules of the layering:
 
 - `units`, `stock`, `model`, `snap`, `pack` and `store` never touch the DOM or

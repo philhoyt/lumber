@@ -3,6 +3,11 @@
  * modal transforms, and keeps the meshes in step with the store. All model changes
  * still go through the store.
  *
+ * The scene owns the interaction; the pieces around it live in `view/`: the camera rig
+ * (projections, views, orbit gestures), snap feedback, dimension labels, the measure
+ * tool, fastener placing and part geometry. The scene forwards the camera rig's API so
+ * the panels have one handle.
+ *
  * Moving parts (Blender keys):
  * - G grabs the selection: it follows the mouse on the floor plane; X / Y / Z constrain
  *   to one axis, Shift+X / Y / Z to the plane without that axis; type a distance;
@@ -12,19 +17,12 @@
  * - the gizmo and a part's body can also be dragged directly with the mouse
  */
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg';
-import { dragGesture, orbitDegrees, wheelGesture, wheelPixels, zoomScale } from './gestures';
+import { dragGesture } from './gestures';
 import { axisParam, Gizmo, ringAngle, RotateGizmo } from './gizmo';
 import {
   aabbCenter,
-  aabbSize,
-  cutBox,
-  cutsKey,
-  cutsOf,
   hasMiter,
   miterOf,
-  miterOutline,
   partAABB,
   partDims,
   rotateParts,
@@ -38,13 +36,22 @@ import {
   type Vec3,
 } from './model';
 import { explodeOffsets, offsetAABB } from './explode';
-import { fastenerAt, fastenerLocal, fastenersKey, fastenersOf, type Fastener } from './fastener';
-import { buildMarkers, markerMesh, placeMarker } from './markers';
-import { measureBetween, measureText, nearestSnap, snapPoints } from './measure';
-import { coplanarFaces, snapQuads, snapWithHits, type SnapHit } from './snap';
+import { fastenersOf } from './fastener';
+import { buildMarkers } from './markers';
+import { nearestSnap, snapPoints } from './measure';
+import { coplanarFaces, snapWithHits, type SnapHit } from './snap';
 import { stockById, type Stock } from './stock';
 import type { Store } from './store';
 import { fmt, parseLen } from './units';
+import { CameraRig, Z_UP, type Projection, type ViewName } from './view/camera';
+import { DimLabels } from './view/dimLabels';
+import { FastenMode } from './view/fastenMode';
+import { toScreen } from './view/labels';
+import { MeasureTool } from './view/measureTool';
+import { meshSignature, partGeometry } from './view/partMesh';
+import { SnapFeedback } from './view/snapFeedback';
+
+export type { Projection, ViewName } from './view/camera';
 
 type Constraint =
   | { kind: 'plane'; axes: AxisIndex[]; plane: THREE.Plane; ref: THREE.Vector3 }
@@ -104,12 +111,6 @@ export interface MenuContext {
   ground: Vec3 | null;
 }
 
-export type Projection = 'persp' | 'ortho';
-/** Half the ortho frustum height at zoom 1, world inches. */
-const ORTHO_HALF = 60;
-
-export type ViewName =
-  'iso' | 'top' | 'bottom' | 'front' | 'back' | 'right' | 'left' | 'fit' | 'selected';
 type MeshState = 'normal' | 'hover' | 'selected';
 
 const EDGE_COLORS: Record<MeshState, number> = {
@@ -121,78 +122,12 @@ const EMISSIVE: Record<MeshState, number> = { normal: 0, hover: 0x2a2416, select
 const LABELS = ['X', 'Y', 'Z'] as const;
 /** Quarter turns as a signed count in -1..2, so three turns read as -90°. */
 const signedTurns = (n: number): number => ((((n + 1) % 4) + 4) % 4) - 1;
-const Z_UP = new THREE.Vector3(0, 0, 1);
-const VIEW_DIRS: Record<Exclude<ViewName, 'fit' | 'selected'>, THREE.Vector3> = {
-  iso: new THREE.Vector3(1, -1, 0.8),
-  top: new THREE.Vector3(0, -0.0001, 1),
-  bottom: new THREE.Vector3(0, -0.0001, -1),
-  front: new THREE.Vector3(0, -1, 0),
-  back: new THREE.Vector3(0, 1, 0),
-  right: new THREE.Vector3(1, 0, 0),
-  left: new THREE.Vector3(-1, 0, 0),
-};
-
-const meshSignature = (p: Part, d: Vec3): string =>
-  `${d.join(',')},${p.stock},${miterOf(p).join('/')},${cutsKey(cutsOf(p))},${fastenersKey(fastenersOf(p))}`;
-
-const csg = new Evaluator();
-csg.useGroups = false;
-
-/** Take each cut's box out of the part's solid. */
-function subtractCuts(base: THREE.BufferGeometry, p: Part, d: Vec3): THREE.BufferGeometry {
-  let brush = new Brush(base);
-  brush.updateMatrixWorld();
-  for (const c of cutsOf(p)) {
-    const box = cutBox(c, d);
-    if (!box) continue;
-    const size = [box.max[0] - box.min[0], box.max[1] - box.min[1], box.max[2] - box.min[2]];
-    const tool = new Brush(new THREE.BoxGeometry(size[0], size[1], size[2]));
-    tool.position.set(
-      (box.min[0] + box.max[0]) / 2,
-      (box.min[1] + box.max[1]) / 2,
-      (box.min[2] + box.max[2]) / 2,
-    );
-    tool.updateMatrixWorld();
-    const next = csg.evaluate(brush, tool, SUBTRACTION);
-    brush.geometry.dispose();
-    tool.geometry.dispose();
-    brush = next;
-    brush.updateMatrixWorld();
-  }
-  return brush.geometry;
-}
-
-/** A box, or for a mitered board the face outline extruded through the thickness. */
-function partGeometry(p: Part, d: Vec3): THREE.BufferGeometry {
-  let geo: THREE.BufferGeometry;
-  if (!hasMiter(p) || stockById(p.stock).sheet) geo = new THREE.BoxGeometry(d[0], d[1], d[2]);
-  else {
-    const shape = new THREE.Shape(
-      miterOutline(d[0], d[1], miterOf(p)).map(([x, y]) => new THREE.Vector2(x, y)),
-    );
-    geo = new THREE.ExtrudeGeometry(shape, { depth: d[2], bevelEnabled: false });
-    geo.translate(0, 0, -d[2] / 2);
-  }
-  return cutsOf(p).length && !stockById(p.stock).sheet ? subtractCuts(geo, p, d) : geo;
-}
 
 export class LumberScene {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
-  private persp: THREE.PerspectiveCamera;
-  private ortho: THREE.OrthographicCamera;
-  private camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
-  /** The ortho view came from an axis view; orbiting away returns to perspective. */
-  private orthoFromAxis = false;
-  private axisDir: THREE.Vector3 | null = null;
-  private skipAutoPersp = false;
-  /** Called when the projection changes, for the view strip. */
-  onProjectionChange: ((mode: Projection) => void) | null = null;
-  private cameraWatchers: (() => void)[] = [];
-  private cameraKey = '';
-  private controls: OrbitControls;
-  /** Trackpad mode: two-finger scroll orbits, pinch zooms, Shift+scroll pans. Remembered per browser. */
-  private trackpadOn = false;
+  /** Cameras, orbit controls, views and gestures. */
+  readonly rig: CameraRig;
   private partsGroup = new THREE.Group();
   private meshes = new Map<number, THREE.Group>();
   private matCache = new Map<string, THREE.MeshLambertMaterial>();
@@ -218,23 +153,10 @@ export class LumberScene {
   private labelEl: HTMLElement;
   private dragLabelEl: HTMLElement;
   private boxEl: HTMLElement;
-  /** Dimension labels on every part and extents around the selection. */
-  showDims = false;
-  private dimLabels: HTMLElement[] = [];
-  private extentLabels: HTMLElement[] = [];
-  private extentLines: THREE.LineSegments;
-  /** Translucent quads over the faces a drag snapped to; they flash when the target changes. */
-  private snapQuads: { fill: THREE.Mesh; edge: THREE.LineLoop }[] = [];
-  private snapKey = '';
-  private snapFlash = 0;
-  private measure: { a: Vec3 | null; b: Vec3 | null; live: Vec3 | null } | null = null;
-  private measureLine: THREE.Line;
-  private measureLabel: HTMLElement;
-  private snapDot: THREE.Mesh;
-  onMeasureChange: ((on: boolean) => void) | null = null;
-  /** F: placing fastener markers. The ghost shows where the next one would go. */
-  private fasten: { ghost: THREE.Group | null; ghostKind: string } | null = null;
-  private fastenWatchers: ((on: boolean) => void)[] = [];
+  private readonly dims: DimLabels;
+  private readonly snapFx: SnapFeedback;
+  private readonly measureTool: MeasureTool;
+  private readonly fastenMode: FastenMode;
   /** E: how far the view is exploded, 0..1. Parts draw displaced; the model stays put. */
   explode = 0;
   private lastExplode = 0.5;
@@ -248,6 +170,7 @@ export class LumberScene {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     container.appendChild(this.renderer.domElement);
+    this.rig = new CameraRig(container, this.renderer.domElement, (name) => this.boundsFor(name));
     this.labelEl = document.createElement('div');
     this.labelEl.className = 'part-label';
     this.dragLabelEl = document.createElement('div');
@@ -257,34 +180,6 @@ export class LumberScene {
     container.append(this.labelEl, this.dragLabelEl, this.boxEl);
 
     this.scene.background = new THREE.Color(0x202226);
-    this.persp = new THREE.PerspectiveCamera(45, 1, 0.5, 5000);
-    this.persp.up.copy(Z_UP);
-    this.persp.position.set(90, -110, 70);
-    this.ortho = new THREE.OrthographicCamera(
-      -ORTHO_HALF,
-      ORTHO_HALF,
-      ORTHO_HALF,
-      -ORTHO_HALF,
-      -5000,
-      5000,
-    );
-    this.ortho.up.copy(Z_UP);
-    this.camera = this.persp;
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.minZoom = 0.05;
-    this.controls.maxZoom = 60;
-    this.controls.addEventListener('change', () => this.onCameraMoved());
-    this.controls.target.set(0, 0, 18);
-    // Blender: middle button orbits, Shift+middle pans, wheel zooms. Right-drag also pans.
-    this.controls.mouseButtons = {
-      LEFT: null,
-      MIDDLE: THREE.MOUSE.ROTATE,
-      RIGHT: THREE.MOUSE.PAN,
-    };
-    this.controls.minDistance = 10;
-    this.controls.maxDistance = 1200;
-    this.controls.update();
-
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x9a8a74, 1.0));
     const sun = new THREE.DirectionalLight(0xffffff, 1.4);
     sun.position.set(60, -40, 120);
@@ -306,30 +201,17 @@ export class LumberScene {
     axes.position.z = 0.02;
     this.scene.add(axes);
     this.scene.add(this.partsGroup, this.gizmo.group, this.rotateGizmo.group);
-    const overlayMat = new THREE.LineBasicMaterial({
-      color: 0xffd27a,
-      depthTest: false,
-      transparent: true,
+    this.dims = new DimLabels(this.rig, this.scene);
+    this.snapFx = new SnapFeedback(this.scene);
+    this.measureTool = new MeasureTool(this.rig, this.scene);
+    this.fastenMode = new FastenMode(this.scene, container, store, {
+      pick: (x, y) => {
+        this.setRay(x, y);
+        return this.pickPart();
+      },
+      ray: this.ray,
+      meshOf: (id) => this.meshes.get(id),
     });
-    this.extentLines = new THREE.LineSegments(new THREE.BufferGeometry(), overlayMat);
-    this.extentLines.renderOrder = 990;
-    this.extentLines.visible = false;
-    this.measureLine = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
-      new THREE.LineBasicMaterial({ color: 0x5fb3ff, depthTest: false, transparent: true }),
-    );
-    this.measureLine.renderOrder = 991;
-    this.measureLine.visible = false;
-    this.snapDot = new THREE.Mesh(
-      new THREE.SphereGeometry(1, 12, 8),
-      new THREE.MeshBasicMaterial({ color: 0x5fb3ff, depthTest: false, transparent: true }),
-    );
-    this.snapDot.renderOrder = 992;
-    this.snapDot.visible = false;
-    this.scene.add(this.extentLines, this.measureLine, this.snapDot);
-    this.measureLabel = document.createElement('div');
-    this.measureLabel.className = 'measure-label';
-    container.appendChild(this.measureLabel);
 
     new ResizeObserver(() => this.resize()).observe(container);
     this.resize();
@@ -340,34 +222,6 @@ export class LumberScene {
     el.addEventListener('pointercancel', (e) => this.onPointerUp(e));
     el.addEventListener('pointerleave', () => this.setHover(null));
     el.addEventListener('contextmenu', (e) => this.onContextMenu(e));
-    // Alt+left-drag orbits (Shift+Alt pans, Ctrl+Alt zooms) for mice without a middle
-    // button. The decision is made as the button goes down, ahead of the orbit controls,
-    // which read the button map only then; it is cleared again when the button comes up.
-    container.addEventListener(
-      'pointerdown',
-      (e) => {
-        const g = dragGesture(e);
-        this.controls.mouseButtons.LEFT =
-          g === 'orbit'
-            ? THREE.MOUSE.ROTATE
-            : g === 'pan'
-              ? THREE.MOUSE.PAN
-              : g === 'zoom'
-                ? THREE.MOUSE.DOLLY
-                : null;
-      },
-      { capture: true },
-    );
-    window.addEventListener('pointerup', () => {
-      this.controls.mouseButtons.LEFT = null;
-    });
-    // Trackpad mode takes the wheel before the orbit controls see it.
-    container.addEventListener('wheel', (e) => this.onWheel(e), { capture: true, passive: false });
-    try {
-      this.trackpadOn = localStorage.getItem('lumber.trackpad') === '1';
-    } catch {
-      /* no storage */
-    }
     el.addEventListener('dblclick', (e) => {
       if (this.tf) return;
       this.setRay(e.clientX, e.clientY);
@@ -408,15 +262,80 @@ export class LumberScene {
   }
 
   get measuring(): boolean {
-    return this.measure !== null;
+    return this.measureTool.active;
   }
-
   get fastening(): boolean {
-    return this.fasten !== null;
+    return this.fastenMode.active;
   }
-
   get transforming(): boolean {
     return this.tf !== null;
+  }
+  get showDims(): boolean {
+    return this.dims.on;
+  }
+
+  // ---- the camera rig's API, forwarded ----
+  get projection(): Projection {
+    return this.rig.projection;
+  }
+  get onProjectionChange(): ((mode: Projection) => void) | null {
+    return this.rig.onProjectionChange;
+  }
+  set onProjectionChange(fn: ((mode: Projection) => void) | null) {
+    this.rig.onProjectionChange = fn;
+  }
+  setProjection(mode: Projection, fromAxis = false): void {
+    this.rig.setProjection(mode, fromAxis);
+  }
+  toggleProjection(): void {
+    this.rig.toggleProjection();
+  }
+  watchCamera(fn: () => void): void {
+    this.rig.watchCamera(fn);
+  }
+  cameraAxes(): [Vec3, Vec3, Vec3] {
+    return this.rig.cameraAxes();
+  }
+  viewDir(): Vec3 {
+    return this.rig.viewDir();
+  }
+  setView(name: ViewName): void {
+    this.rig.setView(name);
+  }
+  orbitStep(az: number, el: number): void {
+    this.rig.orbitStep(az, el);
+  }
+  orbitFree(az: number, el: number): void {
+    this.rig.orbitFree(az, el);
+  }
+  flipView(): void {
+    this.rig.flipView();
+  }
+  zoomStep(inward: boolean): void {
+    this.rig.zoomStep(inward);
+  }
+  panStep(dx: number, dy: number): void {
+    this.rig.panStep(dx, dy);
+  }
+  panPixels(dx: number, dy: number): void {
+    this.rig.panPixels(dx, dy);
+  }
+  dolly(scale: number): void {
+    this.rig.dolly(scale);
+  }
+  get trackpad(): boolean {
+    return this.rig.trackpad;
+  }
+  setTrackpad(on: boolean): void {
+    this.rig.setTrackpad(on);
+  }
+  /** What a named view should frame: the selection for `selected`, else everything visible. */
+  private boundsFor(name: ViewName): AABB {
+    const parts =
+      name === 'selected' && this.store.selected.size
+        ? this.store.selectedParts()
+        : this.store.visibleParts();
+    return parts.length ? this.displayBounds(parts) : { min: [-24, -24, 0], max: [24, 24, 24] };
   }
 
   // ---- meshes ----
@@ -501,126 +420,46 @@ export class LumberScene {
       if (p && g) this.applyState(g, p);
     }
   }
+  /** Markers are real size, but never shrink below a few pixels on screen. */
+  private scaleMarkers(): void {
+    const minScale = (at: THREE.Vector3) => Math.max(1, (this.rig.viewHeightAt(at) * 0.016) / 0.44);
+    for (const g of this.meshes.values()) {
+      const markers = g.children[2];
+      if (!g.visible || !markers?.children.length) continue;
+      const s = minScale(g.position);
+      for (const m of markers.children) m.scale.setScalar(s);
+    }
+    this.fastenMode.scaleGhost(minScale);
+  }
 
   private resize(): void {
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
     if (!w || !h) return;
     this.renderer.setSize(w, h, false);
-    this.persp.aspect = w / h;
-    this.persp.updateProjectionMatrix();
-    this.ortho.left = -ORTHO_HALF * (w / h);
-    this.ortho.right = ORTHO_HALF * (w / h);
-    this.ortho.updateProjectionMatrix();
-  }
-
-  /** The world height visible at a point: what a constant screen size must scale to. */
-  private viewHeightAt(point: THREE.Vector3): number {
-    if (this.camera instanceof THREE.OrthographicCamera) return (2 * ORTHO_HALF) / this.camera.zoom;
-    const fov = (this.persp.fov * Math.PI) / 180;
-    return 2 * this.camera.position.distanceTo(point) * Math.tan(fov / 2);
-  }
-
-  // ---- projection ----
-  get projection(): Projection {
-    return this.camera === this.ortho ? 'ortho' : 'persp';
-  }
-  /** Switch cameras in place: the view keeps its direction and apparent size. */
-  setProjection(mode: Projection, fromAxis = false): void {
-    if (mode === this.projection) {
-      this.orthoFromAxis = mode === 'ortho' && fromAxis;
-      return;
-    }
-    const target = this.controls.target;
-    const tan = Math.tan((this.persp.fov * Math.PI) / 360);
-    if (mode === 'ortho') {
-      const dist = this.persp.position.distanceTo(target);
-      this.ortho.position.copy(this.persp.position);
-      this.ortho.quaternion.copy(this.persp.quaternion);
-      this.ortho.zoom = ORTHO_HALF / (dist * tan);
-      this.ortho.updateProjectionMatrix();
-      this.camera = this.ortho;
-    } else {
-      const height = (2 * ORTHO_HALF) / this.ortho.zoom;
-      const dir = this.ortho.position.clone().sub(target).normalize();
-      this.persp.position.copy(target).add(dir.multiplyScalar(height / (2 * tan)));
-      this.persp.quaternion.copy(this.ortho.quaternion);
-      this.camera = this.persp;
-    }
-    this.orthoFromAxis = mode === 'ortho' && fromAxis;
-    this.controls.object = this.camera;
-    this.skipAutoPersp = true;
-    this.controls.update();
-    this.skipAutoPersp = false;
-    this.onProjectionChange?.(mode);
-  }
-  toggleProjection(): void {
-    this.setProjection(this.projection === 'ortho' ? 'persp' : 'ortho');
-  }
-  /** Blender's auto-perspective: orbiting away from an axis view drops back to perspective. */
-  private onCameraMoved(): void {
-    if (this.skipAutoPersp || !this.orthoFromAxis || !this.axisDir) return;
-    const dir = this.camera.position.clone().sub(this.controls.target).normalize();
-    if (dir.angleTo(this.axisDir) > 0.02) this.setProjection('persp');
+    this.rig.resize(w, h);
   }
 
   private animate = (): void => {
     requestAnimationFrame(this.animate);
-    this.controls.update();
-    this.noteCamera();
+    this.rig.tick();
     const center = this.selectionCenter();
     const rotating = this.tf?.kind === 'rotate';
-    const vh = center ? this.viewHeightAt(center) : 0;
+    const vh = center ? this.rig.viewHeightAt(center) : 0;
     this.gizmo.update(rotating || this.explode ? null : center, vh);
     this.rotateGizmo.update(rotating ? center : null, vh);
     this.scaleMarkers();
-    if (this.snapFlash > 0.01) {
-      this.snapFlash *= 0.9;
-      for (const { fill } of this.snapQuads)
-        (fill.material as THREE.MeshBasicMaterial).opacity = 0.22 + 0.45 * this.snapFlash;
-    }
-    this.renderer.render(this.scene, this.camera);
+    this.snapFx.tick();
+    this.renderer.render(this.scene, this.rig.camera);
     this.updateLabels();
-    this.updateDims();
-    this.updateMeasure();
+    this.dims.update(this.store);
+    this.measureTool.update();
   };
-
-  /** Tell the camera watchers when the view has turned or changed projection. */
-  private noteCamera(): void {
-    const q = this.camera.quaternion;
-    const key = `${q.x.toFixed(4)},${q.y.toFixed(4)},${q.z.toFixed(4)},${q.w.toFixed(4)},${this.projection}`;
-    if (key === this.cameraKey) return;
-    this.cameraKey = key;
-    for (const fn of this.cameraWatchers) fn();
-  }
-  /** Called whenever the camera turns or switches projection; for the corner gizmo. */
-  watchCamera(fn: () => void): void {
-    this.cameraWatchers.push(fn);
-  }
-  /** The world axes in camera space: x right, y up, z toward the viewer. */
-  cameraAxes(): [Vec3, Vec3, Vec3] {
-    const inv = this.camera.quaternion.clone().invert();
-    const to = (x: number, y: number, z: number): Vec3 =>
-      new THREE.Vector3(x, y, z).applyQuaternion(inv).toArray();
-    return [to(1, 0, 0), to(0, 1, 0), to(0, 0, 1)];
-  }
-  /** The unit vector from the model to the camera. */
-  viewDir(): Vec3 {
-    return this.camera.position.clone().sub(this.controls.target).normalize().toArray();
-  }
 
   private selectionCenter(): THREE.Vector3 | null {
     const list = this.store.selectedParts();
     if (!list.length) return null;
     return new THREE.Vector3().fromArray(aabbCenter(this.displayBounds(list)));
-  }
-
-  private toScreen(v: THREE.Vector3): [number, number] {
-    const p = v.clone().project(this.camera);
-    return [
-      ((p.x + 1) / 2) * this.container.clientWidth,
-      ((1 - p.y) / 2) * this.container.clientHeight,
-    ];
   }
 
   private updateLabels(): void {
@@ -629,7 +468,7 @@ export class LumberScene {
     const c = this.selectionCenter();
     if (p && c) {
       // Sit the label above the gizmo's up arrow so the two never overlap.
-      const [x, y] = this.toScreen(c.clone().setZ(c.z + this.gizmo.group.scale.z * 1.15));
+      const [x, y] = toScreen(this.rig, c.clone().setZ(c.z + this.gizmo.group.scale.z * 1.15));
       this.labelEl.style.display = 'block';
       this.labelEl.style.left = `${x}px`;
       this.labelEl.style.top = `${y}px`;
@@ -641,7 +480,7 @@ export class LumberScene {
 
     const t = this.tf;
     if (t && c && (t.moved || t.modal)) {
-      const [x, y] = this.toScreen(c);
+      const [x, y] = toScreen(this.rig, c);
       this.dragLabelEl.style.display = 'block';
       this.dragLabelEl.style.left = `${x}px`;
       this.dragLabelEl.style.top = `${y}px`;
@@ -689,121 +528,42 @@ export class LumberScene {
     );
   }
 
-  // ---- dimensions ----
+  // ---- dimensions, measuring, fasteners ----
+  /** D: dimension labels on every part and extents around the selection. */
   toggleDims(): void {
-    if (this.explode && !this.showDims) this.setExplode(0);
-    this.showDims = !this.showDims;
-    if (!this.showDims) {
-      for (const el of this.dimLabels) el.style.display = 'none';
-      for (const el of this.extentLabels) el.style.display = 'none';
-      this.extentLines.visible = false;
-    }
+    if (this.explode && !this.dims.on) this.setExplode(0);
+    this.dims.toggle();
   }
-
-  /** Put a label at a world point, or hide it when the point is behind the camera. */
-  private placeLabel(el: HTMLElement, world: THREE.Vector3, text: string): void {
-    const p = world.clone().project(this.camera);
-    if (p.z > 1) {
-      el.style.display = 'none';
-      return;
-    }
-    el.style.display = 'block';
-    el.style.left = `${((p.x + 1) / 2) * this.container.clientWidth}px`;
-    el.style.top = `${((1 - p.y) / 2) * this.container.clientHeight}px`;
-    if (el.textContent !== text) el.textContent = text;
-  }
-
-  private label(pool: HTMLElement[], i: number, cls: string): HTMLElement {
-    let el = pool[i];
-    if (!el) {
-      el = document.createElement('div');
-      el.className = cls;
-      this.container.appendChild(el);
-      pool[i] = el;
-    }
-    return el;
-  }
-
-  private updateDims(): void {
-    if (!this.showDims) return;
-    const { store } = this;
-    const selectedOne = store.selected.size === 1 ? [...store.selected][0] : null;
-    let i = 0;
-    for (const p of store.visibleParts()) {
-      if (p.id === selectedOne) continue; // the part label already names it
-      const b = partAABB(p);
-      const s = stockById(p.stock);
-      const text = s.sheet ? `${fmt(p.w ?? s.sheet[0])} × ${fmt(p.len)}` : fmt(p.len);
-      this.placeLabel(
-        this.label(this.dimLabels, i++, 'dim-label'),
-        new THREE.Vector3((b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, b.max[2]),
-        text,
-      );
-    }
-    for (let k = i; k < this.dimLabels.length; k++) this.dimLabels[k]!.style.display = 'none';
-
-    // Extents of the selection: three dimension lines just outside its box.
-    const list = store.selectedParts();
-    if (!list.length) {
-      this.extentLines.visible = false;
-      for (const el of this.extentLabels) el.style.display = 'none';
-      return;
-    }
-    const u = unionAABB(list);
-    const size = aabbSize(u);
-    const c = new THREE.Vector3().fromArray(aabbCenter(u));
-    const off = this.viewHeightAt(c) * 0.03;
-    const t = off * 0.4; // tick length
-    const [x0, y0, z0] = u.min;
-    const [x1, y1, z1] = u.max;
-    const pts: number[] = [];
-    const seg = (a: Vec3, b: Vec3) => pts.push(...a, ...b);
-    // width along X, in front of the box at floor level
-    seg([x0, y0 - off, z0], [x1, y0 - off, z0]);
-    seg([x0, y0 - off - t, z0], [x0, y0 - off + t, z0]);
-    seg([x1, y0 - off - t, z0], [x1, y0 - off + t, z0]);
-    // depth along Y, to the right of the box
-    seg([x1 + off, y0, z0], [x1 + off, y1, z0]);
-    seg([x1 + off - t, y0, z0], [x1 + off + t, y0, z0]);
-    seg([x1 + off - t, y1, z0], [x1 + off + t, y1, z0]);
-    // height along Z, at the back-right corner
-    seg([x1 + off, y1 + off, z0], [x1 + off, y1 + off, z1]);
-    seg([x1 + off - t, y1 + off, z0], [x1 + off + t, y1 + off, z0]);
-    seg([x1 + off - t, y1 + off, z1], [x1 + off + t, y1 + off, z1]);
-    this.extentLines.geometry.dispose();
-    this.extentLines.geometry = new THREE.BufferGeometry().setAttribute(
-      'position',
-      new THREE.Float32BufferAttribute(pts, 3),
-    );
-    this.extentLines.visible = true;
-    const mids: [THREE.Vector3, string][] = [
-      [new THREE.Vector3((x0 + x1) / 2, y0 - off, z0), `W ${fmt(size[0])}`],
-      [new THREE.Vector3(x1 + off, (y0 + y1) / 2, z0), `D ${fmt(size[1])}`],
-      [new THREE.Vector3(x1 + off, y1 + off, (z0 + z1) / 2), `H ${fmt(size[2])}`],
-    ];
-    mids.forEach(([v, text], k) =>
-      this.placeLabel(this.label(this.extentLabels, k, 'dim-label extent'), v, text),
-    );
-  }
-
-  // ---- measuring ----
   /** M: measure between two clicked points, snapping to part corners, edges and faces. */
   toggleMeasure(): void {
     if (this.explode) this.setExplode(0);
-    if (this.measure) this.endMeasure();
-    else {
-      this.measure = { a: null, b: null, live: null };
-      this.container.style.cursor = 'crosshair';
-      this.onMeasureChange?.(true);
-    }
+    if (this.measureTool.active) this.measureTool.end();
+    else this.measureTool.start();
   }
   endMeasure(): void {
-    this.measure = null;
-    this.measureLine.visible = false;
-    this.snapDot.visible = false;
-    this.measureLabel.style.display = 'none';
-    this.container.style.cursor = '';
-    this.onMeasureChange?.(false);
+    this.measureTool.end();
+  }
+  get onMeasureChange(): ((on: boolean) => void) | null {
+    return this.measureTool.onChange;
+  }
+  set onMeasureChange(fn: ((on: boolean) => void) | null) {
+    this.measureTool.onChange = fn;
+  }
+  /** F: click a face to add a marker there, click a marker to take it away. */
+  toggleFasten(): void {
+    if (this.explode) this.setExplode(0);
+    if (this.fastenMode.active) this.fastenMode.end();
+    else {
+      if (this.measureTool.active) this.measureTool.end();
+      this.fastenMode.start();
+    }
+  }
+  endFasten(): void {
+    this.fastenMode.end();
+  }
+  /** Be told when fastener placing starts and stops (toolbar, the bar over the view). */
+  watchFasten(fn: (on: boolean) => void): void {
+    this.fastenMode.watch(fn);
   }
 
   // ---- exploded view ----
@@ -820,9 +580,9 @@ export class LumberScene {
     if (v === this.explode) return;
     if (v > 0) {
       if (this.tf) this.finishTransform(false);
-      if (this.measure) this.endMeasure();
-      if (this.fasten) this.endFasten();
-      if (this.showDims) this.toggleDims();
+      if (this.measureTool.active) this.measureTool.end();
+      if (this.fastenMode.active) this.fastenMode.end();
+      if (this.dims.on) this.dims.toggle();
       this.lastExplode = v;
     }
     this.explode = v;
@@ -857,100 +617,16 @@ export class LumberScene {
     return { min, max };
   }
 
-  // ---- fastener markers ----
-  /** Markers are real size, but never shrink below a few pixels on screen. */
-  private scaleMarkers(): void {
-    const minScale = (at: THREE.Vector3) => Math.max(1, (this.viewHeightAt(at) * 0.016) / 0.44);
-    for (const g of this.meshes.values()) {
-      const markers = g.children[2];
-      if (!g.visible || !markers?.children.length) continue;
-      const s = minScale(g.position);
-      for (const m of markers.children) m.scale.setScalar(s);
-    }
-    const ghost = this.fasten?.ghost;
-    if (ghost?.visible) ghost.scale.setScalar(minScale(ghost.position));
+  // ---- picking ----
+  private setRay(clientX: number, clientY: number): void {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    this.ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+    this.ray.setFromCamera(this.ndc, this.rig.camera);
   }
-  /** F: click a face to add a marker there, click a marker to take it away. */
-  toggleFasten(): void {
-    if (this.explode) this.setExplode(0);
-    if (this.fasten) this.endFasten();
-    else {
-      if (this.measure) this.endMeasure();
-      this.fasten = { ghost: null, ghostKind: '' };
-      this.container.style.cursor = 'crosshair';
-      for (const w of this.fastenWatchers) w(true);
-    }
+  private pickPart(): THREE.Intersection | null {
+    const meshes = this.partsGroup.children.filter((g) => g.visible).map((g) => g.children[0]!);
+    return this.ray.intersectObjects(meshes, false)[0] ?? null;
   }
-  endFasten(): void {
-    if (!this.fasten) return;
-    if (this.fasten.ghost) this.scene.remove(this.fasten.ghost);
-    this.fasten = null;
-    this.container.style.cursor = '';
-    for (const w of this.fastenWatchers) w(false);
-  }
-  /** Be told when fastener placing starts and stops (toolbar, the bar over the view). */
-  watchFasten(fn: (on: boolean) => void): void {
-    this.fastenWatchers.push(fn);
-  }
-  /** What a click would do while placing: take a marker away, or add one on a face. */
-  private fastenTarget(
-    clientX: number,
-    clientY: number,
-  ):
-    | { partId: number; remove: number }
-    | { partId: number; add: Fastener; world: THREE.Vector3; normal: THREE.Vector3 }
-    | null {
-    this.setRay(clientX, clientY);
-    const hit = this.pickPart();
-    if (!hit) return null;
-    const partId = hit.object.userData.id as number;
-    const p = this.store.partById(partId);
-    const g = this.meshes.get(partId);
-    if (!p || !g) return null;
-    const markers = g.children[2];
-    if (markers) {
-      const heads = markers.children.map((m) => m.children[0]!);
-      const mh = this.ray.intersectObjects(heads, false)[0];
-      if (mh && mh.distance <= hit.distance + 0.05)
-        return { partId, remove: mh.object.userData.fastener as number };
-    }
-    const local = g.worldToLocal(hit.point.clone());
-    const n = hit.face?.normal ?? new THREE.Vector3(0, 0, 1);
-    const { kind, size } = this.store.settings.fastener;
-    const dims = partDims(p);
-    const add = fastenerAt(
-      kind,
-      local.toArray(),
-      n.toArray(),
-      dims,
-      this.store.settings.grid,
-      size,
-    );
-    const { point, normal } = fastenerLocal(add, dims);
-    const world = g.localToWorld(new THREE.Vector3().fromArray(point));
-    const wn = new THREE.Vector3().fromArray(normal).applyQuaternion(g.quaternion);
-    return { partId, add, world, normal: wn };
-  }
-  private updateFastenGhost(clientX: number, clientY: number): void {
-    const f = this.fasten;
-    if (!f) return;
-    const t = this.fastenTarget(clientX, clientY);
-    if (!t || 'remove' in t) {
-      if (f.ghost) f.ghost.visible = false;
-      this.container.style.cursor = t ? 'pointer' : 'crosshair';
-      return;
-    }
-    this.container.style.cursor = 'crosshair';
-    if (!f.ghost || f.ghostKind !== t.add.kind) {
-      if (f.ghost) this.scene.remove(f.ghost);
-      f.ghost = markerMesh(t.add.kind, [0, 0, 0], [0, 0, 1], true);
-      f.ghostKind = t.add.kind;
-      this.scene.add(f.ghost);
-    }
-    f.ghost.visible = true;
-    placeMarker(f.ghost, t.world.toArray(), t.normal.toArray());
-  }
-
   /** The point under the pointer: a snap point on the part it hits, else the hit, else the floor. */
   private snapUnderPointer(clientX: number, clientY: number): Vec3 | null {
     this.setRay(clientX, clientY);
@@ -959,7 +635,7 @@ export class LumberScene {
       const p = this.store.partById(hit.object.userData.id as number);
       const at: Vec3 = [hit.point.x, hit.point.y, hit.point.z];
       if (!p) return at;
-      const tol = this.viewHeightAt(hit.point) * 0.025;
+      const tol = this.rig.viewHeightAt(hit.point) * 0.025;
       return nearestSnap(snapPoints(partAABB(p)), at, tol) ?? at;
     }
     const g = this.groundPoint(clientX, clientY);
@@ -967,192 +643,6 @@ export class LumberScene {
     const grid = this.store.settings.grid;
     const snap = (v: number) => (grid ? Math.round(v / grid) * grid : v);
     return [snap(g[0]), snap(g[1]), 0];
-  }
-
-  private updateMeasure(): void {
-    const m = this.measure;
-    if (!m) return;
-    const end = m.b ?? m.live;
-    const dot = m.b ? null : m.live;
-    if (dot) {
-      this.snapDot.visible = true;
-      this.snapDot.position.fromArray(dot);
-      const s = this.viewHeightAt(this.snapDot.position) * 0.006;
-      this.snapDot.scale.set(s, s, s);
-    } else this.snapDot.visible = false;
-    if (!m.a || !end) {
-      this.measureLine.visible = false;
-      this.measureLabel.style.display = 'none';
-      return;
-    }
-    const pos = this.measureLine.geometry.getAttribute('position') as THREE.BufferAttribute;
-    pos.setXYZ(0, m.a[0], m.a[1], m.a[2]);
-    pos.setXYZ(1, end[0], end[1], end[2]);
-    pos.needsUpdate = true;
-    this.measureLine.visible = true;
-    const mid = new THREE.Vector3(
-      (m.a[0] + end[0]) / 2,
-      (m.a[1] + end[1]) / 2,
-      (m.a[2] + end[2]) / 2,
-    );
-    this.placeLabel(this.measureLabel, mid, measureText(measureBetween(m.a, end), fmt));
-  }
-
-  // ---- views ----
-  private bounds(parts: readonly Part[]): AABB {
-    return parts.length ? this.displayBounds(parts) : { min: [-24, -24, 0], max: [24, 24, 24] };
-  }
-  setView(name: ViewName): void {
-    const parts =
-      name === 'selected' && this.store.selected.size
-        ? this.store.selectedParts()
-        : this.store.visibleParts();
-    const u = this.bounds(parts);
-    const center = new THREE.Vector3().fromArray(aabbCenter(u));
-    const radius = Math.max(12, new THREE.Vector3().fromArray(u.max).distanceTo(center));
-    const dist = (radius / Math.sin((this.persp.fov * Math.PI) / 360)) * 1.1;
-    const keepDir = name === 'fit' || name === 'selected';
-    // Axis views are orthographic, as in Blender; iso is perspective.
-    if (!keepDir) {
-      if (name === 'iso') this.setProjection('persp');
-      else this.setProjection('ortho', true);
-      this.axisDir = name === 'iso' ? null : VIEW_DIRS[name].clone().normalize();
-    }
-    const dir = keepDir
-      ? this.camera.position.clone().sub(this.controls.target)
-      : VIEW_DIRS[name].clone();
-    this.camera.position.copy(center).add(dir.normalize().multiplyScalar(dist));
-    this.controls.target.copy(center);
-    if (this.camera instanceof THREE.OrthographicCamera) {
-      this.camera.zoom = ORTHO_HALF / (radius * 1.1);
-      this.camera.updateProjectionMatrix();
-    }
-    this.skipAutoPersp = true;
-    this.controls.update();
-    this.skipAutoPersp = false;
-  }
-  /** Turn the camera about the model: `az` degrees around the up axis, `el` degrees up or down. */
-  orbitStep(az: number, el: number): void {
-    const offset = this.camera.position.clone().sub(this.controls.target);
-    if (az) offset.applyAxisAngle(Z_UP, (az * Math.PI) / 180);
-    if (el) {
-      const side = new THREE.Vector3().crossVectors(Z_UP, offset);
-      if (side.lengthSq() > 1e-9) {
-        side.normalize();
-        const polar = offset.angleTo(Z_UP);
-        const step = (el * Math.PI) / 180;
-        const target = Math.min(Math.PI - 0.01, Math.max(0.01, polar - step));
-        offset.applyAxisAngle(side, polar - target);
-      }
-    }
-    this.camera.position.copy(this.controls.target).add(offset);
-    // A stepped orbit is a view snap, not a free orbit: it keeps the ortho view.
-    if (this.orthoFromAxis) this.axisDir = offset.clone().normalize();
-    this.skipAutoPersp = true;
-    this.controls.update();
-    this.skipAutoPersp = false;
-  }
-
-  /** Blender's Numpad 9: look from the opposite side, a half turn about the up axis. */
-  flipView(): void {
-    const dir = this.viewDir();
-    if (Math.abs(dir[2]) > 0.999) this.setView(dir[2] > 0 ? 'bottom' : 'top');
-    else this.orbitStep(180, 0);
-  }
-  /** Blender's Numpad + and -: a step closer or farther. */
-  zoomStep(inward: boolean): void {
-    this.dolly(inward ? 1 / 1.25 : 1.25);
-  }
-  /** Blender's Ctrl+Numpad 2/4/6/8: slide the view by an eighth of its height. */
-  panStep(dx: number, dy: number): void {
-    const step = (this.container.clientHeight || 400) / 8;
-    this.panPixels(dx * step, dy * step);
-  }
-
-  // ---- trackpad gestures ----
-  get trackpad(): boolean {
-    return this.trackpadOn;
-  }
-  setTrackpad(on: boolean): void {
-    this.trackpadOn = on;
-    try {
-      localStorage.setItem('lumber.trackpad', on ? '1' : '0');
-    } catch {
-      /* best effort */
-    }
-  }
-  private onWheel(e: WheelEvent): void {
-    if (!this.trackpadOn) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const [dx, dy] = wheelPixels(e.deltaX, e.deltaY, e.deltaMode);
-    const g = wheelGesture(e);
-    if (g === 'zoom') this.dolly(zoomScale(dy));
-    else if (g === 'pan') this.panPixels(-dx, dy);
-    else {
-      const { az, el } = orbitDegrees(dx, dy);
-      this.orbitFree(az, el);
-    }
-  }
-  /** Orbit by degrees as a free orbit does: an axis ortho view drops back to perspective. */
-  orbitFree(az: number, el: number): void {
-    const offset = this.camera.position.clone().sub(this.controls.target);
-    if (az) offset.applyAxisAngle(Z_UP, (az * Math.PI) / 180);
-    if (el) {
-      const side = new THREE.Vector3().crossVectors(Z_UP, offset);
-      if (side.lengthSq() > 1e-9) {
-        side.normalize();
-        const polar = offset.angleTo(Z_UP);
-        const target = Math.min(Math.PI - 0.01, Math.max(0.01, polar - (el * Math.PI) / 180));
-        offset.applyAxisAngle(side, polar - target);
-      }
-    }
-    this.camera.position.copy(this.controls.target).add(offset);
-    this.controls.update();
-  }
-  /** Slide the view by screen pixels: the camera moves right by `dx` and up by `dy`. */
-  panPixels(dx: number, dy: number): void {
-    const h = this.container.clientHeight || 1;
-    const perPx = this.viewHeightAt(this.controls.target) / h;
-    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrix, 0);
-    const up = new THREE.Vector3().setFromMatrixColumn(this.camera.matrix, 1);
-    const move = right.multiplyScalar(dx * perPx).add(up.multiplyScalar(dy * perPx));
-    this.camera.position.add(move);
-    this.controls.target.add(move);
-    this.skipAutoPersp = true;
-    this.controls.update();
-    this.skipAutoPersp = false;
-  }
-  /** Move toward or away from the target by a factor; an ortho view changes its zoom instead. */
-  dolly(scale: number): void {
-    if (this.camera instanceof THREE.OrthographicCamera) {
-      this.camera.zoom = Math.min(
-        this.controls.maxZoom,
-        Math.max(this.controls.minZoom, this.camera.zoom / scale),
-      );
-      this.camera.updateProjectionMatrix();
-    } else {
-      const offset = this.camera.position.clone().sub(this.controls.target);
-      const dist = Math.min(
-        this.controls.maxDistance,
-        Math.max(this.controls.minDistance, offset.length() * scale),
-      );
-      this.camera.position.copy(this.controls.target).add(offset.setLength(dist));
-    }
-    this.skipAutoPersp = true;
-    this.controls.update();
-    this.skipAutoPersp = false;
-  }
-
-  // ---- picking ----
-  private setRay(clientX: number, clientY: number): void {
-    const r = this.renderer.domElement.getBoundingClientRect();
-    this.ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
-    this.ray.setFromCamera(this.ndc, this.camera);
-  }
-  private pickPart(): THREE.Intersection | null {
-    const meshes = this.partsGroup.children.filter((g) => g.visible).map((g) => g.children[0]!);
-    return this.ray.intersectObjects(meshes, false)[0] ?? null;
   }
   /**
    * A right click that did not pan and did not cancel a transform: select what is under
@@ -1204,7 +694,7 @@ export class LumberScene {
     if (!list.length) return null;
     const ids = new Set(list.map((p) => p.id));
     const aabb = unionAABB(list);
-    this.controls.enabled = false;
+    this.rig.enabled = false;
     this.gizmo.setHover(null);
     this.tf = {
       kind,
@@ -1368,87 +858,11 @@ export class LumberScene {
     const axes = t.constraint.kind === 'axis' ? [t.constraint.axis] : t.constraint.axes;
     t.snaps = snapWithHits(t.aabb, raw, axes, t.others, this.store.settings).hits;
     this.applyDelta(raw);
-    this.showSnaps(t);
-  }
-
-  /** The i-th feedback quad, made on first use. */
-  private snapQuadAt(i: number): { fill: THREE.Mesh; edge: THREE.LineLoop } {
-    while (this.snapQuads.length <= i) {
-      const pos = new THREE.BufferAttribute(new Float32Array(12), 3);
-      const fillGeo = new THREE.BufferGeometry()
-        .setAttribute('position', pos)
-        .setIndex([0, 1, 2, 0, 2, 3]);
-      const fill = new THREE.Mesh(
-        fillGeo,
-        new THREE.MeshBasicMaterial({
-          color: 0xffd27a,
-          transparent: true,
-          opacity: 0.3,
-          depthTest: false,
-          side: THREE.DoubleSide,
-        }),
-      );
-      const edge = new THREE.LineLoop(
-        new THREE.BufferGeometry().setAttribute('position', pos),
-        new THREE.LineBasicMaterial({ color: 0xffd27a, depthTest: false, transparent: true }),
-      );
-      fill.renderOrder = 985;
-      edge.renderOrder = 986;
-      fill.visible = edge.visible = false;
-      this.snapQuads.push({ fill, edge });
-      this.scene.add(fill, edge);
-    }
-    return this.snapQuads[i]!;
-  }
-
-  /** Lay a quad over every face (or the floor footprint) the grab just snapped to. */
-  private showSnaps(t: Transform): void {
     const moved: AABB = {
       min: [t.aabb.min[0] + t.delta[0], t.aabb.min[1] + t.delta[1], t.aabb.min[2] + t.delta[2]],
       max: [t.aabb.max[0] + t.delta[0], t.aabb.max[1] + t.delta[1], t.aabb.max[2] + t.delta[2]],
     };
-    const quads = t.snaps.flatMap((h) => snapQuads(h, moved, t.others));
-    const key = t.snaps
-      .filter((h) => h.kind !== 'grid')
-      .map((h) => `${h.axis}:${h.kind}:${h.at}`)
-      .join('|');
-    if (key !== this.snapKey) {
-      this.snapKey = key;
-      this.snapFlash = key ? 1 : 0;
-    }
-    for (let i = 0; i < Math.max(quads.length, this.snapQuads.length); i++) {
-      const { fill, edge } = this.snapQuadAt(i);
-      const q = quads[i];
-      fill.visible = edge.visible = !!q;
-      if (!q) continue;
-      const pos = fill.geometry.getAttribute('position') as THREE.BufferAttribute;
-      // The two axes across the quad, in order, so the loop goes around the rectangle.
-      const [u, v] = ([0, 1, 2] as AxisIndex[]).filter((a) => a !== q.axis) as [
-        AxisIndex,
-        AxisIndex,
-      ];
-      const corner = (cu: number, cv: number): Vec3 => {
-        const c: Vec3 = [...q.lo];
-        c[u] = cu;
-        c[v] = cv;
-        return c;
-      };
-      const corners = [
-        corner(q.lo[u], q.lo[v]),
-        corner(q.hi[u], q.lo[v]),
-        corner(q.hi[u], q.hi[v]),
-        corner(q.lo[u], q.hi[v]),
-      ];
-      corners.forEach((c, k) => pos.setXYZ(k, c[0], c[1], c[2]));
-      pos.needsUpdate = true;
-      fill.geometry.computeBoundingSphere();
-      edge.geometry.computeBoundingSphere();
-    }
-  }
-  private hideSnaps(): void {
-    for (const { fill, edge } of this.snapQuads) fill.visible = edge.visible = false;
-    this.snapKey = '';
-    this.snapFlash = 0;
+    this.snapFx.show(t.snaps, moved, t.others);
   }
 
   private finishTransform(commit: boolean): void {
@@ -1473,10 +887,10 @@ export class LumberScene {
     }
     if (commit && t.moved) this.store.commit(t.before);
     else this.store.restore(t.before);
-    this.controls.enabled = true;
+    this.rig.enabled = true;
     this.container.style.cursor = '';
     this.tf = null;
-    this.hideSnaps();
+    this.snapFx.hide();
   }
 
   /** The axis a typed distance applies to: the only one, or the one moved furthest so far. */
@@ -1512,31 +926,24 @@ export class LumberScene {
       else if (e.button === 2) this.finishTransform(false);
       return;
     }
-    if (this.fasten) {
+    if (this.fastenMode.active) {
       if (e.button === 2) {
         this.suppressMenu = true;
-        this.endFasten();
+        this.fastenMode.end();
         return;
       }
-      if (e.button !== 0) return;
-      const t = this.fastenTarget(e.clientX, e.clientY);
-      if (!t) return;
-      if ('remove' in t) this.store.removeFastener(t.partId, t.remove);
-      else this.store.addFastener(t.partId, t.add);
-      this.updateFastenGhost(e.clientX, e.clientY);
+      if (e.button === 0) this.fastenMode.click(e.clientX, e.clientY);
       return;
     }
-    if (this.measure) {
+    if (this.measureTool.active) {
       if (e.button === 2) {
         this.suppressMenu = true;
-        this.endMeasure();
+        this.measureTool.end();
         return;
       }
       if (e.button !== 0) return;
       const pt = this.snapUnderPointer(e.clientX, e.clientY);
-      if (!pt) return;
-      if (!this.measure.a || this.measure.b) this.measure = { a: pt, b: null, live: pt };
-      else this.measure.b = pt;
+      if (pt) this.measureTool.click(pt);
       return;
     }
     if (e.button !== 0) return;
@@ -1624,14 +1031,14 @@ export class LumberScene {
       if (this.box.active) this.drawBox();
       return;
     }
-    if (this.fasten) {
-      this.updateFastenGhost(e.clientX, e.clientY);
+    if (this.fastenMode.active) {
+      this.fastenMode.updateGhost(e.clientX, e.clientY);
       const hit = this.pickPart();
       this.setHover(hit ? (hit.object.userData.id as number) : null);
       return;
     }
-    if (this.measure) {
-      this.measure.live = this.snapUnderPointer(e.clientX, e.clientY);
+    if (this.measureTool.active) {
+      this.measureTool.hover(this.snapUnderPointer(e.clientX, e.clientY));
       return;
     }
     this.setRay(e.clientX, e.clientY);
@@ -1676,7 +1083,10 @@ export class LumberScene {
     const y1 = Math.max(b.y0, b.y1) - r.top;
     const ids = b.additive ? new Set(this.store.selected) : new Set<number>();
     for (const p of this.store.visibleParts()) {
-      const [x, y] = this.toScreen(new THREE.Vector3().fromArray(aabbCenter(this.displayAABB(p))));
+      const [x, y] = toScreen(
+        this.rig,
+        new THREE.Vector3().fromArray(aabbCenter(this.displayAABB(p))),
+      );
       if (x >= x0 && x <= x1 && y >= y0 && y <= y1) ids.add(p.id);
     }
     this.store.select(ids);
