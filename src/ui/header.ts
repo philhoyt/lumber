@@ -38,6 +38,8 @@ export interface AppActions {
   /** Ctrl+O: the Projects dialog. */
   showProjects(): void;
   showDrawings(): void;
+  trackpad(): boolean;
+  setTrackpad(on: boolean): void;
 }
 
 export function wireHeader(store: Store, pm: ProjectManager, actions: AppActions): void {
@@ -71,6 +73,9 @@ export function wireHeader(store: Store, pm: ProjectManager, actions: AppActions
   $<HTMLInputElement>('snapChk').addEventListener('change', (e) =>
     store.setSetting('snapParts', (e.target as HTMLInputElement).checked),
   );
+  const trackChk = $<HTMLInputElement>('trackChk');
+  trackChk.checked = actions.trackpad();
+  trackChk.addEventListener('change', () => actions.setTrackpad(trackChk.checked));
   const undo = $<HTMLButtonElement>('bUndo');
   const redo = $<HTMLButtonElement>('bRedo');
   undo.onclick = () => store.undo();

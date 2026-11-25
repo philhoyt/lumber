@@ -93,6 +93,8 @@ const actions = {
   onTheme: (t: Theme) => scene.setTheme(t),
   showProjects: () => projectsDialog.show(),
   showDrawings: () => drawings.toggle(),
+  trackpad: () => scene.trackpad,
+  setTrackpad: (on: boolean) => scene.setTrackpad(on),
 };
 wireHeader(store, pm, actions);
 wireDrop($('viewport'), scene, store);

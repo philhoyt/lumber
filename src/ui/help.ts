@@ -50,6 +50,8 @@ const SECTIONS: [string, [string, string][]][] = [
       ['Middle-drag', 'Orbit'],
       ['Shift+middle-drag, right-drag', 'Pan'],
       ['Wheel', 'Zoom'],
+      ['Alt+drag', 'Orbit without a middle button; Shift+Alt pans, Ctrl+Alt zooms'],
+      ['Trackpad switch', 'Two-finger drag orbits, pinch zooms, Shift+two-finger pans'],
       ['1 / 3 / 7', 'Front / right / top; Ctrl for the opposite'],
       ['2 / 4 / 6 / 8', 'Orbit in 15° steps'],
       ['5', 'Perspective / orthographic'],

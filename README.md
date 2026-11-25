@@ -71,6 +71,8 @@ theme.
 | Ctrl+Z, Ctrl+Shift+Z               | Undo, redo                                                                |
 | Ctrl+S, Ctrl+O                     | Save, open                                                                |
 | Middle-drag, Shift+middle, wheel   | Orbit, pan, zoom (right-drag also pans)                                   |
+| Alt+drag                           | Orbit without a middle button; Shift+Alt pans, Ctrl+Alt zooms             |
+| Trackpad switch (header)           | Two-finger drag orbits, pinch zooms, Shift+two-finger pans                |
 | Numpad 1 / 3 / 7, with Ctrl        | Front / right / top, back / left / bottom (top-row digits too)            |
 | Numpad 5                           | Perspective or orthographic; axis views are ortho, orbiting returns       |
 | E                                  | Exploded view: pull the parts apart to look; slider sets how far          |

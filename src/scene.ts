@@ -14,6 +14,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg';
+import { dragGesture, orbitDegrees, wheelGesture, wheelPixels, zoomScale } from './gestures';
 import { axisParam, Gizmo, ringAngle, RotateGizmo } from './gizmo';
 import {
   aabbCenter,
@@ -188,6 +189,8 @@ export class LumberScene {
   /** Called when the projection changes, for the view strip. */
   onProjectionChange: ((mode: Projection) => void) | null = null;
   private controls: OrbitControls;
+  /** Trackpad mode: two-finger scroll orbits, pinch zooms, Shift+scroll pans. Remembered per browser. */
+  private trackpadOn = false;
   private partsGroup = new THREE.Group();
   private meshes = new Map<number, THREE.Group>();
   private matCache = new Map<string, THREE.MeshLambertMaterial>();
@@ -335,6 +338,34 @@ export class LumberScene {
     el.addEventListener('pointercancel', (e) => this.onPointerUp(e));
     el.addEventListener('pointerleave', () => this.setHover(null));
     el.addEventListener('contextmenu', (e) => this.onContextMenu(e));
+    // Alt+left-drag orbits (Shift+Alt pans, Ctrl+Alt zooms) for mice without a middle
+    // button. The decision is made as the button goes down, ahead of the orbit controls,
+    // which read the button map only then; it is cleared again when the button comes up.
+    container.addEventListener(
+      'pointerdown',
+      (e) => {
+        const g = dragGesture(e);
+        this.controls.mouseButtons.LEFT =
+          g === 'orbit'
+            ? THREE.MOUSE.ROTATE
+            : g === 'pan'
+              ? THREE.MOUSE.PAN
+              : g === 'zoom'
+                ? THREE.MOUSE.DOLLY
+                : null;
+      },
+      { capture: true },
+    );
+    window.addEventListener('pointerup', () => {
+      this.controls.mouseButtons.LEFT = null;
+    });
+    // Trackpad mode takes the wheel before the orbit controls see it.
+    container.addEventListener('wheel', (e) => this.onWheel(e), { capture: true, passive: false });
+    try {
+      this.trackpadOn = localStorage.getItem('lumber.trackpad') === '1';
+    } catch {
+      /* no storage */
+    }
     el.addEventListener('dblclick', (e) => {
       if (this.tf) return;
       this.setRay(e.clientX, e.clientY);
@@ -995,6 +1026,81 @@ export class LumberScene {
     this.skipAutoPersp = false;
   }
 
+  // ---- trackpad gestures ----
+  get trackpad(): boolean {
+    return this.trackpadOn;
+  }
+  setTrackpad(on: boolean): void {
+    this.trackpadOn = on;
+    try {
+      localStorage.setItem('lumber.trackpad', on ? '1' : '0');
+    } catch {
+      /* best effort */
+    }
+  }
+  private onWheel(e: WheelEvent): void {
+    if (!this.trackpadOn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const [dx, dy] = wheelPixels(e.deltaX, e.deltaY, e.deltaMode);
+    const g = wheelGesture(e);
+    if (g === 'zoom') this.dolly(zoomScale(dy));
+    else if (g === 'pan') this.panPixels(-dx, dy);
+    else {
+      const { az, el } = orbitDegrees(dx, dy);
+      this.orbitFree(az, el);
+    }
+  }
+  /** Orbit by degrees as a free orbit does: an axis ortho view drops back to perspective. */
+  private orbitFree(az: number, el: number): void {
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    if (az) offset.applyAxisAngle(Z_UP, (az * Math.PI) / 180);
+    if (el) {
+      const side = new THREE.Vector3().crossVectors(Z_UP, offset);
+      if (side.lengthSq() > 1e-9) {
+        side.normalize();
+        const polar = offset.angleTo(Z_UP);
+        const target = Math.min(Math.PI - 0.01, Math.max(0.01, polar - (el * Math.PI) / 180));
+        offset.applyAxisAngle(side, polar - target);
+      }
+    }
+    this.camera.position.copy(this.controls.target).add(offset);
+    this.controls.update();
+  }
+  /** Slide the view by screen pixels. */
+  private panPixels(dx: number, dy: number): void {
+    const h = this.container.clientHeight || 1;
+    const perPx = this.viewHeightAt(this.controls.target) / h;
+    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrix, 0);
+    const up = new THREE.Vector3().setFromMatrixColumn(this.camera.matrix, 1);
+    const move = right.multiplyScalar(dx * perPx).add(up.multiplyScalar(dy * perPx));
+    this.camera.position.add(move);
+    this.controls.target.add(move);
+    this.skipAutoPersp = true;
+    this.controls.update();
+    this.skipAutoPersp = false;
+  }
+  /** Move toward or away from the target by a factor; an ortho view changes its zoom instead. */
+  private dolly(scale: number): void {
+    if (this.camera instanceof THREE.OrthographicCamera) {
+      this.camera.zoom = Math.min(
+        this.controls.maxZoom,
+        Math.max(this.controls.minZoom, this.camera.zoom / scale),
+      );
+      this.camera.updateProjectionMatrix();
+    } else {
+      const offset = this.camera.position.clone().sub(this.controls.target);
+      const dist = Math.min(
+        this.controls.maxDistance,
+        Math.max(this.controls.minDistance, offset.length() * scale),
+      );
+      this.camera.position.copy(this.controls.target).add(offset.setLength(dist));
+    }
+    this.skipAutoPersp = true;
+    this.controls.update();
+    this.skipAutoPersp = false;
+  }
+
   // ---- picking ----
   private setRay(clientX: number, clientY: number): void {
     const r = this.renderer.domElement.getBoundingClientRect();
@@ -1343,6 +1449,7 @@ export class LumberScene {
   // ---- pointer ----
   private onPointerDown(e: PointerEvent): void {
     this.lastPointer = [e.clientX, e.clientY];
+    if (dragGesture(e)) return; // Alt+left-drag: the orbit controls have it
     if (e.button === 2) {
       this.rightDown = [e.clientX, e.clientY];
       if (this.tf?.modal) this.suppressMenu = true; // this right click cancels, no menu
