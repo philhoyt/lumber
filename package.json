@@ -18,7 +18,9 @@
   },
   "dependencies": {
     "lucide": "^1.80.0",
-    "three": "^0.187.0"
+    "three": "^0.187.0",
+    "three-bvh-csg": "^0.0.19",
+    "three-mesh-bvh": "^0.10.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -1,6 +1,6 @@
 /** The cut list and buy list panel, with cutting diagrams and a cost estimate. */
 import { cutRows, packBoards, packSheets, partsByStock } from '../pack';
-import { grainOf } from '../model';
+import { describeCut, grainOf } from '../model';
 import { stockById } from '../stock';
 import type { Store } from '../store';
 import { fmt, fmtFt, fmtSheet, money, parseLen } from '../units';
@@ -43,7 +43,10 @@ export class CutlistPanel {
         : mitered
           ? `${fmt(r.len)} <span class="muted">long · ${fmt(r.short)} short · ${angleText(r.miter)}</span>`
           : fmt(r.len);
-      html += `<tr><td>${esc(r.stock.name)}</td><td>${cut}</td><td class="r">${r.qty}</td><td class="muted names">${esc(r.names.join(', '))}</td></tr>`;
+      const joinery = r.cuts.length
+        ? `<div class="muted joinery">${r.cuts.map((c) => esc(describeCut(c, fmt))).join('<br>')}</div>`
+        : '';
+      html += `<tr><td>${esc(r.stock.name)}</td><td>${cut}${joinery}</td><td class="r">${r.qty}</td><td class="muted names">${esc(r.names.join(', '))}</td></tr>`;
     }
     html += `</table>`;
     html += `<h2 class="buy-head">Buy list <span>kerf <input class="price len" data-min="0" id="kerfIn" value="${fmt(settings.kerf)}"></span></h2>`;
@@ -170,6 +173,7 @@ export function cutListCsv(store: Store): string {
       'Miter A',
       'Miter B',
       'Grain',
+      'Cuts',
       'Qty',
     ],
   ];
@@ -184,6 +188,7 @@ export function cutListCsv(store: Store): string {
       r.miter[0],
       r.miter[1],
       r.grain,
+      r.cuts.map((c) => describeCut(c, fmt)).join('; '),
       r.qty,
     ]);
   return rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');

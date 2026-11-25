@@ -790,6 +790,30 @@ label.small select.inline {
   cursor: pointer;
 }
 
+.cut-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto;
+  gap: 4px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.cut-row select,
+.cut-row input {
+  min-width: 0;
+  padding: 3px 4px;
+  font-size: 12px;
+}
+.cut-row button {
+  width: 24px;
+  height: 24px;
+  font-size: 15px;
+  line-height: 1;
+}
+.joinery {
+  font-size: 11px;
+  margin-top: 2px;
+}
+
 /* cut list */
 table {
   border-collapse: collapse;

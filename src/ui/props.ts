@@ -5,7 +5,13 @@
 import { ChevronDown, ChevronRight } from 'lucide';
 import {
   aabbSize,
+  clampCut,
   clampMiter,
+  cutsOf,
+  CUT_KINDS,
+  defaultCut,
+  partDims,
+  type Cut,
   grainOf,
   GRAINS,
   miterOf,
@@ -23,6 +29,96 @@ import { keepFocus } from './fields';
 import { icon } from './icons';
 
 type SectionId = 'part' | 'transform' | 'arrange' | 'array';
+
+const FACES: [string, string][] = [
+  ['top', 'Top face'],
+  ['bottom', 'Bottom face'],
+];
+const EDGES_ALL: [string, string][] = [
+  ['endA', 'End A'],
+  ['endB', 'End B'],
+  ['front', 'Front edge'],
+  ['back', 'Back edge'],
+];
+const EDGES_SIDE: [string, string][] = [
+  ['front', 'Front edge'],
+  ['back', 'Back edge'],
+];
+const select = (id: string, opts: [string, string][], value: string) =>
+  `<select id="${id}">${opts.map(([v, l]) => `<option value="${v}"${v === value ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
+const lenField = (id: string, value: number, title: string) =>
+  `<input type="text" class="len" data-min="0" id="${id}" value="${fmt(value)}" title="${title}">`;
+
+/** One row per cut: kind, where, and its numbers; plus an Add row. */
+function cutsEditorHtml(p: { cuts?: Cut[] }): string {
+  const cuts = cutsOf(p as never);
+  let html = `<label class="small">Cuts</label>`;
+  cuts.forEach((c, i) => {
+    const id = (f: string) => `cut-${i}-${f}`;
+    let where: string;
+    let fields: string;
+    if (c.kind === 'dado' || c.kind === 'groove') {
+      where = select(id('face'), FACES, c.face);
+      fields = `${lenField(id('at'), c.at, c.kind === 'dado' ? 'From end A' : 'From the front edge')}${lenField(id('width'), c.width, 'Width')}${lenField(id('depth'), c.depth, 'Depth')}`;
+    } else if (c.kind === 'rabbet') {
+      where = `${select(id('edge'), EDGES_ALL, c.edge)}${select(id('face'), FACES, c.face)}`;
+      fields = `${lenField(id('width'), c.width, 'Width, in from the edge')}${lenField(id('depth'), c.depth, 'Depth')}`;
+    } else {
+      where = select(id('edge'), EDGES_SIDE, c.edge);
+      fields = `${lenField(id('at'), c.at, 'From end A')}${lenField(id('width'), c.width, 'Width along the length')}${lenField(id('depth'), c.depth, 'Depth into the width')}`;
+    }
+    html += `<div class="cut-row">${select(
+      id('kind'),
+      CUT_KINDS.map((k) => [k, k[0]!.toUpperCase() + k.slice(1)]),
+      c.kind,
+    )}${where}${fields}<button class="icon ghost danger" data-delcut="${i}" title="Remove this cut">×</button></div>`;
+  });
+  html += `<div class="row btns"><button id="bAddCut" title="Add a dado; change its kind in the row">Add cut</button></div>
+  <div class="muted note">Dado: across the width, position from end A. Groove: along the length, position from the front edge. Rabbet: along an end or edge. Notch: through the thickness into an edge.</div>`;
+  return html;
+}
+
+function wireCutsEditor(
+  el: HTMLElement,
+  p: { cuts?: Cut[] } & Parameters<typeof partDims>[0],
+  store: Store,
+): void {
+  const dims = partDims(p);
+  const update = (i: number, change: (c: Cut) => Cut) =>
+    store.mutate(() => {
+      const cuts = cutsOf(p);
+      const next = cuts.map((c, k) => (k === i ? clampCut(change(c), dims) : c));
+      p.cuts = next.length ? next : undefined;
+    });
+  cutsOf(p).forEach((c, i) => {
+    const id = (f: string) => `cut-${i}-${f}`;
+    onChange(el, id('kind'), (inp) => update(i, () => defaultCut(inp.value as Cut['kind'])));
+    onChange(el, id('face'), (inp) =>
+      update(i, (cut) => ({ ...cut, face: inp.value as 'top' | 'bottom' }) as Cut),
+    );
+    onChange(el, id('edge'), (inp) => update(i, (cut) => ({ ...cut, edge: inp.value }) as Cut));
+    for (const f of ['at', 'width', 'depth'] as const)
+      onChange(el, id(f), (inp) => {
+        const v = parseLen(inp.value);
+        if (v === null) return;
+        update(i, (cut) => ({ ...cut, [f]: v }) as Cut);
+      });
+    void c;
+  });
+  el.querySelectorAll<HTMLButtonElement>('[data-delcut]').forEach((b) =>
+    b.addEventListener('click', () =>
+      store.mutate(() => {
+        const next = cutsOf(p).filter((_, k) => k !== +b.dataset.delcut!);
+        p.cuts = next.length ? next : undefined;
+      }),
+    ),
+  );
+  onClick(el, 'bAddCut', () =>
+    store.mutate(() => {
+      p.cuts = [...cutsOf(p), clampCut(defaultCut('dado'), dims)];
+    }),
+  );
+}
 const SECTIONS_KEY = 'lumber.sections';
 
 export class PropsPanel {
@@ -113,6 +209,7 @@ export class PropsPanel {
         part += `<div class="row"><div><label class="small">Miter A (−X end)</label><input type="number" id="pMiterA" value="${ma}" min="-75" max="75" step="0.5"></div><div><label class="small">Miter B (+X end)</label><input type="number" id="pMiterB" value="${mb}" min="-75" max="75" step="0.5"></div></div>
         <div class="muted note">Degrees from square, across the width. Positive puts the short point on the back (+Y) edge. Length is long point to long point.</div>`;
       }
+      if (!s.sheet) part += cutsEditorHtml(p);
       if (inGroup) {
         const g = store.groupById(p.group!);
         part += `<div class="muted note">In ${esc(g?.name ?? 'a group')} · click the part in the view to select the whole group</div>`;
@@ -283,6 +380,7 @@ export class PropsPanel {
           else p.grain = i.value as (typeof GRAINS)[number];
         }),
       );
+      wireCutsEditor(el, p, store);
       onChange(el, 'pMiterA', (i) => setMiter(0, i.value));
       onChange(el, 'pMiterB', (i) => setMiter(1, i.value));
     }

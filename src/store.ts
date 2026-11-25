@@ -22,8 +22,10 @@ import {
   type AxisIndex,
   type Group,
   type Part,
+  type Cut,
   type Grain,
   type Vec3,
+  CUT_KINDS,
   GRAINS,
   MAX_MITER,
 } from './model';
@@ -607,6 +609,24 @@ export function parseDocument(o: unknown): Document | null {
       x.q.length !== 4
     )
       return null;
+    if (x.cuts !== undefined) {
+      const ok = Array.isArray(x.cuts)
+        ? (x.cuts as unknown[]).filter((c): c is Cut => {
+            if (!c || typeof c !== 'object') return false;
+            const k = (c as Cut).kind;
+            if (!CUT_KINDS.includes(k)) return false;
+            const o = c as Record<string, unknown>;
+            const nums = k === 'rabbet' ? ['width', 'depth'] : ['at', 'width', 'depth'];
+            if (!nums.every((f) => typeof o[f] === 'number' && (o[f] as number) >= 0)) return false;
+            if (k === 'notch') return o.edge === 'front' || o.edge === 'back';
+            if (o.face !== 'top' && o.face !== 'bottom') return false;
+            if (k === 'rabbet') return ['endA', 'endB', 'front', 'back'].includes(o.edge as string);
+            return true;
+          })
+        : [];
+      if (ok.length) x.cuts = ok;
+      else delete x.cuts;
+    }
     if (x.grain !== undefined && !GRAINS.includes(x.grain as Grain)) delete x.grain;
     if (x.grain === 'any') delete x.grain;
     // Miters must be a pair of angles within range; anything else reads as square.

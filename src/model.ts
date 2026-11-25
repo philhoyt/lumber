@@ -47,7 +47,126 @@ export interface Part {
    * which runs along a plywood sheet's long side. Unset means either way is fine.
    */
   grain?: Grain;
+  /** Joinery removed from the part: dados, grooves, rabbets and notches. */
+  cuts?: Cut[];
 }
+
+/**
+ * A rectangular cut taken out of a board, in its local frame (X length, Y width, Z
+ * thickness). Positions are from end A (−X) or the front edge (−Y).
+ * - dado: across the width on a broad face, `at` from end A along the length
+ * - groove: along the length on a broad face, `at` from the front edge
+ * - rabbet: along an end or an edge on a broad face, `width` in from that edge
+ * - notch: through the thickness, into an edge, `at` from end A, `depth` into the width
+ */
+export type Cut =
+  | { kind: 'dado'; face: 'top' | 'bottom'; at: number; width: number; depth: number }
+  | { kind: 'groove'; face: 'top' | 'bottom'; at: number; width: number; depth: number }
+  | {
+      kind: 'rabbet';
+      face: 'top' | 'bottom';
+      edge: 'endA' | 'endB' | 'front' | 'back';
+      width: number;
+      depth: number;
+    }
+  | { kind: 'notch'; edge: 'front' | 'back'; at: number; width: number; depth: number };
+
+export const CUT_KINDS: Cut['kind'][] = ['dado', 'groove', 'rabbet', 'notch'];
+export const cutsOf = (p: Part): Cut[] => p.cuts ?? [];
+
+/** A sensible starting cut of a kind, for the Add button. */
+export function defaultCut(kind: Cut['kind']): Cut {
+  switch (kind) {
+    case 'dado':
+      return { kind, face: 'top', at: 12, width: 0.75, depth: 0.375 };
+    case 'groove':
+      return { kind, face: 'top', at: 0.5, width: 0.25, depth: 0.375 };
+    case 'rabbet':
+      return { kind, face: 'top', edge: 'endA', width: 0.75, depth: 0.375 };
+    case 'notch':
+      return { kind, edge: 'front', at: 12, width: 1.5, depth: 1.5 };
+  }
+}
+
+/** Keep a cut's numbers sane: non-negative, and no deeper or wider than the part. */
+export function clampCut(c: Cut, dims: Vec3): Cut {
+  const [L, W, T] = dims;
+  const n = (v: number, max: number) => Math.min(max, Math.max(0, Number.isFinite(v) ? v : 0));
+  switch (c.kind) {
+    case 'dado':
+      return { ...c, at: n(c.at, L), width: n(c.width, L), depth: n(c.depth, T) };
+    case 'groove':
+      return { ...c, at: n(c.at, W), width: n(c.width, W), depth: n(c.depth, T) };
+    case 'rabbet':
+      return {
+        ...c,
+        width: n(c.width, c.edge === 'endA' || c.edge === 'endB' ? L : W),
+        depth: n(c.depth, T),
+      };
+    case 'notch':
+      return { ...c, at: n(c.at, L), width: n(c.width, L), depth: n(c.depth, W) };
+  }
+}
+
+/**
+ * The box a cut removes, in the part's local frame, or null when it removes nothing.
+ * The box pokes a hair past the surface it opens on so a subtraction leaves no skin.
+ */
+export function cutBox(c: Cut, dims: Vec3): AABB | null {
+  if (c.width <= 0 || c.depth <= 0) return null;
+  const [L, W, T] = dims;
+  const e = 0.02;
+  const x: [number, number] = [-L / 2 - e, L / 2 + e];
+  const y: [number, number] = [-W / 2 - e, W / 2 + e];
+  let z: [number, number] = [-T / 2 - e, T / 2 + e];
+  const faceZ = (face: 'top' | 'bottom', depth: number): [number, number] =>
+    face === 'top' ? [T / 2 - depth, T / 2 + e] : [-T / 2 - e, -T / 2 + depth];
+  if (c.kind === 'dado') {
+    x[0] = -L / 2 + c.at;
+    x[1] = x[0] + c.width;
+    z = faceZ(c.face, c.depth);
+  } else if (c.kind === 'groove') {
+    y[0] = -W / 2 + c.at;
+    y[1] = y[0] + c.width;
+    z = faceZ(c.face, c.depth);
+  } else if (c.kind === 'rabbet') {
+    if (c.edge === 'endA') x[1] = -L / 2 + c.width;
+    else if (c.edge === 'endB') x[0] = L / 2 - c.width;
+    else if (c.edge === 'front') y[1] = -W / 2 + c.width;
+    else y[0] = W / 2 - c.width;
+    z = faceZ(c.face, c.depth);
+  } else {
+    x[0] = -L / 2 + c.at;
+    x[1] = x[0] + c.width;
+    if (c.edge === 'front') y[1] = -W / 2 + c.depth;
+    else y[0] = W / 2 - c.depth;
+  }
+  if (x[1] <= x[0] || y[1] <= y[0] || z[1] <= z[0]) return null;
+  return { min: [x[0], y[0], z[0]], max: [x[1], y[1], z[1]] };
+}
+
+/** "dado 3/4 wide, 3/8 deep, 12 from A, top face" for the cut list. */
+export function describeCut(c: Cut, fmt: (n: number) => string): string {
+  const edge = (e: string) =>
+    e === 'endA' ? 'end A' : e === 'endB' ? 'end B' : e === 'front' ? 'front edge' : 'back edge';
+  switch (c.kind) {
+    case 'dado':
+      return `dado ${fmt(c.width)} wide × ${fmt(c.depth)} deep, ${fmt(c.at)} from A, ${c.face}`;
+    case 'groove':
+      return `groove ${fmt(c.width)} wide × ${fmt(c.depth)} deep, ${fmt(c.at)} from front, ${c.face}`;
+    case 'rabbet':
+      return `rabbet ${fmt(c.width)} × ${fmt(c.depth)} deep on ${edge(c.edge)}, ${c.face}`;
+    case 'notch':
+      return `notch ${fmt(c.width)} × ${fmt(c.depth)} deep in ${edge(c.edge)}, ${fmt(c.at)} from A`;
+  }
+}
+
+/** A stable key so identical cut sets group together in the cut list. */
+export const cutsKey = (cuts: readonly Cut[]): string =>
+  cuts
+    .map((c) => JSON.stringify(c, Object.keys(c).sort()))
+    .sort()
+    .join(';');
 
 /** 'length': the part's length runs with the grain; 'width': across it; 'any': either. */
 export type Grain = 'any' | 'length' | 'width';

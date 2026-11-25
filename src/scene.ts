@@ -13,9 +13,13 @@
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg';
 import { axisParam, Gizmo, ringAngle, RotateGizmo } from './gizmo';
 import {
   aabbCenter,
+  cutBox,
+  cutsKey,
+  cutsOf,
   hasMiter,
   miterOf,
   miterOutline,
@@ -119,17 +123,47 @@ const VIEW_DIRS: Record<Exclude<ViewName, 'fit' | 'selected'>, THREE.Vector3> = 
 };
 
 const meshSignature = (p: Part, d: Vec3): string =>
-  `${d.join(',')},${p.stock},${miterOf(p).join('/')}`;
+  `${d.join(',')},${p.stock},${miterOf(p).join('/')},${cutsKey(cutsOf(p))}`;
+
+const csg = new Evaluator();
+csg.useGroups = false;
+
+/** Take each cut's box out of the part's solid. */
+function subtractCuts(base: THREE.BufferGeometry, p: Part, d: Vec3): THREE.BufferGeometry {
+  let brush = new Brush(base);
+  brush.updateMatrixWorld();
+  for (const c of cutsOf(p)) {
+    const box = cutBox(c, d);
+    if (!box) continue;
+    const size = [box.max[0] - box.min[0], box.max[1] - box.min[1], box.max[2] - box.min[2]];
+    const tool = new Brush(new THREE.BoxGeometry(size[0], size[1], size[2]));
+    tool.position.set(
+      (box.min[0] + box.max[0]) / 2,
+      (box.min[1] + box.max[1]) / 2,
+      (box.min[2] + box.max[2]) / 2,
+    );
+    tool.updateMatrixWorld();
+    const next = csg.evaluate(brush, tool, SUBTRACTION);
+    brush.geometry.dispose();
+    tool.geometry.dispose();
+    brush = next;
+    brush.updateMatrixWorld();
+  }
+  return brush.geometry;
+}
 
 /** A box, or for a mitered board the face outline extruded through the thickness. */
 function partGeometry(p: Part, d: Vec3): THREE.BufferGeometry {
-  if (!hasMiter(p) || stockById(p.stock).sheet) return new THREE.BoxGeometry(d[0], d[1], d[2]);
-  const shape = new THREE.Shape(
-    miterOutline(d[0], d[1], miterOf(p)).map(([x, y]) => new THREE.Vector2(x, y)),
-  );
-  const geo = new THREE.ExtrudeGeometry(shape, { depth: d[2], bevelEnabled: false });
-  geo.translate(0, 0, -d[2] / 2);
-  return geo;
+  let geo: THREE.BufferGeometry;
+  if (!hasMiter(p) || stockById(p.stock).sheet) geo = new THREE.BoxGeometry(d[0], d[1], d[2]);
+  else {
+    const shape = new THREE.Shape(
+      miterOutline(d[0], d[1], miterOf(p)).map(([x, y]) => new THREE.Vector2(x, y)),
+    );
+    geo = new THREE.ExtrudeGeometry(shape, { depth: d[2], bevelEnabled: false });
+    geo.translate(0, 0, -d[2] / 2);
+  }
+  return cutsOf(p).length && !stockById(p.stock).sheet ? subtractCuts(geo, p, d) : geo;
 }
 
 export class LumberScene {

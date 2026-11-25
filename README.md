@@ -87,6 +87,12 @@ turns a part the way you allow, the cut list marks the direction, and the
 diagrams draw grain lines the long way of the sheet. MDF and OSB have no grain,
 which the stock table's Grain tick controls.
 
+Boards can carry joinery: Add cut in the Part section adds a dado (across the
+width), groove (along the length), rabbet (along an end or edge) or notch
+(through the thickness into an edge), each with its face or edge, position,
+width and depth. The 3D view subtracts them and the cut list prints them under
+the cut.
+
 Boards can have a miter at each end: two angle fields in the Part section,
 degrees from square, cut across the width, positive for a short point on the
 back edge. The length stays long point to long point; the cut list prints the

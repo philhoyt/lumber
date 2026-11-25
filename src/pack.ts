@@ -3,7 +3,16 @@
  * lengths; sheets pack by shelves (rows of parts across the sheet). Both are simple on
  * purpose: good enough to buy the right amount, and easy to check by hand.
  */
-import { grainOf, miterOf, shortLength, type Grain, type Part } from './model';
+import {
+  cutsKey,
+  cutsOf,
+  grainOf,
+  miterOf,
+  shortLength,
+  type Cut,
+  type Grain,
+  type Part,
+} from './model';
 import { getStock, stockById, stockWidth, type Stock } from './stock';
 import { r32 } from './units';
 
@@ -144,6 +153,8 @@ export interface CutRow {
   miter: [number, number];
   /** Sheet parts: how the length runs relative to the grain. */
   grain: Grain;
+  /** Joinery on the part. */
+  cuts: Cut[];
   /** Short-point length when mitered, else the length. */
   short: number;
   qty: number;
@@ -164,7 +175,8 @@ export function cutRows(parts: readonly Part[]): CutRow[] {
     const w = r32(stockWidth(s, p.w));
     const miter = miterOf(p);
     const grain: Grain = s.sheet && s.grain !== false ? grainOf(p) : 'any';
-    const key = `${p.stock}|${len}|${w}|${miter.join('/')}|${grain}`;
+    const cuts = cutsOf(p);
+    const key = `${p.stock}|${len}|${w}|${miter.join('/')}|${grain}|${cutsKey(cuts)}`;
     let r = map.get(key);
     if (!r) {
       r = {
@@ -173,6 +185,7 @@ export function cutRows(parts: readonly Part[]): CutRow[] {
         w,
         miter,
         grain,
+        cuts,
         short: r32(shortLength(len, w, miter)),
         qty: 0,
         names: [],
