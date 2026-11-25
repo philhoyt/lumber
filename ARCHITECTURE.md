@@ -79,6 +79,12 @@ when the part shape changes.
 ## Tooling
 
 Vite builds and serves; TypeScript strict mode with `noUncheckedIndexedAccess`;
-Vitest for the pure modules; ESLint and Prettier with their recommended
-defaults; `.githooks/pre-commit` runs all of it (`git config core.hooksPath
-.githooks` once per clone). `npm run check` is the same set by hand.
+Vitest for the pure modules (`npm run test:coverage` for the report); Playwright
+in `e2e/` drives the real app in Chromium over the sample bench for what only
+the scene, panels and keyboard together can show (modal transforms, box select,
+share links, orbit gestures, the corner gizmo); ESLint with typescript-eslint's
+type-checked strict and stylistic sets (`!` after a checked index and arrow
+shorthand returning void are house style); Prettier. `.githooks/pre-commit`
+runs typecheck, lint, format check, unit tests and the build (`git config
+core.hooksPath .githooks` once per clone); `npm run check` adds the end-to-end
+tests.

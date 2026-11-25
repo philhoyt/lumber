@@ -20,11 +20,14 @@ with three.js bundled in so it works offline.
 
 ## Develop
 
-    npm run check        # typecheck, lint, format check, tests
-    npm run test:watch   # tests on save
+    npm run check        # typecheck, lint, format check, unit tests, build, e2e
+    npm run test:watch   # unit tests on save
+    npm run test:e2e     # Playwright over the sample bench (starts the dev server)
+    npm run test:coverage
     npm run format       # apply Prettier
 
-Enable the pre-commit hook once per clone so `check` runs before every commit:
+Enable the pre-commit hook once per clone; it runs everything in `check` except
+the end-to-end tests before every commit:
 
     git config core.hooksPath .githooks
 
