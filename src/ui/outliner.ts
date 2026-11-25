@@ -148,7 +148,9 @@ export class OutlinerPanel {
 
     const count = document.createElement('span');
     count.className = 'size';
-    count.textContent = `${members.length} part${members.length === 1 ? '' : 's'}`;
+    count.textContent = g.array
+      ? `array · ${members.length} part${members.length === 1 ? '' : 's'}`
+      : `${members.length} part${members.length === 1 ? '' : 's'}`;
 
     const eye = this.eyeButton(allHidden, () =>
       store.setHidden(

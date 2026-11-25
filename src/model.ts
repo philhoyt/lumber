@@ -34,11 +34,28 @@ export interface Part {
   hidden?: boolean;
   /** The group this part belongs to, if any. */
   group?: number;
+  /** In an array group: 0 for the source cell, 1.. for generated copies. */
+  arrayIndex?: number;
 }
 
 export interface AABB {
   min: Vec3;
   max: Vec3;
+}
+
+/**
+ * An array modifier on a group: the group's source cell (its parts with `arrayIndex` 0)
+ * is repeated along an axis. Copies are real parts, regenerated whenever the source or
+ * these parameters change.
+ */
+export interface ArrayParams {
+  axis: Axis;
+  /** Either a fixed number of copies, or as many as fit in `fit` inches. */
+  count?: number;
+  fit?: number;
+  /** Centre-to-centre distance, or the clear gap between copies. */
+  spacing: number;
+  mode: 'center' | 'gap';
 }
 
 /** An assembly of parts (and of other groups). A part belongs to at most one group. */
@@ -47,6 +64,15 @@ export interface Group {
   name: string;
   /** The enclosing group, for nested assemblies. */
   parent?: number;
+  array?: ArrayParams;
+}
+
+/** The centre-to-centre step and the number of pieces an array produces. */
+export function arrayLayout(a: ArrayParams, cellExtent: number): { step: number; count: number } {
+  const step = Math.max(1 / 16, a.mode === 'gap' ? a.spacing + cellExtent : a.spacing);
+  let count = a.count ?? 2;
+  if (a.fit !== undefined) count = Math.floor((a.fit - cellExtent) / step + 1e-9) + 1;
+  return { step, count: Math.max(1, Math.min(500, Math.floor(count))) };
 }
 
 const AX: Record<Axis, Vector3> = {

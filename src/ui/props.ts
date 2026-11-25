@@ -1,7 +1,14 @@
 /** The Part panel: name, stock, size and position of the selection, plus the part actions. */
-import { aabbSize, unionAABB, withMinKept, type AlignMode, type Axis } from '../model';
+import {
+  aabbSize,
+  unionAABB,
+  withMinKept,
+  type AlignMode,
+  type ArrayParams,
+  type Axis,
+} from '../model';
 import { STOCK, stockById } from '../stock';
-import type { ArraySpacing, Store } from '../store';
+import type { Store } from '../store';
 import { fmt, parseLen } from '../units';
 import { esc, onChange, onClick } from './dom';
 import { keepFocus } from './fields';
@@ -73,12 +80,94 @@ export class PropsPanel {
       <div class="row btns align">${btn(1, 'min', 'Front', 'Flush at the front (min Y)')}${btn(1, 'center', 'Center Y', 'Centre on Y')}${btn(1, 'max', 'Back', 'Flush at the back (max Y)')}</div>
       <div class="row btns align">${btn(2, 'min', 'Bottom', 'Flush on the bottom (min Z)')}${btn(2, 'center', 'Center Z', 'Centre on Z')}${btn(2, 'max', 'Top', 'Flush on top (max Z)')}</div>`;
     }
-    html += `<div class="row"><div><label class="small">Array along</label><select id="arrAxis"><option value="x">X</option><option value="y">Y</option><option value="z">Z</option></select></div>
-        <div><label class="small">Count</label><input type="number" id="arrN" value="4" min="2" step="1"></div>
-        <div><label class="small"><select id="arrMode" class="inline" title="How the spacing is measured"><option value="center">On center</option><option value="gap">Gap</option></select></label><input type="text" class="len" data-min="0" id="arrS" value="16"></div><div class="grow0"><button id="bArr">Array</button></div></div>${hiddenNote}`;
+    const arrayGroup = store.selectedGroup();
+    const arr = arrayGroup?.array;
+    const sel = (id: string, opts: [string, string][], value: string, title?: string) =>
+      `<select id="${id}" class="inline"${title ? ` title="${title}"` : ''}>${opts
+        .map(([v, l]) => `<option value="${v}"${v === value ? ' selected' : ''}>${l}</option>`)
+        .join('')}</select>`;
+    if (arr && arrayGroup) {
+      const byFit = arr.fit !== undefined;
+      html += `<label class="small">Array modifier · ${esc(arrayGroup.name)}</label>
+      <div class="row"><div><label class="small">Along</label>${sel(
+        'arrAxis',
+        [
+          ['x', 'X'],
+          ['y', 'Y'],
+          ['z', 'Z'],
+        ],
+        arr.axis,
+      )}</div>
+        <div><label class="small">${sel(
+          'arrHow',
+          [
+            ['count', 'Count'],
+            ['fit', 'Fit length'],
+          ],
+          byFit ? 'fit' : 'count',
+          'A fixed number, or as many as fit in a length',
+        )}</label>${
+          byFit
+            ? `<input type="text" class="len" data-min="0" id="arrFit" value="${fmt(arr.fit!)}">`
+            : `<input type="number" id="arrN" value="${arr.count ?? 2}" min="1" step="1">`
+        }</div>
+        <div><label class="small">${sel(
+          'arrMode',
+          [
+            ['center', 'On center'],
+            ['gap', 'Gap'],
+          ],
+          arr.mode,
+          'How the spacing is measured',
+        )}</label><input type="text" class="len" data-min="0" id="arrS" value="${fmt(arr.spacing)}"></div></div>
+      <div class="row btns"><button id="bApplyArr" title="Keep the copies as ordinary parts">Apply</button><button id="bRemoveArr" class="danger" title="Drop the copies, keep the source">Remove array</button></div>`;
+    } else {
+      html += `<div class="row"><div><label class="small">Array along</label>${sel(
+        'arrAxis',
+        [
+          ['x', 'X'],
+          ['y', 'Y'],
+          ['z', 'Z'],
+        ],
+        'x',
+      )}</div>
+        <div><label class="small">Count</label><input type="number" id="arrN" value="4" min="1" step="1"></div>
+        <div><label class="small">${sel(
+          'arrMode',
+          [
+            ['center', 'On center'],
+            ['gap', 'Gap'],
+          ],
+          'center',
+          'How the spacing is measured',
+        )}</label><input type="text" class="len" data-min="0" id="arrS" value="16"></div><div class="grow0"><button id="bArr" title="Make a live array you can keep adjusting">Array</button></div></div>`;
+    }
+    html += hiddenNote;
     const restoreFocus = keepFocus(el);
     el.innerHTML = html;
     restoreFocus();
+
+    const readArray = (): ArrayParams => {
+      const axis = el.querySelector<HTMLSelectElement>('#arrAxis')!.value as Axis;
+      const mode = el.querySelector<HTMLSelectElement>('#arrMode')!.value as ArrayParams['mode'];
+      const spacing = parseLen(el.querySelector<HTMLInputElement>('#arrS')!.value) ?? 16;
+      const how = el.querySelector<HTMLSelectElement>('#arrHow')?.value ?? 'count';
+      const params: ArrayParams = { axis, mode, spacing };
+      if (how === 'fit') {
+        const fit = el.querySelector<HTMLInputElement>('#arrFit');
+        params.fit = fit ? (parseLen(fit.value) ?? 48) : (arr?.fit ?? 48);
+      } else {
+        const n = el.querySelector<HTMLInputElement>('#arrN');
+        params.count = Math.max(1, Math.floor(n ? +n.value : (arr?.count ?? 2)));
+      }
+      return params;
+    };
+    if (arr && arrayGroup) {
+      for (const id of ['arrAxis', 'arrHow', 'arrMode', 'arrS', 'arrN', 'arrFit'])
+        onChange(el, id, () => store.setArray(readArray()));
+      onClick(el, 'bApplyArr', () => store.applyArray(arrayGroup.id));
+      onClick(el, 'bRemoveArr', () => store.removeArray(arrayGroup.id));
+    } else onClick(el, 'bArr', () => store.setArray(readArray()));
 
     if (list.length === 1) {
       const p = list[0]!;
@@ -132,12 +221,5 @@ export class PropsPanel {
     );
     onClick(el, 'bDup', () => store.duplicateSelected());
     onClick(el, 'bDel', () => store.deleteSelected());
-    onClick(el, 'bArr', () => {
-      const axis = el.querySelector<HTMLSelectElement>('#arrAxis')!.value as Axis;
-      const count = +el.querySelector<HTMLInputElement>('#arrN')!.value;
-      const spacing = parseLen(el.querySelector<HTMLInputElement>('#arrS')!.value) ?? 16;
-      const mode = el.querySelector<HTMLSelectElement>('#arrMode')!.value as ArraySpacing;
-      store.arraySelected(axis, count, spacing, mode);
-    });
   }
 }

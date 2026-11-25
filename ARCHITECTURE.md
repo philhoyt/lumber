@@ -59,6 +59,16 @@ constraint mid-drag re-anchors so the parts do not jump. Typed digits are kept
 on the transform and applied on Enter. Confirm commits the pre-transform
 snapshot to the store; cancel restores it.
 
+## Groups and arrays
+
+A group is an assembly: parts carry a `group` id and groups may nest through
+`parent`. A click in the view selects the whole assembly. An array modifier
+is a group with `array` parameters: its source cell (members with
+`arrayIndex` 0) is copied along an axis, and `Store.mutate` regenerates the
+copies after every change, so the copies are ordinary parts (cut list,
+picking, transforms all work) yet always follow the source. Apply drops the
+parameters and keeps the parts.
+
 ## File format
 
 `Store.toDocument()` writes `{ version: 2, parts, stockLen, prices }`.

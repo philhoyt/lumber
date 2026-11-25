@@ -14,7 +14,9 @@ import {
   translateParts,
   unionAABB,
   AXIS_INDEX,
+  arrayLayout,
   type AlignMode,
+  type ArrayParams,
   type Axis,
   type AxisIndex,
   type Group,
@@ -106,6 +108,7 @@ export class Store {
   mutate(fn: () => void): void {
     const before = this.snapshot();
     fn();
+    this.regenerateArrays();
     this.pruneGroups();
     this.commit(before);
   }
@@ -246,6 +249,98 @@ export class Store {
     if (!g || !next || g.name === next) return;
     this.mutate(() => (g.name = next));
   }
+  // ---- array modifier ----
+  /** The source cell of an array group: its direct members with index 0 (or no index). */
+  arraySource(g: Group): Part[] {
+    return this.parts.filter((p) => p.group === g.id && !p.arrayIndex);
+  }
+  /**
+   * Turn the selection into an array group, or change the parameters of the array group
+   * that is selected. Copies are generated at once.
+   */
+  setArray(params: ArrayParams): Group | undefined {
+    const existing = this.selectedGroup();
+    if (existing?.array) {
+      this.mutate(() => (existing.array = { ...params }));
+      return existing;
+    }
+    const list = this.selectedParts();
+    if (!list.length) return undefined;
+    let g!: Group;
+    this.mutate(() => {
+      const common = list[0]!.group;
+      const parent = list.every((p) => p.group === common) ? common : undefined;
+      g = { id: this.nextGroupId++, name: `Array ${this.nextGroupId - 1}`, array: { ...params } };
+      if (parent !== undefined) g.parent = parent;
+      this.groups.push(g);
+      for (const p of list) {
+        p.group = g.id;
+        p.arrayIndex = 0;
+      }
+    });
+    this.select(this.membersOf(g.id).map((p) => p.id));
+    return g;
+  }
+  /** Keep the copies, drop the modifier: the group becomes an ordinary assembly. */
+  applyArray(groupId: number): void {
+    const g = this.groupById(groupId);
+    if (!g?.array) return;
+    this.mutate(() => {
+      delete g.array;
+      for (const p of this.parts) if (p.group === g.id) delete p.arrayIndex;
+    });
+  }
+  /** Drop the copies and the modifier, leaving the source cell. */
+  removeArray(groupId: number): void {
+    const g = this.groupById(groupId);
+    if (!g?.array) return;
+    const keep = this.arraySource(g).map((p) => p.id);
+    this.mutate(() => {
+      delete g.array;
+      this.parts = this.parts.filter((p) => p.group !== g.id || !p.arrayIndex);
+      for (const p of this.parts) if (p.group === g.id) delete p.arrayIndex;
+      // A lone part does not need a group of its own: dissolve it.
+      if (this.membersOf(g.id).length < 2 && !this.childGroups(g.id).length) {
+        for (const p of this.parts)
+          if (p.group === g.id) {
+            if (g.parent === undefined) delete p.group;
+            else p.group = g.parent;
+          }
+        this.groups = this.groups.filter((x) => x !== g);
+      }
+    });
+    this.select(keep);
+  }
+  /** Rebuild every array group's copies from its source cell. Runs inside each mutation. */
+  private regenerateArrays(): void {
+    for (const g of this.groups) {
+      if (!g.array) continue;
+      const source = this.arraySource(g);
+      if (!source.length) {
+        // The source is gone: whatever copies remain become ordinary parts.
+        delete g.array;
+        for (const p of this.parts) if (p.group === g.id) delete p.arrayIndex;
+        continue;
+      }
+      const wasSelected = this.parts.some((p) => p.group === g.id && this.selected.has(p.id));
+      for (const p of this.parts) if (p.group === g.id && p.arrayIndex) this.selected.delete(p.id);
+      this.parts = this.parts.filter((p) => p.group !== g.id || !p.arrayIndex);
+      const a = AXIS_INDEX[g.array.axis];
+      const { step, count } = arrayLayout(g.array, aabbSize(unionAABB(source))[a]);
+      for (let i = 1; i < count; i++) {
+        const offset: Vec3 = [0, 0, 0];
+        offset[a] = step * i;
+        for (const s of source) {
+          const c = clonePart(s, this.nextId++, offset);
+          c.name = `${s.name} ${i + 1}`;
+          c.arrayIndex = i;
+          this.parts.push(c);
+          if (wasSelected) this.selected.add(c.id);
+        }
+      }
+    }
+  }
+
   /** Drop groups with no parts left (directly or in nested groups) and dangling references. */
   private pruneGroups(): void {
     const known = new Set(this.groups.map((g) => g.id));
@@ -303,6 +398,7 @@ export class Store {
       for (const g of wholeGroups) groupMap.set(g.id, this.nextGroupId++);
       for (const g of wholeGroups) {
         const copy: Group = { id: groupMap.get(g.id)!, name: g.name };
+        if (g.array) copy.array = { ...g.array };
         const parent = g.parent === undefined ? undefined : (groupMap.get(g.parent) ?? g.parent);
         if (parent !== undefined) copy.parent = parent;
         this.groups.push(copy);
