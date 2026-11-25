@@ -84,14 +84,15 @@ export class RotateGizmo {
     }
   }
 
-  update(origin: THREE.Vector3 | null, camera: THREE.PerspectiveCamera): void {
+  /** Place the rings and size them to a fraction of `viewHeight`, the world height on screen. */
+  update(origin: THREE.Vector3 | null, viewHeight: number): void {
     if (!origin) {
       this.group.visible = false;
       return;
     }
     this.group.visible = true;
     this.group.position.copy(origin);
-    const s = camera.position.distanceTo(origin) * 0.16;
+    const s = viewHeight * 0.19;
     this.group.scale.set(s, s, s);
   }
 
@@ -192,16 +193,15 @@ export class Gizmo {
     return AXIS_DIRS[axis].clone();
   }
 
-  /** Place the gizmo and size it to a constant fraction of the view. */
-  update(origin: THREE.Vector3 | null, camera: THREE.PerspectiveCamera): void {
+  /** Place the gizmo and size it to a fraction of `viewHeight`, the world height on screen. */
+  update(origin: THREE.Vector3 | null, viewHeight: number): void {
     if (!origin) {
       this.group.visible = false;
       return;
     }
     this.group.visible = true;
     this.group.position.copy(origin);
-    const dist = camera.position.distanceTo(origin);
-    const s = dist * 0.14;
+    const s = viewHeight * 0.17;
     this.group.scale.set(s, s, s);
   }
 

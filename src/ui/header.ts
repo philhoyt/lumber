@@ -62,6 +62,12 @@ export function wireViews(scene: LumberScene): void {
   document
     .querySelectorAll<HTMLButtonElement>('[data-view]')
     .forEach((b) => b.addEventListener('click', () => scene.setView(b.dataset.view as ViewName)));
+  const proj = $('bProj');
+  proj.onclick = () => scene.toggleProjection();
+  scene.onProjectionChange = (mode) => {
+    proj.textContent = mode === 'ortho' ? 'Ortho' : 'Persp';
+    proj.classList.toggle('on', mode === 'ortho');
+  };
 }
 
 export function wireDrop(viewport: HTMLElement, scene: LumberScene, store: Store): void {
@@ -97,7 +103,12 @@ const ORBIT_KEYS: Record<string, [number, number]> = {
   '2': [0, -15],
 };
 
-export function wireKeyboard(store: Store, scene: LumberScene): void {
+export interface KeyboardExtras {
+  /** Shift+A: open the add-stock menu at the pointer. */
+  addMenu(): void;
+}
+
+export function wireKeyboard(store: Store, scene: LumberScene, extras: KeyboardExtras): void {
   window.addEventListener('keydown', (e) => {
     const t = e.target as HTMLElement | null;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) {
@@ -117,6 +128,7 @@ export function wireKeyboard(store: Store, scene: LumberScene): void {
     else if (mod && k === 'd') store.duplicateSelected();
     else if (mod && e.code === 'Space') togglePanels('both');
     else if (e.shiftKey && k === 'd') scene.duplicateAndGrab();
+    else if (e.shiftKey && k === 'a') extras.addMenu();
     else if (e.altKey && k === 'a') store.select([]);
     else if (e.altKey && k === 'h') store.unhideAll();
     else if (e.altKey && k === 'g') store.dropSelected();
@@ -132,6 +144,7 @@ export function wireKeyboard(store: Store, scene: LumberScene): void {
     else if (e.key === 'Tab') togglePanels('both');
     else if (e.key === 'Home') scene.setView('fit');
     else if (e.code === 'NumpadDecimal' || e.code === 'Period') scene.setView('selected');
+    else if (digit === '5') scene.toggleProjection();
     else if (VIEW_KEYS[digit]) scene.setView(VIEW_KEYS[digit]![mod ? 1 : 0]);
     else if (ORBIT_KEYS[digit]) scene.orbitStep(...ORBIT_KEYS[digit]!);
     else if (e.key === 'ArrowLeft') store.nudge([-step, 0, 0]);

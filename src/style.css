@@ -233,6 +233,10 @@ label.small {
   display: flex;
   gap: 4px;
 }
+.views button.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .views button {
   padding: 2px 8px;
   font-size: 12px;
@@ -600,7 +604,7 @@ footer b {
   display: flex;
   align-items: center;
 }
-.cmenu.sub {
-  max-height: 70vh;
+.cmenu {
+  max-height: calc(100vh - 16px);
   overflow-y: auto;
 }

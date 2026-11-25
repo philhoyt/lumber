@@ -4,14 +4,16 @@ import { LumberScene } from './scene';
 import { Store } from './store';
 import { CutlistPanel } from './ui/cutlist';
 import { $ } from './ui/dom';
+import { wireLengthFields } from './ui/fields';
 import { wireDrop, wireHeader, wireKeyboard, wireViews } from './ui/header';
-import { buildMenu, ContextMenu, menuTitle } from './ui/menu';
+import { buildMenu, ContextMenu, menuTitle, stockItems } from './ui/menu';
 import { renderPalette } from './ui/palette';
 import { OutlinerPanel } from './ui/outliner';
 import { PropsPanel } from './ui/props';
 import { wireStatus } from './ui/status';
 
 const store = new Store();
+const menu = new ContextMenu();
 if (!store.loadAutosave()) store.replaceParts(sampleWorkbench());
 store.clearHistory();
 
@@ -24,8 +26,13 @@ wireStatus($('stat'), $('overall'), store);
 wireHeader(store);
 wireDrop($('viewport'), scene, store);
 wireViews(scene);
-wireKeyboard(store, scene);
+wireKeyboard(store, scene, {
+  addMenu: () => {
+    const [x, y] = scene.pointerPosition();
+    menu.open(x, y, 'Add stock', [stockItems(scene.groundPoint(x, y), store)]);
+  },
+});
+wireLengthFields(store);
 
-const menu = new ContextMenu();
 scene.onContextMenuRequest = (ctx) =>
   menu.open(ctx.x, ctx.y, menuTitle(store), buildMenu(ctx, store, scene));

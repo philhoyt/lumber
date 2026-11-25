@@ -87,6 +87,10 @@ export interface MenuContext {
   ground: Vec3 | null;
 }
 
+export type Projection = 'persp' | 'ortho';
+/** Half the ortho frustum height at zoom 1, world inches. */
+const ORTHO_HALF = 60;
+
 export type ViewName =
   'iso' | 'top' | 'bottom' | 'front' | 'back' | 'right' | 'left' | 'fit' | 'selected';
 type MeshState = 'normal' | 'hover' | 'selected';
@@ -114,7 +118,15 @@ const VIEW_DIRS: Record<Exclude<ViewName, 'fit' | 'selected'>, THREE.Vector3> = 
 export class LumberScene {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
-  private camera: THREE.PerspectiveCamera;
+  private persp: THREE.PerspectiveCamera;
+  private ortho: THREE.OrthographicCamera;
+  private camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
+  /** The ortho view came from an axis view; orbiting away returns to perspective. */
+  private orthoFromAxis = false;
+  private axisDir: THREE.Vector3 | null = null;
+  private skipAutoPersp = false;
+  /** Called when the projection changes, for the view strip. */
+  onProjectionChange: ((mode: Projection) => void) | null = null;
   private controls: OrbitControls;
   private partsGroup = new THREE.Group();
   private meshes = new Map<number, THREE.Group>();
@@ -157,10 +169,23 @@ export class LumberScene {
     container.append(this.labelEl, this.dragLabelEl, this.boxEl);
 
     this.scene.background = new THREE.Color(0x202226);
-    this.camera = new THREE.PerspectiveCamera(45, 1, 0.5, 5000);
-    this.camera.up.copy(Z_UP);
-    this.camera.position.set(90, -110, 70);
+    this.persp = new THREE.PerspectiveCamera(45, 1, 0.5, 5000);
+    this.persp.up.copy(Z_UP);
+    this.persp.position.set(90, -110, 70);
+    this.ortho = new THREE.OrthographicCamera(
+      -ORTHO_HALF,
+      ORTHO_HALF,
+      ORTHO_HALF,
+      -ORTHO_HALF,
+      -5000,
+      5000,
+    );
+    this.ortho.up.copy(Z_UP);
+    this.camera = this.persp;
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.minZoom = 0.05;
+    this.controls.maxZoom = 60;
+    this.controls.addEventListener('change', () => this.onCameraMoved());
     this.controls.target.set(0, 0, 18);
     // Blender: middle button orbits, Shift+middle pans, wheel zooms. Right-drag also pans.
     this.controls.mouseButtons = {
@@ -296,8 +321,61 @@ export class LumberScene {
     const h = this.container.clientHeight;
     if (!w || !h) return;
     this.renderer.setSize(w, h, false);
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    this.persp.aspect = w / h;
+    this.persp.updateProjectionMatrix();
+    this.ortho.left = -ORTHO_HALF * (w / h);
+    this.ortho.right = ORTHO_HALF * (w / h);
+    this.ortho.updateProjectionMatrix();
+  }
+
+  /** The world height visible at a point: what a constant screen size must scale to. */
+  private viewHeightAt(point: THREE.Vector3): number {
+    if (this.camera instanceof THREE.OrthographicCamera) return (2 * ORTHO_HALF) / this.camera.zoom;
+    const fov = (this.persp.fov * Math.PI) / 180;
+    return 2 * this.camera.position.distanceTo(point) * Math.tan(fov / 2);
+  }
+
+  // ---- projection ----
+  get projection(): Projection {
+    return this.camera === this.ortho ? 'ortho' : 'persp';
+  }
+  /** Switch cameras in place: the view keeps its direction and apparent size. */
+  setProjection(mode: Projection, fromAxis = false): void {
+    if (mode === this.projection) {
+      this.orthoFromAxis = mode === 'ortho' && fromAxis;
+      return;
+    }
+    const target = this.controls.target;
+    const tan = Math.tan((this.persp.fov * Math.PI) / 360);
+    if (mode === 'ortho') {
+      const dist = this.persp.position.distanceTo(target);
+      this.ortho.position.copy(this.persp.position);
+      this.ortho.quaternion.copy(this.persp.quaternion);
+      this.ortho.zoom = ORTHO_HALF / (dist * tan);
+      this.ortho.updateProjectionMatrix();
+      this.camera = this.ortho;
+    } else {
+      const height = (2 * ORTHO_HALF) / this.ortho.zoom;
+      const dir = this.ortho.position.clone().sub(target).normalize();
+      this.persp.position.copy(target).add(dir.multiplyScalar(height / (2 * tan)));
+      this.persp.quaternion.copy(this.ortho.quaternion);
+      this.camera = this.persp;
+    }
+    this.orthoFromAxis = mode === 'ortho' && fromAxis;
+    this.controls.object = this.camera;
+    this.skipAutoPersp = true;
+    this.controls.update();
+    this.skipAutoPersp = false;
+    this.onProjectionChange?.(mode);
+  }
+  toggleProjection(): void {
+    this.setProjection(this.projection === 'ortho' ? 'persp' : 'ortho');
+  }
+  /** Blender's auto-perspective: orbiting away from an axis view drops back to perspective. */
+  private onCameraMoved(): void {
+    if (this.skipAutoPersp || !this.orthoFromAxis || !this.axisDir) return;
+    const dir = this.camera.position.clone().sub(this.controls.target).normalize();
+    if (dir.angleTo(this.axisDir) > 0.02) this.setProjection('persp');
   }
 
   private animate = (): void => {
@@ -305,8 +383,9 @@ export class LumberScene {
     this.controls.update();
     const center = this.selectionCenter();
     const rotating = this.tf?.kind === 'rotate';
-    this.gizmo.update(rotating ? null : center, this.camera);
-    this.rotateGizmo.update(rotating ? center : null, this.camera);
+    const vh = center ? this.viewHeightAt(center) : 0;
+    this.gizmo.update(rotating ? null : center, vh);
+    this.rotateGizmo.update(rotating ? center : null, vh);
     this.renderer.render(this.scene, this.camera);
     this.updateLabels();
   };
@@ -380,14 +459,26 @@ export class LumberScene {
     const u = this.bounds(parts);
     const center = new THREE.Vector3().fromArray(aabbCenter(u));
     const radius = Math.max(12, new THREE.Vector3().fromArray(u.max).distanceTo(center));
-    const dist = (radius / Math.sin((this.camera.fov * Math.PI) / 360)) * 1.1;
-    const dir =
-      name === 'fit' || name === 'selected'
-        ? this.camera.position.clone().sub(this.controls.target)
-        : VIEW_DIRS[name].clone();
+    const dist = (radius / Math.sin((this.persp.fov * Math.PI) / 360)) * 1.1;
+    const keepDir = name === 'fit' || name === 'selected';
+    // Axis views are orthographic, as in Blender; iso is perspective.
+    if (!keepDir) {
+      if (name === 'iso') this.setProjection('persp');
+      else this.setProjection('ortho', true);
+      this.axisDir = name === 'iso' ? null : VIEW_DIRS[name].clone().normalize();
+    }
+    const dir = keepDir
+      ? this.camera.position.clone().sub(this.controls.target)
+      : VIEW_DIRS[name].clone();
     this.camera.position.copy(center).add(dir.normalize().multiplyScalar(dist));
     this.controls.target.copy(center);
+    if (this.camera instanceof THREE.OrthographicCamera) {
+      this.camera.zoom = ORTHO_HALF / (radius * 1.1);
+      this.camera.updateProjectionMatrix();
+    }
+    this.skipAutoPersp = true;
     this.controls.update();
+    this.skipAutoPersp = false;
   }
   /** Turn the camera about the model: `az` degrees around the up axis, `el` degrees up or down. */
   orbitStep(az: number, el: number): void {
@@ -404,7 +495,11 @@ export class LumberScene {
       }
     }
     this.camera.position.copy(this.controls.target).add(offset);
+    // A stepped orbit is a view snap, not a free orbit: it keeps the ortho view.
+    if (this.orthoFromAxis) this.axisDir = offset.clone().normalize();
+    this.skipAutoPersp = true;
     this.controls.update();
+    this.skipAutoPersp = false;
   }
 
   // ---- picking ----
@@ -440,6 +535,12 @@ export class LumberScene {
       partId,
       ground: this.groundPoint(e.clientX, e.clientY),
     });
+  }
+  /** Where the pointer was last seen, for menus opened from the keyboard. */
+  pointerPosition(): [number, number] {
+    if (this.lastPointer) return this.lastPointer;
+    const r = this.container.getBoundingClientRect();
+    return [r.left + r.width / 2, r.top + r.height / 2];
   }
   /** Where a screen position lands on the floor, or null when it misses. */
   groundPoint(clientX: number, clientY: number): Vec3 | null {

@@ -44,6 +44,7 @@ right, −Y is the front, Z is up.
 | Enter / click, Esc / right-click   | Confirm or cancel a transform                                       |
 | R then X / Y / Z                   | Quarter turn about that axis; Shift reverses                        |
 | S then a length, Enter             | Set the cut length                                                  |
+| Shift+A                            | Add stock at the pointer                                            |
 | Shift+D                            | Duplicate and grab the copy; Ctrl+D duplicates with an offset       |
 | Alt+G                              | Drop onto the floor or the parts beneath                            |
 | H, Alt+H                           | Hide the selection, show everything                                 |
@@ -52,9 +53,11 @@ right, −Y is the front, Z is up.
 | Ctrl+S, Ctrl+O                     | Save, open                                                          |
 | Middle-drag, Shift+middle, wheel   | Orbit, pan, zoom (right-drag also pans)                             |
 | Numpad 1 / 3 / 7, with Ctrl        | Front / right / top, back / left / bottom (top-row digits too)      |
+| Numpad 5                           | Perspective or orthographic; axis views are ortho, orbiting returns |
 | Numpad 2 / 4 / 6 / 8               | Orbit in 15° steps                                                  |
 | Numpad . , Home                    | Frame the selection, fit the model                                  |
 | N, T, Tab                          | Toggle the side panel, the palette, both                            |
+| Up / Down in a length field        | Step by the grid; Shift 1", Ctrl 1/16"                              |
 | Arrows, PgUp / PgDn                | Nudge by the grid step                                              |
 
 The Parts list at the top of the side panel shows every part grouped by

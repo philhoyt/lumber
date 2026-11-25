@@ -67,6 +67,19 @@ const ALIGN: [AxisIndex, AlignMode, string][] = [
   [2, 'max', 'Top'],
 ];
 
+/** One item per stock; choosing it adds a full piece resting on the floor at `ground`. */
+export function stockItems(ground: Vec3 | null, store: Store): MenuItem[] {
+  return STOCK.map((s) => ({
+    label: s.name,
+    action: () => {
+      const g = ground ?? [0, 0, 0];
+      const grid = store.settings.grid;
+      const snap = (v: number) => (grid ? Math.round(v / grid) * grid : v);
+      store.addPart(s.id, [snap(g[0]), snap(g[1]), 0] as Vec3);
+    },
+  }));
+}
+
 /** The menu's sections for a right click, as lists separated by rules. */
 export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): MenuItem[][] {
   const hasSelection = store.selected.size > 0;
@@ -74,15 +87,7 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
   const addStock: MenuItem = {
     label: 'Add stock',
     icon: Plus,
-    children: STOCK.map((s) => ({
-      label: s.name,
-      action: () => {
-        const g = ctx.ground ?? [0, 0, 0];
-        const grid = store.settings.grid;
-        const snap = (v: number) => (grid ? Math.round(v / grid) * grid : v);
-        store.addPart(s.id, [snap(g[0]), snap(g[1]), 0] as Vec3);
-      },
-    })),
+    children: stockItems(ctx.ground, store),
   };
   const views: MenuItem = {
     label: 'View',
