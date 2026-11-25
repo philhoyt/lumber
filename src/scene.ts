@@ -79,6 +79,14 @@ interface BoxSelect {
   active: boolean;
 }
 
+/** What a right click landed on. */
+export interface MenuContext {
+  x: number;
+  y: number;
+  partId: number | null;
+  ground: Vec3 | null;
+}
+
 export type ViewName =
   'iso' | 'top' | 'bottom' | 'front' | 'back' | 'right' | 'left' | 'fit' | 'selected';
 type MeshState = 'normal' | 'hover' | 'selected';
@@ -125,6 +133,10 @@ export class LumberScene {
   private lastPointer: [number, number] | null = null;
   private downPos: [number, number] | null = null;
   private hoverId: number | null = null;
+  private rightDown: [number, number] | null = null;
+  private suppressMenu = false;
+  /** Set by the app to open the right-click menu. */
+  onContextMenuRequest: ((ctx: MenuContext) => void) | null = null;
   private labelEl: HTMLElement;
   private dragLabelEl: HTMLElement;
   private boxEl: HTMLElement;
@@ -189,7 +201,7 @@ export class LumberScene {
     el.addEventListener('pointerup', (e) => this.onPointerUp(e));
     el.addEventListener('pointercancel', (e) => this.onPointerUp(e));
     el.addEventListener('pointerleave', () => this.setHover(null));
-    el.addEventListener('contextmenu', (e) => e.preventDefault());
+    el.addEventListener('contextmenu', (e) => this.onContextMenu(e));
     // Keys during a transform take priority over the app's shortcuts.
     window.addEventListener('keydown', (e) => this.onKeyDown(e), { capture: true });
 
@@ -263,6 +275,10 @@ export class LumberScene {
         this.meshes.delete(id);
       }
     for (const p of this.store.parts) this.syncMesh(p);
+  }
+  /** Highlight a part from outside the view, for example from the outliner. */
+  hover(id: number | null): void {
+    this.setHover(id);
   }
   private setHover(id: number | null): void {
     if (id === this.hoverId) return;
@@ -400,6 +416,30 @@ export class LumberScene {
   private pickPart(): THREE.Intersection | null {
     const meshes = this.partsGroup.children.filter((g) => g.visible).map((g) => g.children[0]!);
     return this.ray.intersectObjects(meshes, false)[0] ?? null;
+  }
+  /**
+   * A right click that did not pan and did not cancel a transform: select what is under
+   * the pointer and hand the context to whoever draws the menu.
+   */
+  private onContextMenu(e: MouseEvent): void {
+    e.preventDefault();
+    if (this.suppressMenu) {
+      this.suppressMenu = false;
+      return;
+    }
+    const d = this.rightDown;
+    this.rightDown = null;
+    if (!d || Math.hypot(e.clientX - d[0], e.clientY - d[1]) > 3) return;
+    this.setRay(e.clientX, e.clientY);
+    const hit = this.pickPart();
+    const partId = hit ? (hit.object.userData.id as number) : null;
+    if (partId !== null && !this.store.selected.has(partId)) this.store.select([partId]);
+    this.onContextMenuRequest?.({
+      x: e.clientX,
+      y: e.clientY,
+      partId,
+      ground: this.groundPoint(e.clientX, e.clientY),
+    });
   }
   /** Where a screen position lands on the floor, or null when it misses. */
   groundPoint(clientX: number, clientY: number): Vec3 | null {
@@ -624,6 +664,10 @@ export class LumberScene {
   // ---- pointer ----
   private onPointerDown(e: PointerEvent): void {
     this.lastPointer = [e.clientX, e.clientY];
+    if (e.button === 2) {
+      this.rightDown = [e.clientX, e.clientY];
+      if (this.tf?.modal) this.suppressMenu = true; // this right click cancels, no menu
+    }
     if (this.tf?.modal) {
       if (e.button === 0 && this.tf.kind === 'rotate') {
         this.setRay(e.clientX, e.clientY);

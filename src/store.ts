@@ -212,6 +212,25 @@ export class Store {
     if (dz === 0) return;
     this.mutate(() => translateParts(list, [0, 0, dz]));
   }
+  /** Hide or show particular parts; hiding drops them from the selection. */
+  setHidden(ids: Iterable<number>, hidden: boolean): void {
+    const list = [...ids].map((id) => this.partById(id)).filter((p): p is Part => !!p);
+    const changing = list.filter((p) => !!p.hidden !== hidden);
+    if (!changing.length) return;
+    this.mutate(() =>
+      changing.forEach((p) => {
+        if (hidden) p.hidden = true;
+        else delete p.hidden;
+      }),
+    );
+    if (hidden) this.select([...this.selected].filter((id) => !changing.some((p) => p.id === id)));
+  }
+  renamePart(id: number, name: string): void {
+    const p = this.partById(id);
+    const next = name.trim();
+    if (!p || !next || p.name === next) return;
+    this.mutate(() => (p.name = next));
+  }
   hideSelected(): void {
     const list = this.selectedParts();
     if (!list.length) return;

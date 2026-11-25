@@ -53,6 +53,25 @@ describe('Store', () => {
     expect(s.selected.has(a.id)).toBe(true);
   });
 
+  it('hides and shows single parts and renames them', () => {
+    const s = new Store();
+    const a = s.addPart('2x4');
+    const b = s.addPart('2x4');
+    s.selectAll();
+    s.setHidden([a.id], true);
+    expect(s.partById(a.id)!.hidden).toBe(true);
+    expect([...s.selected]).toEqual([b.id]);
+    s.setHidden([a.id], true); // no change, no new undo step
+    const before = s.canUndo;
+    s.setHidden([a.id], false);
+    expect(before).toBe(true);
+    expect(s.partById(a.id)!.hidden).toBeUndefined();
+    s.renamePart(b.id, '  Stud 1 ');
+    expect(s.partById(b.id)!.name).toBe('Stud 1');
+    s.renamePart(b.id, '   ');
+    expect(s.partById(b.id)!.name).toBe('Stud 1');
+  });
+
   it('notifies subscribers with the kind of change', () => {
     const s = new Store();
     const kinds: string[] = [];

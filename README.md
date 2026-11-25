@@ -35,6 +35,7 @@ right, −Y is the front, Z is up.
 
 | Keys                               | What                                                                |
 | ---------------------------------- | ------------------------------------------------------------------- |
+| Right-click                        | Menu with every action for the part, selection or scene             |
 | Click, Shift+click, drag on empty  | Select, extend the selection, box select                            |
 | A, Alt+A                           | Select all, select none                                             |
 | G                                  | Grab: the selection follows the mouse on the floor plane            |
@@ -55,6 +56,10 @@ right, −Y is the front, Z is up.
 | Numpad . , Home                    | Frame the selection, fit the model                                  |
 | N, T, Tab                          | Toggle the side panel, the palette, both                            |
 | Arrows, PgUp / PgDn                | Nudge by the grid step                                              |
+
+The Parts list at the top of the side panel shows every part grouped by
+stock: click to select, Shift+click to extend, double-click (or F2) to rename,
+and the eye to hide or show. Hovering a row highlights the part.
 
 You can also drag a part's body to slide it on the floor, or drag the gizmo's
 arrows and squares. Drag stock in from the left, or click it to add at the
