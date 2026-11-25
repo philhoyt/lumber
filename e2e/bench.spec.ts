@@ -152,3 +152,30 @@ test('the corner gizmo snaps to an axis view and 9 looks from the other side', a
   await expect.poll(() => gizmoLayout(page)).not.toBe(right);
   await expect(page.locator('.nav-handle', { hasText: /^X$/ })).toHaveClass(/far/);
 });
+
+test('assembly steps walk the build in the order the Part panel sets', async ({ page }) => {
+  await openBench(page);
+  // Shift+click the four legs in the Parts list and give them step 1.
+  const rows = page.locator('.out-row');
+  await rows.filter({ hasText: 'Leg LF' }).first().click();
+  for (const n of ['Leg RF', 'Leg LB', 'Leg RB'])
+    await rows
+      .filter({ hasText: n })
+      .first()
+      .click({ modifiers: ['Shift'] });
+  await expect(page.locator('#stat')).toContainText('4 selected');
+  await page.locator('#pStep').fill('1');
+  await page.locator('#pStep').press('Enter');
+  await page.locator('#pStep').press('Escape'); // leave the field so keys reach the view
+  await hoverView(page);
+  await page.keyboard.press('Shift+E');
+  const bar = page.locator('.assembly-bar');
+  await expect(bar).toBeVisible();
+  await expect(bar).toContainText('Step 1 of 2: Leg LF, Leg RF, Leg LB, Leg RB');
+  await page.keyboard.press(']');
+  await expect(bar).toContainText('Step 2 of 2 (unnumbered)');
+  await page.keyboard.press('Shift+E');
+  await expect(bar).toBeHidden();
+  await page.locator('#bUndo').click();
+  await expect(page.locator('#pStep')).toHaveValue('');
+});

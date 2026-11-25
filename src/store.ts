@@ -3,6 +3,7 @@
  * Every change to parts goes through `mutate`, which snapshots the model first so it
  * can be undone, then tells subscribers (the project manager saves on those).
  */
+import { normalizeStep } from './assembly';
 import { cloneStock, DEFAULT_STOCK, getStock, sanitizeStock, setStock, type Stock } from './stock';
 import { clampFastener, isFace, isFastenerKind, type Fastener } from './fastener';
 import {
@@ -539,6 +540,18 @@ export class Store {
       p.fasteners.filter((_, i) => i !== index),
     );
   }
+  /** Set (or clear, with null) the assembly step of the given parts. */
+  setStep(ids: Iterable<number>, step: number | null): void {
+    const s = normalizeStep(step);
+    const list = [...ids].map((id) => this.partById(id)).filter((p) => p !== undefined);
+    if (!list.length) return;
+    this.mutate(() => {
+      for (const p of list) {
+        if (s === undefined) delete p.step;
+        else p.step = s;
+      }
+    });
+  }
   mirrorSelected(axis: Axis): void {
     const list = this.selectedParts();
     if (!list.length) return;
@@ -668,6 +681,11 @@ export function parseDocument(o: unknown): Document | null {
         : [];
       if (ok.length) x.cuts = ok;
       else delete x.cuts;
+    }
+    if (x.step !== undefined) {
+      const s = normalizeStep(typeof x.step === 'number' ? x.step : null);
+      if (s === undefined) delete x.step;
+      else x.step = s;
     }
     if (x.fasteners !== undefined) {
       const ok = Array.isArray(x.fasteners)

@@ -11,6 +11,7 @@ const actions = (): MenuActions => ({
   flipView: vi.fn(),
   toggleFasten: vi.fn(),
   toggleExplode: vi.fn(),
+  toggleAssembly: vi.fn(),
 });
 const labels = (sections: ReturnType<typeof buildMenu>) =>
   sections.map((s) => s.map((i) => i.label));
@@ -21,7 +22,7 @@ describe('buildMenu', () => {
     const m = buildMenu({ x: 0, y: 0, partId: null, ground: [10, 5, 0] }, store, actions());
     expect(labels(m)).toEqual([
       ['Add stock', 'Select all', 'Fasteners'],
-      ['View', 'Exploded view', 'Fit all'],
+      ['View', 'Exploded view', 'Assembly steps', 'Fit all'],
     ]);
     const stock = m[0]![0]!.children!;
     expect(stock.map((s) => s.label)).toContain('2x4');
@@ -39,7 +40,7 @@ describe('buildMenu', () => {
       ['Grab', 'Rotate', 'Set length', 'Fasteners'],
       ['Duplicate', 'Array…', 'Drop', 'Mirror'],
       ['Hide', 'Delete'],
-      ['Add stock', 'Select all', 'View', 'Exploded view'],
+      ['Add stock', 'Select all', 'View', 'Exploded view', 'Assembly steps'],
     ]);
     m[0]![1]!.action!();
     expect(a.beginRotate).toHaveBeenCalled();

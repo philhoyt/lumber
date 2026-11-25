@@ -81,6 +81,7 @@ theme.
 | Numpad 9                           | Look from the opposite side                                               |
 | Numpad 5                           | Perspective or orthographic; axis views are ortho, orbiting returns       |
 | E                                  | Exploded view: pull the parts apart to look; slider sets how far          |
+| Shift+E, [ / ]                     | Assembly steps: walk the build; the Part panel sets each part's step      |
 | Numpad 2 / 4 / 6 / 8, with Ctrl    | Orbit in 15° steps, pan                                                   |
 | Numpad + / -                       | Zoom in, out                                                              |
 | Numpad . , Home                    | Frame the selection, fit the model                                        |

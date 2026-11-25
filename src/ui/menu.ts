@@ -3,20 +3,20 @@
  * icons and the key beside each item. One level of submenus for stock, align and views.
  */
 import {
-  createElement,
-  type IconNode,
   AlignHorizontalJustifyStart,
   ArrowDownToLine,
   Boxes,
   Camera,
   ChevronRight,
   Copy,
+  createElement,
   Drill,
   Expand,
   Eye,
   EyeOff,
   FlipHorizontal2,
   Grid3x3,
+  ListOrdered,
   Maximize,
   Move3d,
   Plus,
@@ -24,6 +24,7 @@ import {
   Ruler,
   SquareDashedMousePointer,
   Trash2,
+  type IconNode,
   Ungroup,
 } from 'lucide';
 import type { AlignMode, Axis, AxisIndex, Vec3 } from '../model';
@@ -50,6 +51,7 @@ export interface MenuActions {
   flipView(): void;
   toggleFasten(): void;
   toggleExplode(): void;
+  toggleAssembly(): void;
 }
 
 const VIEWS: [ViewName, string, string][] = [
@@ -120,6 +122,12 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
     icon: Expand,
     action: () => scene.toggleExplode(),
   };
+  const assembly: MenuItem = {
+    label: 'Assembly steps',
+    key: 'Shift+E',
+    icon: ListOrdered,
+    action: () => scene.toggleAssembly(),
+  };
   const selectAll: MenuItem = {
     label: 'Select all',
     key: 'A',
@@ -147,6 +155,7 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
       [
         views,
         exploded,
+        assembly,
         { label: 'Fit all', key: 'Home', icon: Maximize, action: () => scene.setView('fit') },
       ],
     ];
@@ -216,7 +225,7 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
   });
   const sections = [edit, arrange];
   if (grouping.length) sections.push(grouping);
-  return [...sections, visibility, [addStock, selectAll, views, exploded]];
+  return [...sections, visibility, [addStock, selectAll, views, exploded, assembly]];
 }
 
 /** A title for the menu: the part's name, or how many parts are selected. */

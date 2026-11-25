@@ -35,6 +35,7 @@ import {
   type Part,
   type Vec3,
 } from './model';
+import { assemblyOffsets, lastStep, stepCount, stepTitle } from './assembly';
 import { explodeOffsets, offsetAABB } from './explode';
 import { fastenersOf } from './fastener';
 import { buildMarkers } from './markers';
@@ -111,14 +112,23 @@ export interface MenuContext {
   ground: Vec3 | null;
 }
 
-type MeshState = 'normal' | 'hover' | 'selected';
+/** `pending` and `current` are for walking the assembly steps. */
+type MeshState = 'normal' | 'hover' | 'selected' | 'pending' | 'current';
 
 const EDGE_COLORS: Record<MeshState, number> = {
   normal: 0x3a2a15,
   hover: 0xd9c08a,
   selected: 0x9fd3ff,
+  pending: 0x55585e,
+  current: 0xe0a94b,
 };
-const EMISSIVE: Record<MeshState, number> = { normal: 0, hover: 0x2a2416, selected: 0x1e4b73 };
+const EMISSIVE: Record<MeshState, number> = {
+  normal: 0,
+  hover: 0x2a2416,
+  selected: 0x1e4b73,
+  pending: 0,
+  current: 0x3a2e10,
+};
 const LABELS = ['X', 'Y', 'Z'] as const;
 /** Quarter turns as a signed count in -1..2, so three turns read as -90°. */
 const signedTurns = (n: number): number => ((((n + 1) % 4) + 4) % 4) - 1;
@@ -135,6 +145,12 @@ export class LumberScene {
     normal: new THREE.LineBasicMaterial({ color: EDGE_COLORS.normal }),
     hover: new THREE.LineBasicMaterial({ color: EDGE_COLORS.hover }),
     selected: new THREE.LineBasicMaterial({ color: EDGE_COLORS.selected }),
+    pending: new THREE.LineBasicMaterial({
+      color: EDGE_COLORS.pending,
+      transparent: true,
+      opacity: 0.4,
+    }),
+    current: new THREE.LineBasicMaterial({ color: EDGE_COLORS.current }),
   };
   private gizmo = new Gizmo();
   private rotateGizmo = new RotateGizmo();
@@ -162,6 +178,10 @@ export class LumberScene {
   private lastExplode = 0.5;
   private offsets = new Map<number, Vec3>();
   private explodeWatchers: ((amount: number) => void)[] = [];
+  /** Shift+E: walking the assembly steps; the current step, or null when not. */
+  private assembly: number | null = null;
+  private assemblyLast = 0;
+  private assemblyWatchers: ((step: number | null) => void)[] = [];
 
   constructor(
     private container: HTMLElement,
@@ -343,7 +363,14 @@ export class LumberScene {
     const key = `${stock.id}:${state}`;
     let m = this.matCache.get(key);
     if (!m) {
-      m = new THREE.MeshLambertMaterial({ color: stock.color, emissive: EMISSIVE[state] });
+      const pending = state === 'pending';
+      m = new THREE.MeshLambertMaterial({
+        color: stock.color,
+        emissive: EMISSIVE[state],
+        transparent: pending,
+        opacity: pending ? 0.25 : 1,
+        depthWrite: !pending,
+      });
       this.matCache.set(key, m);
     }
     return m;
@@ -351,6 +378,11 @@ export class LumberScene {
   private stateOf(id: number): MeshState {
     if (this.store.selected.has(id)) return 'selected';
     if (this.hoverId === id) return 'hover';
+    if (this.assembly !== null) {
+      const step = this.store.partById(id)?.step ?? this.assemblyLast + 1;
+      if (step > this.assembly) return 'pending';
+      if (step === this.assembly) return 'current';
+    }
     return 'normal';
   }
   private buildMesh(p: Part): THREE.Group {
@@ -391,13 +423,24 @@ export class LumberScene {
     (g.children[1] as THREE.LineSegments).material = this.edgeMats[state];
   }
   syncAll(): void {
-    this.offsets = this.explode
-      ? explodeOffsets(
-          this.store.visibleParts(),
-          (p) => this.store.rootGroupOf(p.id)?.id,
-          this.explode,
-        )
-      : new Map<number, Vec3>();
+    const visible = this.store.visibleParts();
+    this.assemblyLast = lastStep(visible);
+    if (this.assembly !== null) {
+      // Steps may have come or gone: keep the current one in range, or stop.
+      const n = stepCount(visible);
+      const k = n === 0 ? null : Math.min(this.assembly, n);
+      if (k !== this.assembly) {
+        this.assembly = k;
+        for (const w of this.assemblyWatchers) w(k);
+      }
+    }
+    const rootOf = (p: Part) => this.store.rootGroupOf(p.id)?.id;
+    this.offsets =
+      this.assembly !== null
+        ? assemblyOffsets(visible, rootOf, this.assembly)
+        : this.explode
+          ? explodeOffsets(visible, rootOf, this.explode)
+          : new Map<number, Vec3>();
     const live = new Set(this.store.parts.map((p) => p.id));
     for (const [id, g] of this.meshes)
       if (!live.has(id)) {
@@ -446,7 +489,7 @@ export class LumberScene {
     const center = this.selectionCenter();
     const rotating = this.tf?.kind === 'rotate';
     const vh = center ? this.rig.viewHeightAt(center) : 0;
-    this.gizmo.update(rotating || this.explode ? null : center, vh);
+    this.gizmo.update(rotating || this.lookOnly ? null : center, vh);
     this.rotateGizmo.update(rotating ? center : null, vh);
     this.scaleMarkers();
     this.snapFx.tick();
@@ -529,14 +572,23 @@ export class LumberScene {
   }
 
   // ---- dimensions, measuring, fasteners ----
+  /** The view is look-only while exploded or walking the steps: clicks select, nothing edits. */
+  private get lookOnly(): boolean {
+    return this.explode > 0 || this.assembly !== null;
+  }
+  /** Back to the plain view: collapse the exploded view and stop stepping. */
+  private collapseAll(): void {
+    if (this.explode) this.setExplode(0);
+    this.endAssembly();
+  }
   /** D: dimension labels on every part and extents around the selection. */
   toggleDims(): void {
-    if (this.explode && !this.dims.on) this.setExplode(0);
+    if (!this.dims.on) this.collapseAll();
     this.dims.toggle();
   }
   /** M: measure between two clicked points, snapping to part corners, edges and faces. */
   toggleMeasure(): void {
-    if (this.explode) this.setExplode(0);
+    this.collapseAll();
     if (this.measureTool.active) this.measureTool.end();
     else this.measureTool.start();
   }
@@ -551,7 +603,7 @@ export class LumberScene {
   }
   /** F: click a face to add a marker there, click a marker to take it away. */
   toggleFasten(): void {
-    if (this.explode) this.setExplode(0);
+    this.collapseAll();
     if (this.fastenMode.active) this.fastenMode.end();
     else {
       if (this.measureTool.active) this.measureTool.end();
@@ -583,6 +635,7 @@ export class LumberScene {
       if (this.measureTool.active) this.measureTool.end();
       if (this.fastenMode.active) this.fastenMode.end();
       if (this.dims.on) this.dims.toggle();
+      this.endAssembly();
       this.lastExplode = v;
     }
     this.explode = v;
@@ -596,15 +649,66 @@ export class LumberScene {
   watchExplode(fn: (amount: number) => void): void {
     this.explodeWatchers.push(fn);
   }
+  // ---- assembly steps ----
+  /** The step being shown, or null when not walking the steps. */
+  get assemblyStep(): number | null {
+    return this.assembly;
+  }
+  /** Shift+E: walk the assembly steps from the first, or stop. */
+  toggleAssembly(): void {
+    if (this.assembly !== null) this.endAssembly();
+    else this.setAssemblyStep(1);
+  }
+  /**
+   * Show step `k`: parts up to it in place, the parts of the step lit, the rest pulled
+   * away and faded. Look-only like the exploded view, and starting it ends the other
+   * tools.
+   */
+  setAssemblyStep(k: number): void {
+    const n = stepCount(this.store.visibleParts());
+    if (n === 0) return;
+    const step = Math.max(1, Math.min(n, Math.round(k)));
+    if (this.assembly === null) {
+      if (this.tf) this.finishTransform(false);
+      if (this.measureTool.active) this.measureTool.end();
+      if (this.fastenMode.active) this.fastenMode.end();
+      if (this.dims.on) this.dims.toggle();
+      if (this.explode) this.setExplode(0);
+    } else if (step === this.assembly) return;
+    this.assembly = step;
+    this.syncAll();
+    for (const w of this.assemblyWatchers) w(step);
+  }
+  /** [ and ]: the previous or next step. */
+  stepAssembly(by: number): void {
+    if (this.assembly !== null) this.setAssemblyStep(this.assembly + by);
+  }
+  endAssembly(): void {
+    if (this.assembly === null) return;
+    this.assembly = null;
+    this.syncAll();
+    for (const w of this.assemblyWatchers) w(null);
+  }
+  watchAssembly(fn: (step: number | null) => void): void {
+    this.assemblyWatchers.push(fn);
+  }
+  assemblyCount(): number {
+    return stepCount(this.store.visibleParts());
+  }
+  /** The bar's text for the step being shown. */
+  assemblyTitle(): string {
+    return this.assembly === null ? '' : stepTitle(this.store.visibleParts(), this.assembly);
+  }
+
   private offsetOf(id: number): Vec3 {
     return this.offsets.get(id) ?? [0, 0, 0];
   }
   /** A part's bounds as drawn: shifted while the view is exploded. */
   private displayAABB(p: Part): AABB {
-    return this.explode ? offsetAABB(p, this.offsetOf(p.id)) : partAABB(p);
+    return this.lookOnly ? offsetAABB(p, this.offsetOf(p.id)) : partAABB(p);
   }
   private displayBounds(parts: readonly Part[]): AABB {
-    if (!this.explode) return unionAABB(parts);
+    if (!this.lookOnly) return unionAABB(parts);
     const min: Vec3 = [Infinity, Infinity, Infinity];
     const max: Vec3 = [-Infinity, -Infinity, -Infinity];
     for (const p of parts) {
@@ -689,7 +793,7 @@ export class LumberScene {
 
   // ---- transforms ----
   private startTransform(kind: Transform['kind'], modal: boolean): Transform | null {
-    if (this.explode) return null; // look-only while exploded
+    if (this.lookOnly) return null; // look-only while exploded or stepping
     const list = this.store.selectedParts();
     if (!list.length) return null;
     const ids = new Set(list.map((p) => p.id));
@@ -951,7 +1055,7 @@ export class LumberScene {
     this.setRay(e.clientX, e.clientY);
 
     // Gizmo handles win over parts.
-    const gh = this.explode ? null : this.gizmo.pick(this.ray);
+    const gh = this.lookOnly ? null : this.gizmo.pick(this.ray);
     const center = this.selectionCenter();
     if (gh && center) {
       const t = this.startTransform('grab', false);
@@ -1042,7 +1146,7 @@ export class LumberScene {
       return;
     }
     this.setRay(e.clientX, e.clientY);
-    const gh = this.explode ? null : this.gizmo.pick(this.ray);
+    const gh = this.lookOnly ? null : this.gizmo.pick(this.ray);
     this.gizmo.setHover(gh?.object ?? null);
     const hit = gh ? null : this.pickPart();
     this.setHover(hit ? (hit.object.userData.id as number) : null);

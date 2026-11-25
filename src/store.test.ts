@@ -132,3 +132,28 @@ describe('parseDocument', () => {
     expect(parseDocument(v2)!.parts[0]!.pos).toEqual([1, 2, 3]);
   });
 });
+
+describe('assembly steps', () => {
+  it('sets and clears a step on the given parts, undoably', () => {
+    const store = new Store();
+    store.addPart('2x4');
+    store.addPart('2x4');
+    const ids = store.parts.map((p) => p.id);
+    store.setStep(ids, 2.6);
+    expect(store.parts.map((p) => p.step)).toEqual([3, 3]);
+    store.setStep([ids[0]!], null);
+    expect(store.parts[0]!.step).toBeUndefined();
+    store.undo();
+    expect(store.parts[0]!.step).toBe(3);
+  });
+  it('keeps only sensible steps when loading a document', () => {
+    const doc = parseDocument({
+      version: 2,
+      parts: [
+        { id: 1, stock: '2x4', len: 10, pos: [0, 0, 0], q: [0, 0, 0, 1], name: 'a', step: 2 },
+        { id: 2, stock: '2x4', len: 10, pos: [0, 0, 0], q: [0, 0, 0, 1], name: 'b', step: 0 },
+      ],
+    });
+    expect(doc?.parts.map((p) => p.step)).toEqual([2, undefined]);
+  });
+});

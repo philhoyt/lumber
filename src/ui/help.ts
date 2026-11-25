@@ -61,6 +61,10 @@ const SECTIONS: [string, [string, string][]][] = [
       ['5', 'Perspective / orthographic'],
       ['. / Home', 'Frame the selection / fit the model'],
       ['E', 'Exploded view: pull the parts apart; drag the slider; E collapses'],
+      [
+        'Shift+E, [ / ]',
+        'Assembly steps: walk the build one step at a time (set steps in the Part panel)',
+      ],
       ['D', 'Dimension labels and selection extents'],
       ['M', 'Measure: click two points; Esc ends'],
       ['N / T / Tab', 'Side panel / palette / both'],

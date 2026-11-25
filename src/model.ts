@@ -52,6 +52,8 @@ export interface Part {
   cuts?: Cut[];
   /** Screws, pocket holes and the like marked on the part's faces; counted as hardware. */
   fasteners?: Fastener[];
+  /** Assembly step, 1-based: the order the parts go together. Unset parts come last. */
+  step?: number;
 }
 
 /**

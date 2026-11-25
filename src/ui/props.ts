@@ -41,7 +41,16 @@ import { esc, onChange, onClick } from './dom';
 import { keepFocus } from './fields';
 import { icon } from './icons';
 
-type SectionId = 'part' | 'transform' | 'arrange' | 'fasteners' | 'array';
+type SectionId = 'part' | 'transform' | 'arrange' | 'assembly' | 'fasteners' | 'array';
+
+/** The Assembly section: one step number for the selection, blank when unset or mixed. */
+function assemblyHtml(list: readonly Part[]): string {
+  const steps = new Set(list.map((p) => p.step));
+  const value = steps.size === 1 ? ([...steps][0] ?? '') : '';
+  const hint = steps.size > 1 ? 'mixed' : 'none';
+  return `<div class="row"><div><label class="small">Step</label><input type="number" min="1" step="1" id="pStep" value="${value}" placeholder="${hint}"></div></div>
+    <div class="muted">The order the parts go together. Shift+E walks the steps; unnumbered parts come last.</div>`;
+}
 
 const FACES: [string, string][] = [
   ['top', 'Top face'],
@@ -387,6 +396,7 @@ export class PropsPanel {
       this.section('part', partTitle, part, partCount) +
       this.section('transform', 'Transform', transform) +
       this.section('arrange', 'Arrange', arrange) +
+      this.section('assembly', 'Assembly', assemblyHtml(list)) +
       this.section('fasteners', 'Fasteners', fasteners, fastCount) +
       this.section('array', 'Array', array, arrayCount) +
       hiddenNote;
@@ -488,6 +498,12 @@ export class PropsPanel {
     onChange(el, 'pX', (i) => moveTo(0, i.value));
     onChange(el, 'pY', (i) => moveTo(1, i.value));
     onChange(el, 'pZ', (i) => moveTo(2, i.value));
+    onChange(el, 'pStep', (i) =>
+      store.setStep(
+        list.map((p) => p.id),
+        i.value.trim() === '' ? null : Number(i.value),
+      ),
+    );
     onClick(el, 'bRotX', () => store.rotateSelected('x'));
     onClick(el, 'bRotY', () => store.rotateSelected('y'));
     onClick(el, 'bRotZ', () => store.rotateSelected('z'));

@@ -279,6 +279,7 @@ export function wireKeyboard(
       if (e.shiftKey) store.ungroupSelected();
       else store.groupSelected();
     } else if (mod && e.code === 'Space') togglePanels('both');
+    else if (e.shiftKey && k === 'e') scene.toggleAssembly();
     else if (e.shiftKey && k === 'd') scene.duplicateAndGrab();
     else if (e.shiftKey && k === 'a') actions.addMenu();
     else if (e.altKey && k === 'a') store.select([]);
@@ -297,6 +298,8 @@ export function wireKeyboard(
     else if (k === 't') togglePanels('palette');
     else if (k === 'x' || e.key === 'Delete') store.deleteSelected();
     else if (e.key === 'Tab') togglePanels('both');
+    else if (e.key === '[') scene.stepAssembly(-1);
+    else if (e.key === ']') scene.stepAssembly(1);
     else if (e.key === 'Home') scene.setView('fit');
     else if (e.code === 'NumpadDecimal' || e.code === 'Period') scene.setView('selected');
     else if (digit === '5') scene.toggleProjection();

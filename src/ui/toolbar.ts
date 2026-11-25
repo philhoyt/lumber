@@ -6,15 +6,16 @@
 import {
   ArrowDownToLine,
   ArrowLeftRight,
-  DraftingCompass,
-  Drill,
-  Expand,
   Boxes,
   CircleHelp,
   Copy,
+  DraftingCompass,
+  Drill,
+  Expand,
   EyeOff,
   FlipHorizontal2,
   Grid3x3,
+  ListOrdered,
   Move3d,
   Plus,
   RotateCw,
@@ -102,6 +103,12 @@ export function buildToolbar(
     scene.toggleExplode(),
   );
   scene.watchExplode((v) => explode.classList.toggle('on', v > 0));
+  const assembly = iconButton(
+    ListOrdered,
+    'Assembly steps (Shift+E): walk through the build; [ and ] step',
+    () => scene.toggleAssembly(),
+  );
+  scene.watchAssembly((k) => assembly.classList.toggle('on', k !== null));
   const iso = viewButton('iso', 'Isometric view', () => scene.setView('iso'));
   const top = viewButton('top', 'Top view (7) · Ctrl for bottom', () => scene.setView('top'));
   const front = viewButton('front', 'Front view (1) · Ctrl for back', () => scene.setView('front'));
@@ -138,6 +145,7 @@ export function buildToolbar(
     measure,
     fasten,
     explode,
+    assembly,
     spacer,
     iso,
     top,
