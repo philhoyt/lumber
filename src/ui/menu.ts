@@ -13,6 +13,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  FlipHorizontal2,
   Grid3x3,
   Maximize,
   Move3d,
@@ -23,7 +24,7 @@ import {
   Trash2,
   Ungroup,
 } from 'lucide';
-import type { AlignMode, AxisIndex, Vec3 } from '../model';
+import type { AlignMode, Axis, AxisIndex, Vec3 } from '../model';
 import type { MenuContext, ViewName } from '../scene';
 import { getStock } from '../stock';
 import type { Store } from '../store';
@@ -56,6 +57,11 @@ const VIEWS: [ViewName, string, string][] = [
   ['left', 'Left', 'Ctrl+3'],
   ['fit', 'Fit all', 'Home'],
   ['selected', 'Frame selected', '.'],
+];
+const MIRROR: [Axis, string][] = [
+  ['x', 'Left-right'],
+  ['y', 'Front-back'],
+  ['z', 'Top-bottom'],
 ];
 const ALIGN: [AxisIndex, AlignMode, string][] = [
   [0, 'min', 'Left'],
@@ -141,6 +147,16 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
       },
     },
     { label: 'Drop', key: 'Alt+G', icon: ArrowDownToLine, action: () => store.dropSelected() },
+    {
+      label: 'Mirror',
+      key: 'Ctrl+M',
+      icon: FlipHorizontal2,
+      children: MIRROR.map(([axis, label]) => ({
+        label,
+        key: axis.toUpperCase(),
+        action: () => store.mirrorSelected(axis),
+      })),
+    },
   ];
   if (store.selected.size > 1)
     arrange.splice(2, 0, {

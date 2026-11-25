@@ -11,6 +11,7 @@ import {
   CircleHelp,
   Copy,
   EyeOff,
+  FlipHorizontal2,
   Grid3x3,
   Move3d,
   Plus,
@@ -27,6 +28,7 @@ import { viewIcon, type ViewIcon } from './viewIcons';
 export interface ToolbarActions {
   togglePalette(): void;
   focusArray(): void;
+  mirror(): void;
   showHelp(): void;
 }
 
@@ -69,6 +71,9 @@ export function buildToolbar(
   const ungroup = need(
     iconButton(Ungroup, 'Ungroup (Ctrl+Shift+G)', () => store.ungroupSelected()),
   );
+  const mirror = need(
+    iconButton(FlipHorizontal2, 'Mirror (Ctrl+M, then X / Y / Z)', actions.mirror),
+  );
   const drop = need(
     iconButton(ArrowDownToLine, 'Drop onto what is below (Alt+G)', () => store.dropSelected()),
   );
@@ -110,6 +115,7 @@ export function buildToolbar(
     array,
     group,
     ungroup,
+    mirror,
     drop,
     hide,
     del,

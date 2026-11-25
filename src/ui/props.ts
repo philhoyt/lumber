@@ -224,7 +224,9 @@ export class PropsPanel {
     const transform = `<div class="row"><div><label class="small">X (left)</label><input type="text" class="len" id="pX" value="${fmt(u.min[0])}"></div><div><label class="small">Y (front)</label><input type="text" class="len" id="pY" value="${fmt(u.min[1])}"></div><div><label class="small">Z (bottom)</label><input type="text" class="len" id="pZ" value="${fmt(u.min[2])}"></div></div>
       <div class="muted footprint">Footprint ${fmt(size[0])} × ${fmt(size[1])}, height ${fmt(size[2])}</div>
       <label class="small">Rotate 90° (R, then axis)</label>
-      <div class="row btns"><button id="bRotX" title="R X">About X</button><button id="bRotY" title="R Y">About Y</button><button id="bRotZ" title="R Z">About Z</button></div>`;
+      <div class="row btns"><button id="bRotX" title="R X">About X</button><button id="bRotY" title="R Y">About Y</button><button id="bRotZ" title="R Z">About Z</button></div>
+      <label class="small">Mirror (Ctrl+M, then axis)</label>
+      <div class="row btns"><button id="bMirX" title="Ctrl+M X: flip left-right">Left-right</button><button id="bMirY" title="Ctrl+M Y: flip front-back">Front-back</button><button id="bMirZ" title="Ctrl+M Z: flip top-bottom">Top-bottom</button></div>`;
 
     // ---- Arrange ----
     const groupBtns =
@@ -396,6 +398,9 @@ export class PropsPanel {
     onClick(el, 'bRotX', () => store.rotateSelected('x'));
     onClick(el, 'bRotY', () => store.rotateSelected('y'));
     onClick(el, 'bRotZ', () => store.rotateSelected('z'));
+    onClick(el, 'bMirX', () => store.mirrorSelected('x'));
+    onClick(el, 'bMirY', () => store.mirrorSelected('y'));
+    onClick(el, 'bMirZ', () => store.mirrorSelected('z'));
     onClick(el, 'bDrop', () => store.dropSelected());
     onClick(el, 'bHide', () => store.hideSelected());
     onClick(el, 'bGroup', () => store.groupSelected());

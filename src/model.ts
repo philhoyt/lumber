@@ -385,6 +385,65 @@ export function rotateParts(list: Part[], axis: Axis, turns = 1): void {
   for (const p of list) p.pos[UP] += dz;
 }
 
+/**
+ * Which local axis of a part (0 length, 1 width, 2 thickness) runs along a world axis.
+ * Orientations are quarter turns, so exactly one does.
+ */
+export function localAxisAlong(q: Quat, axis: AxisIndex): AxisIndex {
+  _q.fromArray(q);
+  for (const a of [0, 1, 2] as const) {
+    _v.set(a === 0 ? 1 : 0, a === 1 ? 1 : 0, a === 2 ? 1 : 0).applyQuaternion(_q);
+    if (Math.abs(_v.getComponent(axis)) > 0.5) return a;
+  }
+  return 0;
+}
+
+/** A cut flipped end for end (local X), front for back (Y) or top for bottom (Z). */
+export function mirrorCut(c: Cut, local: AxisIndex, dims: Vec3): Cut {
+  const [L, W] = dims;
+  const flipFace = (f: 'top' | 'bottom') => (f === 'top' ? 'bottom' : 'top');
+  if (local === 0) {
+    if (c.kind === 'dado' || c.kind === 'notch') return { ...c, at: L - c.at - c.width };
+    if (c.kind === 'rabbet' && (c.edge === 'endA' || c.edge === 'endB'))
+      return { ...c, edge: c.edge === 'endA' ? 'endB' : 'endA' };
+    return c;
+  }
+  if (local === 1) {
+    if (c.kind === 'groove') return { ...c, at: W - c.at - c.width };
+    if (c.kind === 'rabbet' && (c.edge === 'front' || c.edge === 'back'))
+      return { ...c, edge: c.edge === 'front' ? 'back' : 'front' };
+    if (c.kind === 'notch') return { ...c, edge: c.edge === 'front' ? 'back' : 'front' };
+    return c;
+  }
+  if (c.kind === 'notch') return c;
+  return { ...c, face: flipFace(c.face) };
+}
+
+/**
+ * Mirror parts across a plane through the centre of their shared bounds, perpendicular
+ * to `axis`. Each part keeps its orientation (a mirrored box is the same box) and its
+ * shape flips along whichever local axis runs along the mirror normal: miters swap ends
+ * or sides and cuts move to the opposite end, edge or face.
+ */
+export function mirrorParts(list: Part[], axis: Axis): void {
+  if (!list.length) return;
+  const a = AXIS_INDEX[axis];
+  const c = aabbCenter(unionAABB(list))[a];
+  for (const p of list) {
+    p.pos[a] = 2 * c - p.pos[a] || 0;
+    const local = localAxisAlong(p.q, a);
+    if (p.miter) {
+      const [m0, m1] = p.miter;
+      if (local === 0) p.miter = [m1, m0];
+      else if (local === 1) p.miter = [-m0 || 0, -m1 || 0];
+    }
+    if (p.cuts?.length) {
+      const dims = partDims(p);
+      p.cuts = p.cuts.map((cut) => mirrorCut(cut, local, dims));
+    }
+  }
+}
+
 export function clonePart(p: Part, id: number, offset: Vec3): Part {
   return {
     ...p,

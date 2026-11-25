@@ -16,6 +16,7 @@ import { ProjectsDialog } from './ui/projectsDialog';
 import { ProjectManager } from './projectManager';
 import { ProjectStore } from './projects';
 import { decodeShare } from './share';
+import { beginMirror } from './ui/mirror';
 import { toast } from './ui/toast';
 import { browserPicker, FolderSync, idbHandleStore } from './folderSync';
 import { initTheme, type Theme } from './ui/theme';
@@ -97,6 +98,7 @@ buildToolbar($('toolbar'), store, scene, {
       document.getElementById('arrS')
     )?.focus();
   },
+  mirror: () => beginMirror(store),
   showHelp: () => help.toggle(),
 });
 scene.onContextMenuRequest = (ctx) =>

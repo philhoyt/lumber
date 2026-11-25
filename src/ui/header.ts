@@ -23,6 +23,7 @@ import { setIcon } from './icons';
 import { DRAG_TYPE } from './palette';
 import { encodeShare, linkSize } from '../share';
 import { currentTheme, toggleTheme, type Theme } from './theme';
+import { beginMirror, mirrorKey } from './mirror';
 import { toast } from './toast';
 
 export interface AppActions {
@@ -235,6 +236,10 @@ export function wireKeyboard(
       return;
     }
     if (scene.transforming) return; // the scene handles keys during G / R / S
+    if (mirrorKey(e, store)) {
+      e.preventDefault();
+      return;
+    }
     const k = e.key.toLowerCase();
     const mod = e.ctrlKey || e.metaKey;
     const step = store.settings.grid || 0.0625;
@@ -250,6 +255,7 @@ export function wireKeyboard(
     else if (mod && k === 's') pm.exportCurrent(download);
     else if (mod && k === 'o') actions.showProjects();
     else if (mod && k === 'd') store.duplicateSelected();
+    else if (mod && k === 'm') beginMirror(store);
     else if (mod && k === 'g') {
       if (e.shiftKey) store.ungroupSelected();
       else store.groupSelected();

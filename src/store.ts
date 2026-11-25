@@ -11,6 +11,7 @@ import {
   createPart,
   dropDistance,
   migrateFromYUp,
+  mirrorParts,
   rotateParts,
   translateParts,
   unionAABB,
@@ -501,6 +502,11 @@ export class Store {
     const list = this.selectedParts();
     if (!list.length) return;
     this.mutate(() => rotateParts(list, axis, turns));
+  }
+  mirrorSelected(axis: Axis): void {
+    const list = this.selectedParts();
+    if (!list.length) return;
+    this.mutate(() => mirrorParts(list, axis));
   }
   nudge(d: Vec3): void {
     const list = this.selectedParts();

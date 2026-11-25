@@ -56,6 +56,7 @@ theme.
 | Ctrl+G, Ctrl+Shift+G               | Group the selection into an assembly, ungroup                             |
 | Double-click a part                | Select just that part inside its group                                    |
 | Alt+G                              | Drop onto the floor or the parts beneath                                  |
+| Ctrl+M then X / Y / Z              | Mirror across that axis through the selection's centre                    |
 | H, Alt+H                           | Hide the selection, show everything                                       |
 | X or Delete                        | Delete                                                                    |
 | Ctrl+Z, Ctrl+Shift+Z               | Undo, redo                                                                |
