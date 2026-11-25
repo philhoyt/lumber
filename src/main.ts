@@ -15,13 +15,16 @@ import { StockEditor } from './ui/stockEditor';
 import { ProjectsDialog } from './ui/projectsDialog';
 import { ProjectManager } from './projectManager';
 import { ProjectStore } from './projects';
+import { browserPicker, FolderSync, idbHandleStore } from './folderSync';
 import { initTheme, type Theme } from './ui/theme';
 import { buildToolbar } from './ui/toolbar';
 
 const theme = initTheme();
 const store = new Store();
 const menu = new ContextMenu();
-const pm = new ProjectManager(store, new ProjectStore(localStorage));
+const folder = new FolderSync(idbHandleStore, browserPicker);
+const pm = new ProjectManager(store, new ProjectStore(localStorage), folder);
+void folder.init();
 
 const scene = new LumberScene($('viewport'), store);
 scene.setTheme(theme);

@@ -1,5 +1,14 @@
 /** The Projects dialog: open, create, duplicate, rename, delete and import projects. */
-import { Copy, FolderInput, Pencil, Plus, Trash2, X } from 'lucide';
+import {
+  Copy,
+  FolderInput,
+  FolderOpen,
+  FolderSync as FolderSyncIcon,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide';
 import type { ProjectManager } from '../projectManager';
 import { timeAgo } from '../projects';
 import { esc } from './dom';
@@ -17,7 +26,7 @@ export class ProjectsDialog {
   ) {
     this.dialog = document.createElement('dialog');
     this.dialog.className = 'dlg projects-dlg';
-    this.dialog.innerHTML = `<div class="dlg-head"><h2>Projects</h2><span class="muted">Kept in this browser. Export a project to send it anywhere else.</span><span class="spacer"></span><button class="icon ghost" id="pjClose" title="Close (Esc)"></button></div><div class="dlg-body"></div><div class="dlg-foot"><button id="pjNew" class="primary"></button><button id="pjImport"></button><input id="pjFile" type="file" accept=".json,application/json" hidden></div>`;
+    this.dialog.innerHTML = `<div class="dlg-head"><h2>Projects</h2><span class="muted">Kept in this browser. Export a project to send it anywhere else.</span><span class="spacer"></span><button class="icon ghost" id="pjClose" title="Close (Esc)"></button></div><div class="dlg-body"></div><div class="folder-row" id="pjFolder"></div><div class="dlg-foot"><button id="pjNew" class="primary"></button><button id="pjImport"></button><input id="pjFile" type="file" accept=".json,application/json" hidden></div>`;
     host.appendChild(this.dialog);
     this.body = this.dialog.querySelector('.dlg-body')!;
     const close = this.dialog.querySelector<HTMLButtonElement>('#pjClose')!;
@@ -43,6 +52,80 @@ export class ProjectsDialog {
     this.dialog.addEventListener('click', (e) => {
       if (e.target === this.dialog) this.hide();
     });
+    if (pm.folder) pm.folder.onChange = () => this.dialog.open && this.renderFolder();
+  }
+
+  /** The folder-on-disk row: link, reconnect, import from, or unlink. */
+  private renderFolder(message = ''): void {
+    const row = this.dialog.querySelector<HTMLElement>('#pjFolder')!;
+    row.textContent = '';
+    const fs = this.pm.folder;
+    const note = (text: string) => {
+      const s = document.createElement('span');
+      s.className = 'muted';
+      s.textContent = text;
+      row.appendChild(s);
+    };
+    const button = (
+      label: string,
+      node: Parameters<typeof icon>[0] | null,
+      fn: () => void,
+      cls = '',
+    ) => {
+      const b = document.createElement('button');
+      b.className = cls;
+      if (node) b.appendChild(icon(node, 14));
+      b.append(label);
+      b.addEventListener('click', fn);
+      row.appendChild(b);
+      return b;
+    };
+    if (!fs || fs.state === 'unsupported') {
+      note('Saving to a folder on disk needs Chrome or Edge.');
+      return;
+    }
+    if (fs.state === 'none') {
+      button('Save to a folder on disk…', FolderOpen, async () => {
+        if (await fs.link()) {
+          const imported = await this.pm.importFromFolder();
+          const written = await this.pm.mirrorAll();
+          this.render(
+            `Linked ${fs.folderName}: ${written} project${written === 1 ? '' : 's'} written${imported ? `, ${imported} imported from the folder` : ''}.`,
+          );
+        }
+      });
+      note('Each project is written as its own .json file whenever it saves.');
+      return;
+    }
+    note(`Folder: ${fs.folderName}`);
+    if (fs.state === 'needs-permission')
+      button(
+        'Reconnect',
+        FolderSyncIcon,
+        async () => {
+          if (await fs.reconnect()) this.render(`Reconnected to ${fs.folderName}.`);
+        },
+        'primary',
+      );
+    else
+      button('Import new files', FolderInput, async () => {
+        const n = await this.pm.importFromFolder();
+        this.render(
+          n
+            ? `Imported ${n} project${n === 1 ? '' : 's'} from ${fs.folderName}.`
+            : 'Nothing new in the folder.',
+        );
+      });
+    button(
+      'Unlink',
+      null,
+      async () => {
+        await fs.unlink();
+        this.render('Folder unlinked. The files stay where they are.');
+      },
+      'ghost',
+    );
+    if (message) note(message);
   }
 
   get open(): boolean {
@@ -60,6 +143,7 @@ export class ProjectsDialog {
 
   private render(message = ''): void {
     const { pm, body } = this;
+    this.renderFolder();
     body.textContent = '';
     if (message) {
       const m = document.createElement('div');

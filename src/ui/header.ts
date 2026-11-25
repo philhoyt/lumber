@@ -92,11 +92,28 @@ function wireProjectName(pm: ProjectManager): void {
   const show = () => (btn.textContent = pm.current.name);
   pm.onProject = show;
   show();
-  pm.onStatus = (s) => {
+  let last: 'saved' | 'saving' | 'error' = 'saved';
+  const showStatus = () => {
+    const folder = pm.folder?.state === 'ready' ? ` · ${pm.folder.folderName}` : '';
     saved.textContent =
-      s === 'saved' ? 'Saved' : s === 'saving' ? 'Saving…' : 'Not saved: storage is full';
-    saved.classList.toggle('warn', s === 'error');
+      last === 'saved'
+        ? `Saved${folder}`
+        : last === 'saving'
+          ? 'Saving…'
+          : 'Not saved: storage is full';
+    saved.classList.toggle('warn', last === 'error');
   };
+  pm.onStatus = (s) => {
+    last = s;
+    showStatus();
+  };
+  if (pm.folder) {
+    const prev = pm.folder.onChange;
+    pm.folder.onChange = () => {
+      prev?.();
+      showStatus();
+    };
+  }
   btn.onclick = () => {
     const input = document.createElement('input');
     input.type = 'text';

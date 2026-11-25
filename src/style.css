@@ -441,6 +441,16 @@ footer .saved.warn {
   white-space: nowrap;
 }
 
+.folder-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+}
+
 /* ---- stock editor ---- */
 .stock-dlg,
 .dlg {

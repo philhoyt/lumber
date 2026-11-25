@@ -3,6 +3,7 @@
  * every change, switching projects saves first and resets undo, and the window title
  * and status follow along.
  */
+import type { FolderSync } from './folderSync';
 import { ProjectStore, type ProjectMeta } from './projects';
 import { sampleWorkbench } from './sample';
 import { parseDocument, type Document, type Store } from './store';
@@ -22,6 +23,8 @@ export class ProjectManager {
   constructor(
     private store: Store,
     private projects: ProjectStore,
+    /** Mirrors project files into a folder on disk, when one is linked. */
+    readonly folder: FolderSync | null = null,
   ) {
     this.current = projects.ensureFirst();
     this.loadInto(this.current);
@@ -68,8 +71,10 @@ export class ProjectManager {
     if (!this.dirty) return;
     this.dirty = false;
     try {
-      this.current = this.projects.save(this.current.id, this.store.toDocument());
+      const doc = this.store.toDocument();
+      this.current = this.projects.save(this.current.id, doc);
       this.onStatus?.('saved');
+      void this.folder?.write(this.current.name, JSON.stringify(doc, null, 1));
     } catch {
       this.dirty = true;
       this.onStatus?.('error');
@@ -88,6 +93,7 @@ export class ProjectManager {
     this.flush();
     const meta = this.projects.create(name, doc);
     this.loadInto(meta);
+    void this.folder?.write(meta.name, JSON.stringify(doc, null, 1));
     return meta;
   }
 
@@ -96,7 +102,16 @@ export class ProjectManager {
   }
 
   rename(id: string, name: string): void {
+    const before = this.projects.get(id);
     this.projects.rename(id, name);
+    const after = this.projects.get(id);
+    if (before && after && before.name !== after.name && this.folder) {
+      const doc = this.projects.load(id);
+      void (async () => {
+        if (doc && (await this.folder!.write(after.name, JSON.stringify(doc, null, 1))))
+          await this.folder!.remove(before.name);
+      })();
+    }
     if (id === this.current.id) {
       this.current = this.projects.get(id)!;
       document.title = `${this.current.name} — Lumber`;
@@ -107,7 +122,42 @@ export class ProjectManager {
   duplicate(id: string): void {
     this.flush();
     const copy = this.projects.duplicate(id);
-    if (copy) this.loadInto(copy);
+    if (!copy) return;
+    this.loadInto(copy);
+    const doc = this.projects.load(copy.id);
+    if (doc) void this.folder?.write(copy.name, JSON.stringify(doc, null, 1));
+  }
+
+  /** Write every project into the linked folder (after linking one). */
+  async mirrorAll(): Promise<number> {
+    if (!this.folder || this.folder.state !== 'ready') return 0;
+    this.flush();
+    let n = 0;
+    for (const p of this.projects.list()) {
+      const doc = this.projects.load(p.id);
+      if (doc && (await this.folder.write(p.name, JSON.stringify(doc, null, 1)))) n++;
+    }
+    return n;
+  }
+
+  /** Bring in JSON files from the folder that are not projects yet. Returns how many. */
+  async importFromFolder(): Promise<number> {
+    if (!this.folder) return 0;
+    const have = new Set(this.projects.list().map((p) => p.name.toLowerCase()));
+    let n = 0;
+    for (const f of await this.folder.listFiles()) {
+      if (have.has(f.name.toLowerCase())) continue;
+      let doc: Document | null = null;
+      try {
+        doc = parseDocument(JSON.parse(f.text));
+      } catch {
+        /* not a model */
+      }
+      if (!doc) continue;
+      this.projects.create(f.name, doc);
+      n++;
+    }
+    return n;
   }
 
   remove(id: string): void {
