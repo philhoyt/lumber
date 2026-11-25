@@ -37,7 +37,7 @@ export class CutlistPanel {
     let total = 0;
     for (const [stockId, list] of partsByStock(parts)) {
       const s = stockById(stockId);
-      const price = settings.prices[s.id] ?? s.price;
+      const price = s.price;
       const priceInput = `<input class="price" data-price="${s.id}" value="${price.toFixed(2)}">`;
       if (!s.sheet) {
         const lengths = s.lengths ?? [96];
@@ -112,7 +112,7 @@ export class CutlistPanel {
     el.querySelectorAll<HTMLInputElement>('[data-price]').forEach((inp) =>
       inp.addEventListener('change', () => {
         const v = parseFloat(inp.value);
-        if (!isNaN(v)) store.setSetting('prices', { ...settings.prices, [inp.dataset.price!]: v });
+        if (!isNaN(v)) store.updateStock(inp.dataset.price!, { price: v });
         else this.render();
       }),
     );

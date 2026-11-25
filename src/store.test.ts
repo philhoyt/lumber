@@ -95,13 +95,13 @@ describe('Store', () => {
   it('round-trips a document', () => {
     const s = new Store();
     s.addPart('ply34');
-    s.setSetting('prices', { ply34: 60 });
+    s.updateStock('ply34', { price: 60 });
     const doc = parseDocument(JSON.parse(JSON.stringify(s.toDocument())));
     expect(doc).not.toBeNull();
     const t = new Store();
     t.loadDocument(doc!);
     expect(t.parts).toHaveLength(1);
-    expect(t.settings.prices.ply34).toBe(60);
+    expect(t.stock.find((x) => x.id === 'ply34')!.price).toBe(60);
     expect(t.nextId).toBe(2);
   });
 });

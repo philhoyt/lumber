@@ -12,6 +12,7 @@ import { OutlinerPanel } from './ui/outliner';
 import { renderPalette } from './ui/palette';
 import { PropsPanel } from './ui/props';
 import { wireStatus } from './ui/status';
+import { StockEditor } from './ui/stockEditor';
 import { initTheme, type Theme } from './ui/theme';
 import { buildToolbar } from './ui/toolbar';
 
@@ -24,6 +25,8 @@ store.clearHistory();
 const scene = new LumberScene($('viewport'), store);
 scene.setTheme(theme);
 const help = new HelpOverlay($('help'));
+const stockEditor = new StockEditor(document.body, store);
+$('bStockEdit').onclick = () => stockEditor.show();
 const props = new PropsPanel($('props'), store);
 renderPalette($('boards'), $('sheets'), $<HTMLInputElement>('palSearch'), store);
 new OutlinerPanel($('outBody'), $('outCount'), $<HTMLInputElement>('outFilter'), store, scene);
@@ -44,6 +47,10 @@ const actions = {
     }
     if (menu.isOpen) {
       menu.close();
+      return true;
+    }
+    if (stockEditor.open) {
+      stockEditor.hide();
       return true;
     }
     return false;

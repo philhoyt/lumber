@@ -9,6 +9,7 @@ import {
   Printer,
   Redo2,
   Save,
+  Settings2,
   Sun,
   Undo2,
 } from 'lucide';
@@ -41,6 +42,7 @@ export function wireHeader(store: Store, actions: AppActions): void {
   setIcon($('bPrint'), Printer);
   setIcon($('bPalette'), PanelLeft);
   setIcon($('bSide'), PanelRight);
+  setIcon($('bStockEdit'), Settings2, 15);
   const themeBtn = $('bTheme');
   const showTheme = (t: Theme) => {
     setIcon(themeBtn, t === 'light' ? Moon : Sun);

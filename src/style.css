@@ -362,6 +362,74 @@ header .group + .group::before {
   font-size: 11px;
 }
 
+/* ---- stock editor ---- */
+.stock-dlg {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 0;
+  width: min(880px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  box-shadow: var(--shadow);
+}
+.stock-dlg::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+.dlg-head,
+.dlg-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+}
+.dlg-head {
+  border-bottom: 1px solid var(--line);
+}
+.dlg-head h2 {
+  font-size: 15px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+}
+.dlg-head .muted {
+  font-size: 12px;
+}
+.dlg-foot {
+  border-top: 1px solid var(--line);
+}
+.dlg-body {
+  padding: 6px 16px 12px;
+  overflow: auto;
+  max-height: calc(100vh - 170px);
+}
+.dlg-body h3 {
+  margin: 10px 0 4px;
+}
+.stock-table th,
+.stock-table td {
+  padding: 2px 4px;
+  border-bottom: 0;
+}
+.stock-table input {
+  padding: 3px 6px;
+}
+.stock-table input[type='color'] {
+  width: 28px;
+  height: 26px;
+  padding: 1px 2px;
+  cursor: pointer;
+}
+.stock-table td:nth-child(2) input {
+  min-width: 110px;
+}
+.stock-table td:nth-child(5) input {
+  min-width: 120px;
+}
+.stock-table input.price {
+  width: 70px;
+}
+
 /* ---- viewport ---- */
 #viewport {
   position: relative;

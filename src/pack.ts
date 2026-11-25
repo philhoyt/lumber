@@ -4,7 +4,7 @@
  * purpose: good enough to buy the right amount, and easy to check by hand.
  */
 import type { Part } from './model';
-import { STOCK, stockById, stockWidth, type Stock } from './stock';
+import { getStock, stockById, stockWidth, type Stock } from './stock';
 import { r32 } from './units';
 
 export interface BoardItem {
@@ -134,6 +134,11 @@ export interface CutRow {
   names: string[];
 }
 
+const order = (s: Stock): number => {
+  const i = getStock().indexOf(s);
+  return i < 0 ? 1e9 : i;
+};
+
 /** Identical cuts grouped, ordered by stock then size, largest first. */
 export function cutRows(parts: readonly Part[]): CutRow[] {
   const map = new Map<string, CutRow>();
@@ -151,14 +156,14 @@ export function cutRows(parts: readonly Part[]): CutRow[] {
     r.names.push(p.name);
   }
   return [...map.values()].sort(
-    (a, b) => STOCK.indexOf(a.stock) - STOCK.indexOf(b.stock) || b.len - a.len || b.w - a.w,
+    (a, b) => order(a.stock) - order(b.stock) || b.len - a.len || b.w - a.w,
   );
 }
 
 /** Parts grouped by stock id, in stock library order. */
 export function partsByStock(parts: readonly Part[]): Map<string, Part[]> {
   const by = new Map<string, Part[]>();
-  for (const s of STOCK) {
+  for (const s of getStock()) {
     const list = parts.filter((p) => p.stock === s.id);
     if (list.length) by.set(s.id, list);
   }

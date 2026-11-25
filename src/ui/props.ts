@@ -11,7 +11,7 @@ import {
   type ArrayParams,
   type Axis,
 } from '../model';
-import { STOCK, stockById } from '../stock';
+import { getStock, stockById } from '../stock';
 import type { Store } from '../store';
 import { fmt, parseLen } from '../units';
 import { esc, onChange, onClick } from './dom';
@@ -81,10 +81,12 @@ export class PropsPanel {
     if (list.length === 1) {
       const p = list[0]!;
       const s = stockById(p.stock);
-      const options = STOCK.map(
-        (x) =>
-          `<option value="${x.id}" ${x.id === p.stock ? 'selected' : ''}>${esc(x.name)}</option>`,
-      ).join('');
+      const options = getStock()
+        .map(
+          (x) =>
+            `<option value="${x.id}" ${x.id === p.stock ? 'selected' : ''}>${esc(x.name)}</option>`,
+        )
+        .join('');
       part = `<div class="row"><div><label class="small">Name</label><input type="text" id="pName" value="${esc(p.name)}"></div>
         <div><label class="small">Stock</label><select id="pStock">${options}</select></div></div>
         <div class="row"><div><label class="small">Length (S)</label><input type="text" class="len" data-min="0.0625" id="pLen" value="${fmt(p.len)}"></div>

@@ -3,6 +3,7 @@
  * Every change to parts goes through `mutate`, which snapshots the model first so it
  * can be undone, then autosaves and tells subscribers.
  */
+import { cloneStock, DEFAULT_STOCK, getStock, sanitizeStock, setStock, type Stock } from './stock';
 import {
   aabbSize,
   alignParts,
@@ -30,8 +31,6 @@ export interface Settings {
   kerf: number;
   /** Chosen purchase length per board stock id. */
   stockLen: Record<string, number>;
-  /** Price overrides per stock id. */
-  prices: Record<string, number>;
 }
 
 /** The saved file format. Version 1 was Y-up; version 2 is Z-up and may carry groups. */
@@ -39,7 +38,10 @@ export interface Document {
   version: 2;
   parts: Part[];
   groups?: Group[];
+  /** The stock library as edited for this model; absent means the defaults. */
+  stock?: Stock[];
   stockLen?: Record<string, number>;
+  /** Price overrides from older files; folded into `stock` on load. */
   prices?: Record<string, number>;
 }
 
@@ -52,6 +54,7 @@ const AUTOSAVE_KEY = 'lumber.autosave.v2';
 interface Snapshot {
   parts: Part[];
   groups?: Group[];
+  stock?: Stock[];
   nextId: number;
   nextGroupId?: number;
 }
@@ -62,7 +65,7 @@ export class Store {
   nextId = 1;
   nextGroupId = 1;
   selected = new Set<number>();
-  settings: Settings = { grid: 0.5, snapParts: true, kerf: 0.125, stockLen: {}, prices: {} };
+  settings: Settings = { grid: 0.5, snapParts: true, kerf: 0.125, stockLen: {} };
 
   private undoStack: string[] = [];
   private redoStack: string[] = [];
@@ -81,6 +84,7 @@ export class Store {
     const s: Snapshot = {
       parts: this.parts,
       groups: this.groups,
+      stock: getStock() as Stock[],
       nextId: this.nextId,
       nextGroupId: this.nextGroupId,
     };
@@ -90,6 +94,7 @@ export class Store {
     const o = JSON.parse(s) as Snapshot;
     this.parts = o.parts;
     this.groups = o.groups ?? [];
+    setStock(o.stock ?? DEFAULT_STOCK);
     this.nextId = o.nextId;
     this.nextGroupId = o.nextGroupId ?? Math.max(0, ...this.groups.map((g) => g.id)) + 1;
     this.selected = new Set(
@@ -359,6 +364,55 @@ export class Store {
     }
   }
 
+  // ---- stock library ----
+  get stock(): readonly Stock[] {
+    return getStock();
+  }
+  /** How many parts use a stock; a stock in use cannot be deleted. */
+  stockUseCount(id: string): number {
+    return this.parts.filter((p) => p.stock === id).length;
+  }
+  updateStock(id: string, patch: Partial<Stock>): void {
+    if (!getStock().some((s) => s.id === id)) return;
+    this.mutate(() => setStock(getStock().map((s) => (s.id === id ? { ...s, ...patch } : s))));
+  }
+  addStock(kind: 'board' | 'sheet'): Stock {
+    const used = new Set(getStock().map((s) => s.id));
+    let n = 1;
+    while (used.has(`custom${n}`)) n++;
+    const s: Stock =
+      kind === 'sheet'
+        ? {
+            id: `custom${n}`,
+            name: 'New sheet',
+            t: 0.75,
+            sheet: [48, 96],
+            price: 0,
+            color: 0xd9c9a3,
+          }
+        : {
+            id: `custom${n}`,
+            name: 'New board',
+            t: 0.75,
+            w: 3.5,
+            lengths: [96],
+            price: 0,
+            color: 0xcfa872,
+          };
+    this.mutate(() => setStock([...getStock(), s]));
+    return s;
+  }
+  /** Remove a stock nobody uses. Returns false when parts still use it. */
+  deleteStock(id: string): boolean {
+    if (this.stockUseCount(id)) return false;
+    if (!getStock().some((s) => s.id === id)) return false;
+    this.mutate(() => setStock(getStock().filter((s) => s.id !== id)));
+    return true;
+  }
+  resetStock(): void {
+    this.mutate(() => setStock(DEFAULT_STOCK));
+  }
+
   // ---- settings ----
   setSetting<K extends keyof Settings>(key: K, value: Settings[K]): void {
     this.settings[key] = value;
@@ -499,10 +553,11 @@ export class Store {
     this.select(hidden.map((p) => p.id));
   }
   /** Replace the whole model (new file, sample, open). */
-  replaceParts(parts: Part[], groups: Group[] = []): void {
+  replaceParts(parts: Part[], groups: Group[] = [], stock?: Stock[]): void {
     this.mutate(() => {
       this.parts = parts;
       this.groups = groups;
+      if (stock) setStock(stock);
       this.nextId = Math.max(0, ...parts.map((p) => p.id)) + 1;
       this.nextGroupId = Math.max(0, ...groups.map((g) => g.id)) + 1;
     });
@@ -515,14 +570,16 @@ export class Store {
       version: 2,
       parts: this.parts,
       groups: this.groups,
+      stock: cloneStock(getStock()),
       stockLen: this.settings.stockLen,
-      prices: this.settings.prices,
     };
   }
   loadDocument(doc: Document): void {
     this.settings.stockLen = doc.stockLen ?? {};
-    this.settings.prices = doc.prices ?? {};
-    this.replaceParts(doc.parts, doc.groups ?? []);
+    // Older files carried price overrides instead of a stock table: fold them in.
+    const stock = cloneStock(doc.stock ?? DEFAULT_STOCK);
+    for (const s of stock) if (doc.prices?.[s.id] !== undefined) s.price = doc.prices[s.id]!;
+    this.replaceParts(doc.parts, doc.groups ?? [], stock);
     this.notify('settings');
   }
 
@@ -553,6 +610,7 @@ export function parseDocument(o: unknown): Document | null {
     version?: unknown;
     parts?: unknown;
     groups?: unknown;
+    stock?: unknown;
     stockLen?: unknown;
     prices?: unknown;
   };
@@ -582,10 +640,12 @@ export function parseDocument(o: unknown): Document | null {
           typeof (g as Group).name === 'string',
       )
     : [];
+  const stock = sanitizeStock(d.stock) ?? undefined;
   return {
     version: 2,
     parts,
     groups,
+    stock: stock && stock.length ? stock : undefined,
     stockLen: d.stockLen as Record<string, number> | undefined,
     prices: d.prices as Record<string, number> | undefined,
   };

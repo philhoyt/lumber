@@ -25,7 +25,7 @@ import {
 } from 'lucide';
 import type { AlignMode, AxisIndex, Vec3 } from '../model';
 import type { MenuContext, ViewName } from '../scene';
-import { STOCK } from '../stock';
+import { getStock } from '../stock';
 import type { Store } from '../store';
 import { $ } from './dom';
 
@@ -71,7 +71,7 @@ const ALIGN: [AxisIndex, AlignMode, string][] = [
 
 /** One item per stock; choosing it adds a full piece resting on the floor at `ground`. */
 export function stockItems(ground: Vec3 | null, store: Store): MenuItem[] {
-  return STOCK.map((s) => ({
+  return getStock().map((s) => ({
     label: s.name,
     action: () => {
       const g = ground ?? [0, 0, 0];

@@ -2,7 +2,7 @@
  * The stock palette: each stock with a to-scale cross-section thumbnail. Drag a stock
  * onto the scene, or click to add one at the centre. The search box filters by name.
  */
-import { STOCK, type Stock } from '../stock';
+import { getStock, stockVersion, type Stock } from '../stock';
 import type { Store } from '../store';
 import { fmt } from '../units';
 import { esc, hex } from './dom';
@@ -32,26 +32,40 @@ export function renderPalette(
   searchEl: HTMLInputElement,
   store: Store,
 ): void {
-  const items: { el: HTMLElement; text: string }[] = [];
-  for (const s of STOCK) {
-    const el = document.createElement('div');
-    el.className = 'stock';
-    el.draggable = true;
-    el.title = `Click to add a ${s.name} at the center, or drag it onto the scene`;
-    const dim = s.sheet
-      ? `${fmt(s.t)} · ${s.sheet[0] / 12}×${s.sheet[1] / 12} ft`
-      : `${fmt(s.t)} × ${fmt(s.w ?? 0)}`;
-    el.innerHTML = `${thumbnail(s)}<div><div class="nm">${esc(s.name)}</div><div class="dim">${dim}</div></div>`;
-    el.addEventListener('dragstart', (e) => {
-      e.dataTransfer?.setData(DRAG_TYPE, s.id);
-      if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
-    });
-    el.addEventListener('click', () => store.addPart(s.id, [0, 0, 0]));
-    (s.sheet ? sheetsEl : boardsEl).appendChild(el);
-    items.push({ el, text: `${s.name} ${dim}`.toLowerCase() });
-  }
-  searchEl.addEventListener('input', () => {
+  let items: { el: HTMLElement; text: string }[] = [];
+  const applyFilter = () => {
     const q = searchEl.value.trim().toLowerCase();
     for (const it of items) it.el.hidden = !!q && !it.text.includes(q);
+  };
+  let built = -1;
+  const build = () => {
+    if (built === stockVersion()) return;
+    built = stockVersion();
+    boardsEl.textContent = '';
+    sheetsEl.textContent = '';
+    items = [];
+    for (const s of getStock()) {
+      const el = document.createElement('div');
+      el.className = 'stock';
+      el.draggable = true;
+      el.title = `Click to add a ${s.name} at the center, or drag it onto the scene`;
+      const dim = s.sheet
+        ? `${fmt(s.t)} · ${s.sheet[0] / 12}×${s.sheet[1] / 12} ft`
+        : `${fmt(s.t)} × ${fmt(s.w ?? 0)}`;
+      el.innerHTML = `${thumbnail(s)}<div><div class="nm">${esc(s.name)}</div><div class="dim">${dim}</div></div>`;
+      el.addEventListener('dragstart', (e) => {
+        e.dataTransfer?.setData(DRAG_TYPE, s.id);
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
+      });
+      el.addEventListener('click', () => store.addPart(s.id, [0, 0, 0]));
+      (s.sheet ? sheetsEl : boardsEl).appendChild(el);
+      items.push({ el, text: `${s.name} ${dim}`.toLowerCase() });
+    }
+    applyFilter();
+  };
+  build();
+  searchEl.addEventListener('input', applyFilter);
+  store.subscribe((kind) => {
+    if (kind === 'model') build();
   });
 }

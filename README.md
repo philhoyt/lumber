@@ -81,6 +81,11 @@ arrows and squares. Drag stock in from the left, or click it to add at the
 center. With several parts selected, the Align buttons make them flush or
 centred on any axis. Sizes accept fractions and feet.
 
+The stock table is yours to edit: the gear button in the palette opens it. Change
+sizes, purchase lengths, prices and colors, add custom boards or sheets, delete
+unused ones, or reset to the defaults. Metric sizes can be typed as `38mm`. The
+table is saved with the model.
+
 Models autosave in the browser and can be saved and opened as JSON; files from
 the earlier Y-up version are converted on open. The cut list exports to CSV and
 prints.

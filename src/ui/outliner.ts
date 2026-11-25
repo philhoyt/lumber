@@ -6,7 +6,7 @@
  */
 import { createElement, ChevronDown, ChevronRight, Eye, EyeOff, Boxes } from 'lucide';
 import { partDims, type Group, type Part } from '../model';
-import { STOCK, stockById } from '../stock';
+import { getStock, stockById } from '../stock';
 import type { Store } from '../store';
 import { fmt } from '../units';
 import { hex } from './dom';
@@ -69,7 +69,7 @@ export class OutlinerPanel {
     let shown = 0;
     for (const g of this.sortedGroups(undefined)) shown += this.renderGroup(g, 0);
     const loose = store.parts.filter((p) => p.group === undefined && this.matches(p));
-    for (const s of STOCK) {
+    for (const s of getStock()) {
       const group = this.sortParts(loose.filter((p) => p.stock === s.id));
       if (!group.length) continue;
       const h = document.createElement('div');
