@@ -1,5 +1,4 @@
 import './style.css';
-import { sampleWorkbench } from './sample';
 import { LumberScene } from './scene';
 import { Store } from './store';
 import { CutlistPanel } from './ui/cutlist';
@@ -13,19 +12,22 @@ import { renderPalette } from './ui/palette';
 import { PropsPanel } from './ui/props';
 import { wireStatus } from './ui/status';
 import { StockEditor } from './ui/stockEditor';
+import { ProjectsDialog } from './ui/projectsDialog';
+import { ProjectManager } from './projectManager';
+import { ProjectStore } from './projects';
 import { initTheme, type Theme } from './ui/theme';
 import { buildToolbar } from './ui/toolbar';
 
 const theme = initTheme();
 const store = new Store();
 const menu = new ContextMenu();
-if (!store.loadAutosave()) store.replaceParts(sampleWorkbench());
-store.clearHistory();
+const pm = new ProjectManager(store, new ProjectStore(localStorage));
 
 const scene = new LumberScene($('viewport'), store);
 scene.setTheme(theme);
 const help = new HelpOverlay($('help'));
 const stockEditor = new StockEditor(document.body, store);
+const projectsDialog = new ProjectsDialog(document.body, pm);
 $('bStockEdit').onclick = () => stockEditor.show();
 const props = new PropsPanel($('props'), store);
 renderPalette($('boards'), $('sheets'), $<HTMLInputElement>('palSearch'), store);
@@ -53,13 +55,18 @@ const actions = {
       stockEditor.hide();
       return true;
     }
+    if (projectsDialog.open) {
+      projectsDialog.hide();
+      return true;
+    }
     return false;
   },
   onTheme: (t: Theme) => scene.setTheme(t),
+  showProjects: () => projectsDialog.show(),
 };
-wireHeader(store, actions);
+wireHeader(store, pm, actions);
 wireDrop($('viewport'), scene, store);
-wireKeyboard(store, scene, actions);
+wireKeyboard(store, scene, pm, actions);
 wireLengthFields(store);
 buildToolbar($('toolbar'), store, scene, {
   togglePalette: () => togglePanels('palette'),

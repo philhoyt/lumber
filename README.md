@@ -86,6 +86,9 @@ sizes, purchase lengths, prices and colors, add custom boards or sheets, delete
 unused ones, or reset to the defaults. Metric sizes can be typed as `38mm`. The
 table is saved with the model.
 
-Models autosave in the browser and can be saved and opened as JSON; files from
-the earlier Y-up version are converted on open. The cut list exports to CSV and
+Projects live in the browser: every change saves to the current project a
+moment later (the status bar says Saved). The project name in the header
+renames on click; Ctrl+O opens the Projects dialog to open, create, duplicate,
+rename, delete or import a JSON file; Ctrl+S exports the current project as
+JSON. Files from the earlier Y-up version are converted on open. The cut list exports to CSV and
 prints.

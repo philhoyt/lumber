@@ -317,7 +317,7 @@ header .group + .group::before {
   flex: none;
 }
 .pal-body {
-  overflow: auto;
+  overflow: hidden auto;
   padding: 0 10px 10px;
 }
 .pal-body h3 {
@@ -354,6 +354,15 @@ header .group + .group::before {
   height: 24px;
   flex: none;
 }
+.stock > div {
+  min-width: 0;
+}
+.stock .nm,
+.stock .dim {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .stock .nm {
   font-weight: 600;
 }
@@ -362,8 +371,79 @@ header .group + .group::before {
   font-size: 11px;
 }
 
+/* ---- project name ---- */
+header .proj {
+  background: transparent;
+  border-color: transparent;
+  font-weight: 600;
+  font-size: 13px;
+  flex: 0 1 auto;
+  min-width: 90px;
+  max-width: 220px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+header .proj:hover {
+  border-color: var(--line);
+}
+header .proj-edit {
+  width: 220px;
+  font-weight: 600;
+}
+footer .saved.warn {
+  color: var(--danger);
+}
+
+/* ---- projects dialog ---- */
+.projects-dlg {
+  width: min(560px, calc(100vw - 32px));
+}
+.proj-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.proj-row:hover {
+  background: var(--panel2);
+}
+.proj-row.current {
+  background: var(--sel-bg);
+}
+.proj-main {
+  flex: 1;
+  min-width: 0;
+}
+.proj-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.proj-name input {
+  width: 100%;
+  padding: 2px 6px;
+}
+.proj-meta {
+  font-size: 11px;
+}
+.proj-actions {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+.proj-actions .danger {
+  white-space: nowrap;
+}
+
 /* ---- stock editor ---- */
-.stock-dlg {
+.stock-dlg,
+.dlg {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel);

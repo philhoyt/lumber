@@ -1,7 +1,7 @@
 /**
  * Application state: the parts, their groups, the selection, settings, and undo/redo.
  * Every change to parts goes through `mutate`, which snapshots the model first so it
- * can be undone, then autosaves and tells subscribers.
+ * can be undone, then tells subscribers (the project manager saves on those).
  */
 import { cloneStock, DEFAULT_STOCK, getStock, sanitizeStock, setStock, type Stock } from './stock';
 import {
@@ -48,8 +48,6 @@ export interface Document {
 export type ArraySpacing = 'center' | 'gap';
 export type ChangeKind = 'model' | 'selection' | 'settings' | 'drag';
 export type Listener = (kind: ChangeKind) => void;
-
-const AUTOSAVE_KEY = 'lumber.autosave.v2';
 
 interface Snapshot {
   parts: Part[];
@@ -107,7 +105,6 @@ export class Store {
     this.undoStack.push(before);
     if (this.undoStack.length > 200) this.undoStack.shift();
     this.redoStack = [];
-    this.autosave();
     this.notify('model');
   }
   mutate(fn: () => void): void {
@@ -128,14 +125,12 @@ export class Store {
     if (s === undefined) return;
     this.redoStack.push(this.snapshot());
     this.restore(s);
-    this.autosave();
   }
   redo(): void {
     const s = this.redoStack.pop();
     if (s === undefined) return;
     this.undoStack.push(this.snapshot());
     this.restore(s);
-    this.autosave();
   }
   clearHistory(): void {
     this.undoStack = [];
@@ -581,25 +576,6 @@ export class Store {
     for (const s of stock) if (doc.prices?.[s.id] !== undefined) s.price = doc.prices[s.id]!;
     this.replaceParts(doc.parts, doc.groups ?? [], stock);
     this.notify('settings');
-  }
-
-  autosave(): void {
-    try {
-      localStorage.setItem(AUTOSAVE_KEY, this.snapshot());
-    } catch {
-      /* no storage here (tests), or storage full: autosave is best effort */
-    }
-  }
-  /** Restore the autosaved model, if any. Returns whether something was restored. */
-  loadAutosave(): boolean {
-    try {
-      const s = localStorage.getItem(AUTOSAVE_KEY);
-      if (!s) return false;
-      this.restore(s);
-      return true;
-    } catch {
-      return false;
-    }
   }
 }
 

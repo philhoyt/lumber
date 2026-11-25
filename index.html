@@ -9,11 +9,11 @@
     <div id="app">
       <header>
         <h1>Lumber<span>.</span></h1>
+        <button id="projName" class="proj" title="Rename this project"></button>
         <div class="group">
-          <button id="bNew" class="icon" title="New model"></button>
-          <button id="bOpen" class="icon" title="Open a saved model (Ctrl+O)"></button>
-          <button id="bSave" class="icon" title="Save the model as JSON (Ctrl+S)"></button>
-          <input id="fileIn" type="file" accept=".json,application/json" hidden />
+          <button id="bNew" class="icon" title="New project"></button>
+          <button id="bOpen" class="icon" title="Projects (Ctrl+O)"></button>
+          <button id="bSave" class="icon" title="Export as JSON (Ctrl+S)"></button>
         </div>
         <div class="group">
           <button id="bUndo" class="icon" title="Undo (Ctrl+Z)"></button>
@@ -100,7 +100,7 @@
         <span id="hints" class="hints"></span>
         <span class="spacer"></span>
         <span>Overall <b id="overall">—</b></span>
-        <span class="muted">Autosaves in this browser</span>
+        <span id="saved" class="muted saved">Saved</span>
       </footer>
 
       <div id="help" class="overlay" hidden></div>

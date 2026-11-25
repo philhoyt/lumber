@@ -2,7 +2,7 @@
 import { cutRows, packBoards, packSheets, partsByStock } from '../pack';
 import { stockById } from '../stock';
 import type { Store } from '../store';
-import { fmt, fmtFt, money, parseLen } from '../units';
+import { fmt, fmtFt, fmtSheet, money, parseLen } from '../units';
 import { esc, hex } from './dom';
 import { keepFocus } from './fields';
 
@@ -80,7 +80,7 @@ export class CutlistPanel {
         );
         const cost = sheets.length * price;
         total += cost;
-        html += `<div class="grp"><span>${sheets.length} × ${esc(s.name)} ${SW / 12}×${SL / 12}</span><span>${priceInput} = ${money(cost)}</span></div>`;
+        html += `<div class="grp"><span>${sheets.length} × ${esc(s.name)} ${fmtSheet(SW, SL)}</span><span>${priceInput} = ${money(cost)}</span></div>`;
         for (const sh of sheets) {
           const sc = DIAGRAM_W / SL;
           const H = SW * sc;

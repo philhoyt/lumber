@@ -13,8 +13,8 @@ import {
   Sun,
   Undo2,
 } from 'lucide';
-import { sampleWorkbench } from '../sample';
-import { parseDocument, type Store } from '../store';
+import type { ProjectManager } from '../projectManager';
+import type { Store } from '../store';
 import type { LumberScene, ViewName } from '../scene';
 import { cutListCsv } from './cutlist';
 import { $, download } from './dom';
@@ -30,9 +30,11 @@ export interface AppActions {
   /** Close any overlay or menu; returns whether one was open. */
   closeOverlays(): boolean;
   onTheme(theme: Theme): void;
+  /** Ctrl+O: the Projects dialog. */
+  showProjects(): void;
 }
 
-export function wireHeader(store: Store, actions: AppActions): void {
+export function wireHeader(store: Store, pm: ProjectManager, actions: AppActions): void {
   setIcon($('bNew'), FilePlus);
   setIcon($('bOpen'), FolderOpen);
   setIcon($('bSave'), Save);
@@ -71,27 +73,11 @@ export function wireHeader(store: Store, actions: AppActions): void {
   };
   store.subscribe(syncHistory);
   syncHistory();
-  $('bNew').onclick = () => newModel(store);
-  $('bSample').onclick = () => {
-    if (!store.parts.length || confirm('Replace the model with the sample workbench?'))
-      store.replaceParts(sampleWorkbench());
-  };
-  $('bSave').onclick = () => saveModel(store);
-  const fileIn = $<HTMLInputElement>('fileIn');
-  $('bOpen').onclick = () => fileIn.click();
-  fileIn.addEventListener('change', async () => {
-    const f = fileIn.files?.[0];
-    fileIn.value = '';
-    if (!f) return;
-    let doc = null;
-    try {
-      doc = parseDocument(JSON.parse(await f.text()));
-    } catch {
-      /* not JSON */
-    }
-    if (doc) store.loadDocument(doc);
-    else alert('That file is not a Lumber model.');
-  });
+  $('bNew').onclick = () => pm.newProject();
+  $('bSample').onclick = () => pm.newFromSample();
+  $('bSave').onclick = () => pm.exportCurrent(download);
+  $('bOpen').onclick = () => actions.showProjects();
+  wireProjectName(pm);
   $('bCsv').onclick = () => download('cut-list.csv', cutListCsv(store), 'text/csv');
   $('bPrint').onclick = () => window.print();
   $('bPalette').onclick = () => togglePanels('palette');
@@ -99,11 +85,42 @@ export function wireHeader(store: Store, actions: AppActions): void {
   syncPanelButtons();
 }
 
-function newModel(store: Store): void {
-  if (!store.parts.length || confirm('Clear the model?')) store.replaceParts([]);
-}
-function saveModel(store: Store): void {
-  download('lumber-model.json', JSON.stringify(store.toDocument(), null, 1), 'application/json');
+/** The project name in the header: click to rename in place; the footer shows save state. */
+function wireProjectName(pm: ProjectManager): void {
+  const btn = $<HTMLButtonElement>('projName');
+  const saved = $('saved');
+  const show = () => (btn.textContent = pm.current.name);
+  pm.onProject = show;
+  show();
+  pm.onStatus = (s) => {
+    saved.textContent =
+      s === 'saved' ? 'Saved' : s === 'saving' ? 'Saving…' : 'Not saved: storage is full';
+    saved.classList.toggle('warn', s === 'error');
+  };
+  btn.onclick = () => {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'proj-edit';
+    input.value = pm.current.name;
+    input.maxLength = 80;
+    btn.replaceWith(input);
+    input.focus();
+    input.select();
+    let done = false;
+    const finish = (ok: boolean) => {
+      if (done) return;
+      done = true;
+      if (ok) pm.rename(pm.current.id, input.value);
+      input.replaceWith(btn);
+      show();
+    };
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') finish(true);
+      else if (e.key === 'Escape') finish(false);
+      e.stopPropagation();
+    });
+    input.addEventListener('blur', () => finish(true));
+  };
 }
 
 /** T toggles the palette, N the side panel (Blender's T and N panels), Tab both. */
@@ -168,7 +185,12 @@ const ORBIT_KEYS: Record<string, [number, number]> = {
   '2': [0, -15],
 };
 
-export function wireKeyboard(store: Store, scene: LumberScene, actions: AppActions): void {
+export function wireKeyboard(
+  store: Store,
+  scene: LumberScene,
+  pm: ProjectManager,
+  actions: AppActions,
+): void {
   window.addEventListener('keydown', (e) => {
     const t = e.target as HTMLElement | null;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) {
@@ -187,8 +209,8 @@ export function wireKeyboard(store: Store, scene: LumberScene, actions: AppActio
       actions.toggleHelp();
     else if (mod && k === 'z') (e.shiftKey ? store.redo : store.undo).call(store);
     else if (mod && k === 'y') store.redo();
-    else if (mod && k === 's') saveModel(store);
-    else if (mod && k === 'o') $('bOpen').click();
+    else if (mod && k === 's') pm.exportCurrent(download);
+    else if (mod && k === 'o') actions.showProjects();
     else if (mod && k === 'd') store.duplicateSelected();
     else if (mod && k === 'g') {
       if (e.shiftKey) store.ungroupSelected();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fmt, fmtFt, parseLen, r32 } from './units';
+import { fmt, fmtFt, fmtSheet, parseLen, r32 } from './units';
 
 describe('parseLen', () => {
   it.each([
@@ -54,6 +54,13 @@ describe('fmtFt', () => {
   it('reads whole feet as feet and everything else as inches', () => {
     expect(fmtFt(96)).toBe('8 ft');
     expect(fmtFt(100)).toBe('100"');
+  });
+});
+
+describe('fmtSheet', () => {
+  it('uses feet for whole-foot sheets and inches otherwise', () => {
+    expect(fmtSheet(48, 96)).toBe('4×8 ft');
+    expect(fmtSheet(49, 97)).toBe('49" × 97"');
   });
 });
 

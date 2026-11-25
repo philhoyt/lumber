@@ -54,4 +54,10 @@ export const fmtFt = (x: number): string => (x % 12 === 0 ? `${x / 12} ft` : fmt
 /** Round to the nearest 1/32" so cuts that differ by float noise group together. */
 export const r32 = (x: number): number => Math.round(x * 32) / 32;
 
+/** A sheet size: "4×8 ft" when both sides are whole feet, otherwise in inches. */
+export function fmtSheet(w: number, l: number): string {
+  if (w % 12 === 0 && l % 12 === 0) return `${w / 12}×${l / 12} ft`;
+  return `${fmt(w)} × ${fmt(l)}`;
+}
+
 export const money = (x: number): string => '$' + x.toFixed(2);

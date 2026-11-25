@@ -4,7 +4,7 @@
  */
 import { getStock, stockVersion, type Stock } from '../stock';
 import type { Store } from '../store';
-import { fmt } from '../units';
+import { fmt, fmtSheet } from '../units';
 import { esc, hex } from './dom';
 
 export const DRAG_TYPE = 'text/stock';
@@ -50,7 +50,7 @@ export function renderPalette(
       el.draggable = true;
       el.title = `Click to add a ${s.name} at the center, or drag it onto the scene`;
       const dim = s.sheet
-        ? `${fmt(s.t)} · ${s.sheet[0] / 12}×${s.sheet[1] / 12} ft`
+        ? `${fmt(s.t)} · ${fmtSheet(s.sheet[0], s.sheet[1])}`
         : `${fmt(s.t)} × ${fmt(s.w ?? 0)}`;
       el.innerHTML = `${thumbnail(s)}<div><div class="nm">${esc(s.name)}</div><div class="dim">${dim}</div></div>`;
       el.addEventListener('dragstart', (e) => {
