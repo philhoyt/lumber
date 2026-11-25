@@ -3,6 +3,7 @@ import {
   Download,
   FilePlus,
   FolderOpen,
+  Link2,
   Moon,
   PanelLeft,
   PanelRight,
@@ -20,7 +21,9 @@ import { cutListCsv } from './cutlist';
 import { $, download } from './dom';
 import { setIcon } from './icons';
 import { DRAG_TYPE } from './palette';
+import { encodeShare, linkSize } from '../share';
 import { currentTheme, toggleTheme, type Theme } from './theme';
+import { toast } from './toast';
 
 export interface AppActions {
   /** Shift+A: open the add-stock menu at the pointer. */
@@ -42,6 +45,7 @@ export function wireHeader(store: Store, pm: ProjectManager, actions: AppActions
   setIcon($('bRedo'), Redo2);
   setIcon($('bCsv'), Download);
   setIcon($('bPrint'), Printer);
+  setIcon($('bShare'), Link2);
   setIcon($('bPalette'), PanelLeft);
   setIcon($('bSide'), PanelRight);
   setIcon($('bStockEdit'), Settings2, 15);
@@ -80,9 +84,25 @@ export function wireHeader(store: Store, pm: ProjectManager, actions: AppActions
   wireProjectName(pm);
   $('bCsv').onclick = () => download('cut-list.csv', cutListCsv(store), 'text/csv');
   $('bPrint').onclick = () => window.print();
+  $('bShare').onclick = () => void shareLink(store, pm);
   $('bPalette').onclick = () => togglePanels('palette');
   $('bSide').onclick = () => togglePanels('side');
   syncPanelButtons();
+}
+
+/** Put a link carrying the current project on the clipboard, or show it to copy by hand. */
+async function shareLink(store: Store, pm: ProjectManager): Promise<void> {
+  pm.flush();
+  const hash = await encodeShare(store.toDocument(), pm.current.name);
+  const link = `${location.origin}${location.pathname}#${hash}`;
+  try {
+    await navigator.clipboard.writeText(link);
+    toast(`Link copied (${linkSize(link)}). Anyone who opens it gets a copy of this project.`);
+  } catch {
+    // Clipboard refused (no permission or not a secure context): put it in the address bar.
+    history.replaceState(null, '', `#${hash}`);
+    toast(`Copy the link from the address bar (${linkSize(link)}).`);
+  }
 }
 
 /** The project name in the header: click to rename in place; the footer shows save state. */

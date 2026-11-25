@@ -15,6 +15,8 @@ import { StockEditor } from './ui/stockEditor';
 import { ProjectsDialog } from './ui/projectsDialog';
 import { ProjectManager } from './projectManager';
 import { ProjectStore } from './projects';
+import { decodeShare } from './share';
+import { toast } from './ui/toast';
 import { browserPicker, FolderSync, idbHandleStore } from './folderSync';
 import { initTheme, type Theme } from './ui/theme';
 import { buildToolbar } from './ui/toolbar';
@@ -24,6 +26,19 @@ const store = new Store();
 const menu = new ContextMenu();
 const folder = new FolderSync(idbHandleStore, browserPicker);
 const pm = new ProjectManager(store, new ProjectStore(localStorage), folder);
+// A share link in the address bar: import it as a new project, then clear the hash so a
+// refresh does not import it again.
+if (/(^|[#&])m=/.test(location.hash)) {
+  void decodeShare(location.hash).then((shared) => {
+    history.replaceState(null, '', location.pathname + location.search);
+    if (!shared) {
+      toast('That link does not hold a Lumber model.');
+      return;
+    }
+    pm.newProject(shared.name, shared.doc);
+    toast(`Opened "${shared.name}" from the link as a new project.`);
+  });
+}
 void folder.init();
 
 const scene = new LumberScene($('viewport'), store);

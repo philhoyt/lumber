@@ -120,7 +120,9 @@ Projects live in the browser: every change saves to the current project a
 moment later (the status bar says Saved). The project name in the header
 renames on click; Ctrl+O opens the Projects dialog to open, create, duplicate,
 rename, delete or import a JSON file; Ctrl+S exports the current project as
-JSON. In Chrome or Edge the Projects dialog can also link a folder on disk:
+JSON. The link button in the header copies a share link: the whole project compressed
+into the address, nothing uploaded anywhere. Whoever opens it gets a copy as a
+new project. In Chrome or Edge the Projects dialog can also link a folder on disk:
 every project is then written there as its own .json file whenever it saves,
 renames move the file, and JSON files already in the folder can be imported
 as projects. Files from the earlier Y-up version are converted on open. The cut list exports to CSV and

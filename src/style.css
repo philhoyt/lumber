@@ -1020,6 +1020,31 @@ footer .hints kbd {
   align-items: center;
 }
 
+/* ---- toast ---- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 40px;
+  transform: translate(-50%, 12px);
+  z-index: 70;
+  background: var(--text);
+  color: var(--bg);
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
+  max-width: min(520px, calc(100vw - 32px));
+}
+.toast.on {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 /* ---- help overlay ---- */
 .overlay {
   position: fixed;
