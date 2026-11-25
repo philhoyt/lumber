@@ -7,6 +7,7 @@ import {
   Moon,
   PanelLeft,
   PanelRight,
+  PencilRuler,
   Printer,
   Redo2,
   Save,
@@ -36,6 +37,7 @@ export interface AppActions {
   onTheme(theme: Theme): void;
   /** Ctrl+O: the Projects dialog. */
   showProjects(): void;
+  showDrawings(): void;
 }
 
 export function wireHeader(store: Store, pm: ProjectManager, actions: AppActions): void {
@@ -46,6 +48,7 @@ export function wireHeader(store: Store, pm: ProjectManager, actions: AppActions
   setIcon($('bRedo'), Redo2);
   setIcon($('bCsv'), Download);
   setIcon($('bPrint'), Printer);
+  setIcon($('bDrawings'), PencilRuler);
   setIcon($('bShare'), Link2);
   setIcon($('bPalette'), PanelLeft);
   setIcon($('bSide'), PanelRight);
@@ -85,6 +88,7 @@ export function wireHeader(store: Store, pm: ProjectManager, actions: AppActions
   wireProjectName(pm);
   $('bCsv').onclick = () => download('cut-list.csv', cutListCsv(store), 'text/csv');
   $('bPrint').onclick = () => window.print();
+  $('bDrawings').onclick = () => actions.showDrawings();
   $('bShare').onclick = () => void shareLink(store, pm);
   $('bPalette').onclick = () => togglePanels('palette');
   $('bSide').onclick = () => togglePanels('side');

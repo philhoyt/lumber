@@ -1127,6 +1127,88 @@ footer .hints kbd {
   transform: translate(-50%, 0);
 }
 
+/* ---- shop drawings ---- */
+.drawings {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  width: min(840px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+}
+.drawings-body {
+  max-height: none;
+  flex: 1 1 auto;
+  padding: 0 16px 16px;
+}
+.sheet {
+  padding: 14px 0 6px;
+  border-bottom: 1px dashed var(--line);
+}
+.sheet h1 {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+.sheet h2 {
+  font-size: 14px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+  margin: 0 0 2px;
+}
+.sheet .notes {
+  margin: 4px 0 0 18px;
+  font-size: 12px;
+}
+svg.drawing {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-top: 8px;
+  color: var(--text);
+}
+svg.drawing .part {
+  fill: var(--panel2);
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+svg.drawing .cut {
+  fill: rgba(95, 179, 255, 0.22);
+  stroke: #5fb3ff;
+  stroke-width: 1;
+}
+svg.drawing .cut.hidden,
+svg.drawing .mark.hidden {
+  stroke-dasharray: 3 2;
+  fill: none;
+}
+svg.drawing .cut.through {
+  fill: var(--panel);
+  stroke: currentColor;
+}
+svg.drawing .mark {
+  fill: rgba(95, 179, 255, 0.5);
+  stroke: #2f6fde;
+  stroke-width: 1;
+}
+svg.drawing .dim line {
+  stroke: var(--accent);
+  stroke-width: 0.8;
+}
+svg.drawing .dim line.ext {
+  stroke: var(--muted);
+  stroke-width: 0.6;
+}
+svg.drawing .dim text {
+  fill: currentColor;
+}
+svg.drawing text {
+  fill: currentColor;
+}
+
 /* ---- help overlay ---- */
 .overlay {
   position: fixed;
@@ -1212,6 +1294,52 @@ footer .hints kbd {
   #tab-cut[hidden] {
     border: 0;
     display: block;
+  }
+  body.drawings-open #side {
+    display: none !important;
+  }
+  .drawings-overlay {
+    position: static;
+    background: none;
+    display: block;
+  }
+  .drawings {
+    border: 0;
+    box-shadow: none;
+    width: auto;
+    max-height: none;
+    background: #fff;
+    color: #000;
+  }
+  .drawings .dlg-head {
+    display: none;
+  }
+  .drawings-body {
+    overflow: visible;
+    padding: 0;
+  }
+  .sheet {
+    break-inside: avoid;
+    border-bottom: 0;
+    padding: 10px 0;
+  }
+  .sheet + .sheet {
+    break-before: page;
+  }
+  .sheet.title-block + .sheet {
+    break-before: auto;
+  }
+  svg.drawing {
+    color: #000;
+  }
+  svg.drawing .part {
+    fill: #f1ede4;
+  }
+  svg.drawing .dim line {
+    stroke: #000;
+  }
+  svg.drawing .dim line.ext {
+    stroke: #666;
   }
   .pane-body {
     overflow: visible;

@@ -7,6 +7,7 @@ import { wireExplodeBar } from './ui/explodeBar';
 import { wireFastenBar } from './ui/fastenBar';
 import { wireLengthFields } from './ui/fields';
 import { togglePanels, wireDrop, wireHeader, wireKeyboard, wireTabs } from './ui/header';
+import { DrawingsOverlay } from './ui/drawings';
 import { HelpOverlay } from './ui/help';
 import { buildMenu, ContextMenu, menuTitle, stockItems } from './ui/menu';
 import { OutlinerPanel } from './ui/outliner';
@@ -47,6 +48,7 @@ void folder.init();
 const scene = new LumberScene($('viewport'), store);
 scene.setTheme(theme);
 const help = new HelpOverlay($('help'));
+const drawings = new DrawingsOverlay(document.body, store, () => pm.current.name);
 const stockEditor = new StockEditor(document.body, store);
 const projectsDialog = new ProjectsDialog(document.body, pm);
 $('bStockEdit').onclick = () => stockEditor.show();
@@ -70,6 +72,10 @@ const actions = {
       help.hide();
       return true;
     }
+    if (drawings.open) {
+      drawings.hide();
+      return true;
+    }
     if (menu.isOpen) {
       menu.close();
       return true;
@@ -86,6 +92,7 @@ const actions = {
   },
   onTheme: (t: Theme) => scene.setTheme(t),
   showProjects: () => projectsDialog.show(),
+  showDrawings: () => drawings.toggle(),
 };
 wireHeader(store, pm, actions);
 wireDrop($('viewport'), scene, store);

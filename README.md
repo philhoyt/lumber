@@ -28,6 +28,14 @@ Enable the pre-commit hook once per clone so `check` runs before every commit:
 
     git config core.hooksPath .githooks
 
+## Shop drawings
+
+The drawings button in the header opens printable shop drawings: front, right and top
+views of the whole model with its overall dimensions, then a sheet per unique part with
+its face and edge views, length, width, thickness, miter angles, joinery and fastener
+marks, and a hardware list. They are drawn from the model's exact sizes, so what is on
+the page is what to cut. Print sends just the drawings to the printer.
+
 ## Controls
 
 The keys follow Blender, and the world is Z-up like Blender: X runs left to
