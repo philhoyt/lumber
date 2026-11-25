@@ -52,6 +52,8 @@ const SECTIONS: [string, [string, string][]][] = [
       ['2 / 4 / 6 / 8', 'Orbit in 15° steps'],
       ['5', 'Perspective / orthographic'],
       ['. / Home', 'Frame the selection / fit the model'],
+      ['D', 'Dimension labels and selection extents'],
+      ['M', 'Measure: click two points; Esc ends'],
       ['N / T / Tab', 'Side panel / palette / both'],
       ['?', 'This list'],
     ],

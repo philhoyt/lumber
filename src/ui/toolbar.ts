@@ -5,6 +5,8 @@
  */
 import {
   ArrowDownToLine,
+  ArrowLeftRight,
+  DraftingCompass,
   Boxes,
   CircleHelp,
   Copy,
@@ -58,7 +60,7 @@ export function buildToolbar(
   const add = iconButton(Plus, 'Add stock (Shift+A, or open the palette)', actions.togglePalette);
   const grab = need(iconButton(Move3d, 'Grab (G)', () => scene.beginGrab()));
   const rotate = need(iconButton(RotateCw, 'Rotate (R)', () => scene.beginRotate()));
-  const length = need(iconButton(Ruler, 'Set length (S)', () => scene.beginSize()));
+  const length = need(iconButton(ArrowLeftRight, 'Set length (S)', () => scene.beginSize()));
   const dup = need(
     iconButton(Copy, 'Duplicate and grab (Shift+D)', () => scene.duplicateAndGrab()),
   );
@@ -73,6 +75,14 @@ export function buildToolbar(
   const hide = need(iconButton(EyeOff, 'Hide (H) · Alt+H shows all', () => store.hideSelected()));
   const del = need(iconButton(Trash2, 'Delete (X)', () => store.deleteSelected(), 'danger'));
 
+  const dims = iconButton(Ruler, 'Dimension labels and selection extents (D)', () => {
+    scene.toggleDims();
+    dims.classList.toggle('on', scene.showDims);
+  });
+  const measure = iconButton(DraftingCompass, 'Measure between two points (M)', () =>
+    scene.toggleMeasure(),
+  );
+  scene.onMeasureChange = (on) => measure.classList.toggle('on', on);
   const iso = viewButton('iso', 'Isometric view', () => scene.setView('iso'));
   const top = viewButton('top', 'Top view (7) · Ctrl for bottom', () => scene.setView('top'));
   const front = viewButton('front', 'Front view (1) · Ctrl for back', () => scene.setView('front'));
@@ -103,6 +113,9 @@ export function buildToolbar(
     drop,
     hide,
     del,
+    sep(),
+    dims,
+    measure,
     spacer,
     iso,
     top,

@@ -560,6 +560,37 @@ footer .saved.warn {
   display: none;
   font-variant-numeric: tabular-nums;
 }
+.dim-label,
+.measure-label {
+  position: absolute;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  display: none;
+}
+.dim-label {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  opacity: 0.9;
+}
+.dim-label.extent {
+  background: #ffd27a;
+  color: #1b1c1f;
+  border-color: #ffd27a;
+  font-weight: 600;
+}
+.measure-label {
+  background: var(--sel);
+  color: #fff;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 2px 7px;
+}
 .box-select {
   position: absolute;
   pointer-events: none;

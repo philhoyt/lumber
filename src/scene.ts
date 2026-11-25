@@ -17,6 +17,7 @@ import { Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg';
 import { axisParam, Gizmo, ringAngle, RotateGizmo } from './gizmo';
 import {
   aabbCenter,
+  aabbSize,
   cutBox,
   cutsKey,
   cutsOf,
@@ -35,6 +36,7 @@ import {
   type Part,
   type Vec3,
 } from './model';
+import { measureBetween, measureText, nearestSnap, snapPoints } from './measure';
 import { snapDelta } from './snap';
 import { stockById, type Stock } from './stock';
 import type { Store } from './store';
@@ -204,6 +206,16 @@ export class LumberScene {
   private labelEl: HTMLElement;
   private dragLabelEl: HTMLElement;
   private boxEl: HTMLElement;
+  /** Dimension labels on every part and extents around the selection. */
+  showDims = false;
+  private dimLabels: HTMLElement[] = [];
+  private extentLabels: HTMLElement[] = [];
+  private extentLines: THREE.LineSegments;
+  private measure: { a: Vec3 | null; b: Vec3 | null; live: Vec3 | null } | null = null;
+  private measureLine: THREE.Line;
+  private measureLabel: HTMLElement;
+  private snapDot: THREE.Mesh;
+  onMeasureChange: ((on: boolean) => void) | null = null;
 
   constructor(
     private container: HTMLElement,
@@ -270,6 +282,30 @@ export class LumberScene {
     axes.position.z = 0.02;
     this.scene.add(axes);
     this.scene.add(this.partsGroup, this.gizmo.group, this.rotateGizmo.group);
+    const overlayMat = new THREE.LineBasicMaterial({
+      color: 0xffd27a,
+      depthTest: false,
+      transparent: true,
+    });
+    this.extentLines = new THREE.LineSegments(new THREE.BufferGeometry(), overlayMat);
+    this.extentLines.renderOrder = 990;
+    this.extentLines.visible = false;
+    this.measureLine = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+      new THREE.LineBasicMaterial({ color: 0x5fb3ff, depthTest: false, transparent: true }),
+    );
+    this.measureLine.renderOrder = 991;
+    this.measureLine.visible = false;
+    this.snapDot = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 12, 8),
+      new THREE.MeshBasicMaterial({ color: 0x5fb3ff, depthTest: false, transparent: true }),
+    );
+    this.snapDot.renderOrder = 992;
+    this.snapDot.visible = false;
+    this.scene.add(this.extentLines, this.measureLine, this.snapDot);
+    this.measureLabel = document.createElement('div');
+    this.measureLabel.className = 'measure-label';
+    container.appendChild(this.measureLabel);
 
     new ResizeObserver(() => this.resize()).observe(container);
     this.resize();
@@ -317,6 +353,10 @@ export class LumberScene {
     };
     set(minor, dark ? 0x33363b : 0xc9c6bd, dark ? 0x2a2d31 : 0xd3d0c8);
     set(major, dark ? 0x4a4e55 : 0xb5b1a7, dark ? 0x4a4e55 : 0xb5b1a7);
+  }
+
+  get measuring(): boolean {
+    return this.measure !== null;
   }
 
   get transforming(): boolean {
@@ -470,6 +510,8 @@ export class LumberScene {
     this.rotateGizmo.update(rotating ? center : null, vh);
     this.renderer.render(this.scene, this.camera);
     this.updateLabels();
+    this.updateDims();
+    this.updateMeasure();
   };
 
   private selectionCenter(): THREE.Vector3 | null {
@@ -529,6 +571,168 @@ export class LumberScene {
       plane +
       axes.map((a) => `${LABELS[a]} ${t.delta[a] >= 0 ? '+' : ''}${fmt(t.delta[a])}`).join('  ')
     );
+  }
+
+  // ---- dimensions ----
+  toggleDims(): void {
+    this.showDims = !this.showDims;
+    if (!this.showDims) {
+      for (const el of this.dimLabels) el.style.display = 'none';
+      for (const el of this.extentLabels) el.style.display = 'none';
+      this.extentLines.visible = false;
+    }
+  }
+
+  /** Put a label at a world point, or hide it when the point is behind the camera. */
+  private placeLabel(el: HTMLElement, world: THREE.Vector3, text: string): void {
+    const p = world.clone().project(this.camera);
+    if (p.z > 1) {
+      el.style.display = 'none';
+      return;
+    }
+    el.style.display = 'block';
+    el.style.left = `${((p.x + 1) / 2) * this.container.clientWidth}px`;
+    el.style.top = `${((1 - p.y) / 2) * this.container.clientHeight}px`;
+    if (el.textContent !== text) el.textContent = text;
+  }
+
+  private label(pool: HTMLElement[], i: number, cls: string): HTMLElement {
+    let el = pool[i];
+    if (!el) {
+      el = document.createElement('div');
+      el.className = cls;
+      this.container.appendChild(el);
+      pool[i] = el;
+    }
+    return el;
+  }
+
+  private updateDims(): void {
+    if (!this.showDims) return;
+    const { store } = this;
+    const selectedOne = store.selected.size === 1 ? [...store.selected][0] : null;
+    let i = 0;
+    for (const p of store.visibleParts()) {
+      if (p.id === selectedOne) continue; // the part label already names it
+      const b = partAABB(p);
+      const s = stockById(p.stock);
+      const text = s.sheet ? `${fmt(p.w ?? s.sheet[0])} × ${fmt(p.len)}` : fmt(p.len);
+      this.placeLabel(
+        this.label(this.dimLabels, i++, 'dim-label'),
+        new THREE.Vector3((b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, b.max[2]),
+        text,
+      );
+    }
+    for (let k = i; k < this.dimLabels.length; k++) this.dimLabels[k]!.style.display = 'none';
+
+    // Extents of the selection: three dimension lines just outside its box.
+    const list = store.selectedParts();
+    if (!list.length) {
+      this.extentLines.visible = false;
+      for (const el of this.extentLabels) el.style.display = 'none';
+      return;
+    }
+    const u = unionAABB(list);
+    const size = aabbSize(u);
+    const c = new THREE.Vector3().fromArray(aabbCenter(u));
+    const off = this.viewHeightAt(c) * 0.03;
+    const t = off * 0.4; // tick length
+    const [x0, y0, z0] = u.min;
+    const [x1, y1, z1] = u.max;
+    const pts: number[] = [];
+    const seg = (a: Vec3, b: Vec3) => pts.push(...a, ...b);
+    // width along X, in front of the box at floor level
+    seg([x0, y0 - off, z0], [x1, y0 - off, z0]);
+    seg([x0, y0 - off - t, z0], [x0, y0 - off + t, z0]);
+    seg([x1, y0 - off - t, z0], [x1, y0 - off + t, z0]);
+    // depth along Y, to the right of the box
+    seg([x1 + off, y0, z0], [x1 + off, y1, z0]);
+    seg([x1 + off - t, y0, z0], [x1 + off + t, y0, z0]);
+    seg([x1 + off - t, y1, z0], [x1 + off + t, y1, z0]);
+    // height along Z, at the back-right corner
+    seg([x1 + off, y1 + off, z0], [x1 + off, y1 + off, z1]);
+    seg([x1 + off - t, y1 + off, z0], [x1 + off + t, y1 + off, z0]);
+    seg([x1 + off - t, y1 + off, z1], [x1 + off + t, y1 + off, z1]);
+    this.extentLines.geometry.dispose();
+    this.extentLines.geometry = new THREE.BufferGeometry().setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute(pts, 3),
+    );
+    this.extentLines.visible = true;
+    const mids: [THREE.Vector3, string][] = [
+      [new THREE.Vector3((x0 + x1) / 2, y0 - off, z0), `W ${fmt(size[0])}`],
+      [new THREE.Vector3(x1 + off, (y0 + y1) / 2, z0), `D ${fmt(size[1])}`],
+      [new THREE.Vector3(x1 + off, y1 + off, (z0 + z1) / 2), `H ${fmt(size[2])}`],
+    ];
+    mids.forEach(([v, text], k) =>
+      this.placeLabel(this.label(this.extentLabels, k, 'dim-label extent'), v, text),
+    );
+  }
+
+  // ---- measuring ----
+  /** M: measure between two clicked points, snapping to part corners, edges and faces. */
+  toggleMeasure(): void {
+    if (this.measure) this.endMeasure();
+    else {
+      this.measure = { a: null, b: null, live: null };
+      this.container.style.cursor = 'crosshair';
+      this.onMeasureChange?.(true);
+    }
+  }
+  endMeasure(): void {
+    this.measure = null;
+    this.measureLine.visible = false;
+    this.snapDot.visible = false;
+    this.measureLabel.style.display = 'none';
+    this.container.style.cursor = '';
+    this.onMeasureChange?.(false);
+  }
+
+  /** The point under the pointer: a snap point on the part it hits, else the hit, else the floor. */
+  private snapUnderPointer(clientX: number, clientY: number): Vec3 | null {
+    this.setRay(clientX, clientY);
+    const hit = this.pickPart();
+    if (hit) {
+      const p = this.store.partById(hit.object.userData.id as number);
+      const at: Vec3 = [hit.point.x, hit.point.y, hit.point.z];
+      if (!p) return at;
+      const tol = this.viewHeightAt(hit.point) * 0.025;
+      return nearestSnap(snapPoints(partAABB(p)), at, tol) ?? at;
+    }
+    const g = this.groundPoint(clientX, clientY);
+    if (!g) return null;
+    const grid = this.store.settings.grid;
+    const snap = (v: number) => (grid ? Math.round(v / grid) * grid : v);
+    return [snap(g[0]), snap(g[1]), 0];
+  }
+
+  private updateMeasure(): void {
+    const m = this.measure;
+    if (!m) return;
+    const end = m.b ?? m.live;
+    const dot = m.b ? null : m.live;
+    if (dot) {
+      this.snapDot.visible = true;
+      this.snapDot.position.fromArray(dot);
+      const s = this.viewHeightAt(this.snapDot.position) * 0.006;
+      this.snapDot.scale.set(s, s, s);
+    } else this.snapDot.visible = false;
+    if (!m.a || !end) {
+      this.measureLine.visible = false;
+      this.measureLabel.style.display = 'none';
+      return;
+    }
+    const pos = this.measureLine.geometry.getAttribute('position') as THREE.BufferAttribute;
+    pos.setXYZ(0, m.a[0], m.a[1], m.a[2]);
+    pos.setXYZ(1, end[0], end[1], end[2]);
+    pos.needsUpdate = true;
+    this.measureLine.visible = true;
+    const mid = new THREE.Vector3(
+      (m.a[0] + end[0]) / 2,
+      (m.a[1] + end[1]) / 2,
+      (m.a[2] + end[2]) / 2,
+    );
+    this.placeLabel(this.measureLabel, mid, measureText(measureBetween(m.a, end), fmt));
   }
 
   // ---- views ----
@@ -868,6 +1072,19 @@ export class LumberScene {
       else if (e.button === 2) this.finishTransform(false);
       return;
     }
+    if (this.measure) {
+      if (e.button === 2) {
+        this.suppressMenu = true;
+        this.endMeasure();
+        return;
+      }
+      if (e.button !== 0) return;
+      const pt = this.snapUnderPointer(e.clientX, e.clientY);
+      if (!pt) return;
+      if (!this.measure.a || this.measure.b) this.measure = { a: pt, b: null, live: pt };
+      else this.measure.b = pt;
+      return;
+    }
     if (e.button !== 0) return;
     this.downPos = [e.clientX, e.clientY];
     this.setRay(e.clientX, e.clientY);
@@ -951,6 +1168,10 @@ export class LumberScene {
       if (!this.box.active && Math.hypot(e.clientX - this.box.x0, e.clientY - this.box.y0) > 3)
         this.box.active = true;
       if (this.box.active) this.drawBox();
+      return;
+    }
+    if (this.measure) {
+      this.measure.live = this.snapUnderPointer(e.clientX, e.clientY);
       return;
     }
     this.setRay(e.clientX, e.clientY);

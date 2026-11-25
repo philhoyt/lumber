@@ -65,6 +65,8 @@ theme.
 | Numpad 5                           | Perspective or orthographic; axis views are ortho, orbiting returns       |
 | Numpad 2 / 4 / 6 / 8               | Orbit in 15° steps                                                        |
 | Numpad . , Home                    | Frame the selection, fit the model                                        |
+| D                                  | Dimension labels on every part and the selection's W × D × H              |
+| M                                  | Measure: click two points (snaps to corners, edges, faces); Esc           |
 | N, T, Tab                          | Toggle the side panel, the palette, both                                  |
 | Up / Down in a length field        | Step by the grid; Shift 1", Ctrl 1/16"                                    |
 | Arrows, PgUp / PgDn                | Nudge by the grid step                                                    |

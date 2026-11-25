@@ -221,7 +221,8 @@ export function wireKeyboard(
     const digit = e.code.startsWith('Numpad') ? e.code.slice(6) : e.code.replace('Digit', '');
 
     if (e.key === 'Escape') {
-      if (!actions.closeOverlays()) store.select([]);
+      if (scene.measuring) scene.endMeasure();
+      else if (!actions.closeOverlays()) store.select([]);
     } else if (e.key === '?' || e.key === 'F1' || (e.shiftKey && e.code === 'Slash'))
       actions.toggleHelp();
     else if (mod && k === 'z') (e.shiftKey ? store.redo : store.undo).call(store);
@@ -243,6 +244,8 @@ export function wireKeyboard(
     else if (k === 'r') scene.beginRotate();
     else if (k === 's') scene.beginSize();
     else if (k === 'h') store.hideSelected();
+    else if (k === 'm') scene.toggleMeasure();
+    else if (k === 'd') scene.toggleDims();
     else if (k === 'n') togglePanels('side');
     else if (k === 't') togglePanels('palette');
     else if (k === 'x' || e.key === 'Delete') store.deleteSelected();
