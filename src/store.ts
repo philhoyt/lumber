@@ -128,6 +128,10 @@ export class Store {
   beginCoalesce(): void {
     this.coalescing ??= this.snapshot();
   }
+  /** Stop coalescing without recording anything: the caller restored the model itself. */
+  cancelCoalesce(): void {
+    this.coalescing = null;
+  }
   endCoalesce(): void {
     const before = this.coalescing;
     this.coalescing = null;
@@ -366,7 +370,7 @@ export class Store {
       const { step, count } = arrayLayout(g.array, aabbSize(unionAABB(source))[a]);
       for (let i = 1; i < count; i++) {
         const offset: Vec3 = [0, 0, 0];
-        offset[a] = step * i;
+        offset[a] = g.array.reverse ? -step * i : step * i;
         for (const s of source) {
           const c = clonePart(s, this.nextId++, offset);
           c.name = `${s.name} ${i + 1}`;

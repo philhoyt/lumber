@@ -299,6 +299,8 @@ export interface ArrayParams {
   fit?: number;
   /** Centre-to-centre distance, or the clear gap between copies. */
   spacing: number;
+  /** Copies run toward −axis instead of +axis. */
+  reverse?: boolean;
   mode: 'center' | 'gap';
 }
 

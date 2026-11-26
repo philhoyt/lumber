@@ -68,7 +68,9 @@ theme.
 | Fit end A / B (Part panel)         | Cut the end to meet what it points at: miter, bevel and length            |
 | Shift+A                            | Add stock at the pointer                                                  |
 | Shift+D                            | Duplicate and grab the copy; Ctrl+D duplicates with an offset             |
-| Array (Part panel)                 | A live array: count or fit-to-length, on center or by gap; Apply bakes it |
+| Shift+R, then drag                 | Array: copies fill toward the pointer, 16" o.c. or the panel's spacing    |
+| X / Y / Z while arraying           | Lock the axis; type a count, or a length to fill; Enter or click keeps it |
+| Array (Part panel)                 | The live array's direction, count or span, spacing and mode; Apply bakes  |
 | Ctrl+G, Ctrl+Shift+G               | Group the selection into an assembly, ungroup                             |
 | Double-click a part                | Select that one part inside its group                                     |
 | Alt+G                              | Drop onto the floor or the parts beneath                                  |

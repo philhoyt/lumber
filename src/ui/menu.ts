@@ -31,7 +31,6 @@ import type { AlignMode, Axis, AxisIndex, Vec3 } from '../model';
 import type { MenuContext, ViewName } from '../scene';
 import { getStock } from '../stock';
 import type { Store } from '../store';
-import { $ } from './dom';
 
 export interface MenuItem {
   label: string;
@@ -43,6 +42,7 @@ export interface MenuItem {
 
 /** What the menu needs from the scene. */
 export interface MenuActions {
+  beginArray(): void;
   beginGrab(): void;
   beginRotate(): void;
   beginSize(): void;
@@ -170,12 +170,10 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
   const arrange: MenuItem[] = [
     { label: 'Duplicate', key: 'Shift+D', icon: Copy, action: () => scene.duplicateAndGrab() },
     {
-      label: 'Array…',
+      label: 'Array by dragging',
+      key: 'Shift+R',
       icon: Grid3x3,
-      action: () => {
-        $('app').classList.remove('no-side');
-        document.getElementById('arrN')?.focus();
-      },
+      action: () => scene.beginArray(),
     },
     { label: 'Drop', key: 'Alt+G', icon: ArrowDownToLine, action: () => store.dropSelected() },
     {

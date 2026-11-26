@@ -43,6 +43,12 @@ describe('array modifier', () => {
     expect(s.selected.size).toBe(3);
   });
 
+  it('runs the copies the other way when reversed', () => {
+    const s = slat();
+    s.setArray({ axis: 'y', count: 3, spacing: 1.5, mode: 'gap', reverse: true });
+    expect(s.parts.map((p) => p.pos[1])).toEqual([0, -5, -10]);
+  });
+
   it('regenerates when the parameters or the source change', () => {
     const s = slat();
     const g = s.setArray({ axis: 'y', count: 3, spacing: 5, mode: 'center' })!;

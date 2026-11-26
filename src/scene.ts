@@ -52,6 +52,15 @@ import { coplanarFaces, snapWithHits, type SnapHit } from './snap';
 import { stockById, type Stock } from './stock';
 import type { Store } from './store';
 import { fmt, parseLen } from './units';
+import {
+  arrayCount,
+  arrayFromDrag,
+  arrayFromTyped,
+  arrayText,
+  dominantAxis,
+  sameArray,
+} from './arrayDrag';
+import type { ArrayParams } from './model';
 import { CameraRig, Z_UP, type Projection, type ViewName } from './view/camera';
 import { DimLabels } from './view/dimLabels';
 import { FastenMode } from './view/fastenMode';
@@ -67,7 +76,7 @@ type Constraint =
   | { kind: 'axis'; axis: AxisIndex; dir: THREE.Vector3; ref: number };
 
 interface Transform {
-  kind: 'grab' | 'rotate' | 'size';
+  kind: 'grab' | 'rotate' | 'size' | 'array';
   /** Started from the keyboard: follows the pointer, confirmed by click or Enter. */
   modal: boolean;
   constraint: Constraint | null;
@@ -95,6 +104,20 @@ interface Transform {
   rotAxis: AxisIndex | null;
   /** A length change by the mouse, in size mode. */
   size: SizeDrag | null;
+  /** Copies being pulled out of the selection, in array mode. */
+  array: ArrayDrag | null;
+}
+
+interface ArrayDrag {
+  /** Spacing and mode to array with; the axis and count come from the drag. */
+  base: ArrayParams;
+  /** The source cell's size on each axis. */
+  extent: Vec3;
+  /** What the store currently shows, so it only changes when the count does. */
+  applied: ArrayParams | null;
+  /** Signed drag distance along `axis`, snapped. */
+  distance: number;
+  axis: AxisIndex;
 }
 
 interface SizeDrag {
@@ -584,6 +607,18 @@ export class LumberScene {
   }
 
   private transformText(t: Transform): string {
+    if (t.kind === 'array') {
+      const ad = t.array;
+      if (!ad) return '';
+      const axis = LABELS[ad.axis];
+      if (t.typed) return `Array ${axis}: ${t.typed}▏  (a count, or a length to fill)`;
+      if (!ad.applied)
+        return 'Array: drag along an axis (X / Y / Z locks it), or type a count or a length · Enter';
+      const way = ad.distance < 0 ? '−' : '+';
+      return (
+        `Array ${way}${axis}: ${arrayText(ad.applied, ad.extent[ad.axis])}` + this.snapTargets(t)
+      );
+    }
     if (t.kind === 'rotate') {
       if (t.typed) return `Rotate ${LABELS[t.rotAxis ?? UP]} ${t.typed}▏°`;
       const done = ([0, 1, 2] as AxisIndex[])
@@ -885,6 +920,7 @@ export class LumberScene {
       angles: [0, 0, 0],
       rotAxis: null,
       size: null,
+      array: null,
     };
     if (modal) this.container.style.cursor = kind === 'rotate' ? '' : 'move';
     return this.tf;
@@ -937,6 +973,31 @@ export class LumberScene {
     // A click on a ring, with no drag to speak of, is one quarter turn.
     if (!r.moved && r.applied === 0) this.turn(r.axis, 90);
     t.ring = null;
+  }
+
+  /**
+   * Shift+R: array the selection by dragging. Copies fill toward the pointer at the
+   * given spacing (16" on centre unless told otherwise), X / Y / Z lock the axis, a typed
+   * number is a count and a typed length a span; Enter or a click keeps it as a live
+   * array. On an existing array, the drag re-fits it from its source cell.
+   */
+  beginArray(base: Partial<ArrayParams> = {}): void {
+    if (this.tf) return;
+    const g = this.store.selectedGroup();
+    if (g?.array) this.store.select(this.store.arraySource(g).map((p) => p.id));
+    const t = this.startTransform('array', true);
+    if (!t) return;
+    const { axis, mode, spacing, reverse } = { ...g?.array, ...base };
+    const params: ArrayParams = {
+      axis: axis ?? 'x',
+      mode: mode ?? 'center',
+      spacing: spacing ?? 16,
+    };
+    if (reverse) params.reverse = true;
+    const size = t.aabb.max.map((v, i) => v - t.aabb.min[i]!) as Vec3;
+    t.array = { base: params, extent: size, applied: null, distance: 0, axis: 0 };
+    this.store.beginCoalesce();
+    this.setConstraint('');
   }
 
   /** G: grab the selection so it follows the pointer until confirmed. */
@@ -1053,7 +1114,7 @@ export class LumberScene {
    */
   private setConstraint(key: string): void {
     const t = this.tf;
-    if (t?.kind !== 'grab') return;
+    if (t?.kind !== 'grab' && t?.kind !== 'array') return;
     const ray = this.currentRay();
     const delta = new THREE.Vector3().fromArray(t.delta);
     if (key !== '' && key === key.toLowerCase()) {
@@ -1110,10 +1171,14 @@ export class LumberScene {
 
   private updateGrab(): void {
     const t = this.tf;
-    if (t?.kind !== 'grab' || !t.moved || !t.constraint) return;
+    if ((t?.kind !== 'grab' && t?.kind !== 'array') || !t.moved || !t.constraint) return;
     const raw = this.rawDelta(t);
     if (!raw) return;
     const axes = t.constraint.kind === 'axis' ? [t.constraint.axis] : t.constraint.axes;
+    if (t.kind === 'array') {
+      this.updateArray(t, raw, axes);
+      return;
+    }
     t.snaps = snapWithHits(t.aabb, raw, axes, t.others, this.store.settings).hits;
     this.applyDelta(raw);
     const moved: AABB = {
@@ -1123,9 +1188,58 @@ export class LumberScene {
     this.snapFx.show(t.snaps, moved, t.others);
   }
 
+  /** The copies follow the pointer along the axis it moves most on, or the locked one. */
+  private updateArray(t: Transform, raw: Vec3, axes: readonly AxisIndex[]): void {
+    const ad = t.array;
+    if (!ad) return;
+    const axis = axes.length === 1 ? axes[0]! : dominantAxis(raw, axes);
+    const d: Vec3 = [0, 0, 0];
+    d[axis] = raw[axis];
+    t.snaps = snapWithHits(t.aabb, d, [axis], t.others, this.store.settings).hits;
+    t.delta = d;
+    ad.axis = axis;
+    ad.distance = d[axis];
+    const params = arrayFromDrag(ad.base, AXIS_NAMES[axis]!, ad.extent[axis], d[axis], false);
+    if (!sameArray(params, ad.applied)) {
+      ad.applied = params;
+      this.store.setArray(params);
+    }
+    const moved: AABB = {
+      min: [t.aabb.min[0] + d[0], t.aabb.min[1] + d[1], t.aabb.min[2] + d[2]],
+      max: [t.aabb.max[0] + d[0], t.aabb.max[1] + d[1], t.aabb.max[2] + d[2]],
+    };
+    this.snapFx.show(t.snaps, moved, t.others);
+  }
+
+  /** End an array drag: keep the array as the span dragged or the value typed, or undo it. */
+  private finishArray(t: Transform, commit: boolean): void {
+    const ad = t.array;
+    if (!ad) return;
+    const axis = AXIS_NAMES[ad.axis]!;
+    let params: ArrayParams | null = null;
+    if (commit && t.typed) params = arrayFromTyped(ad.base, axis, t.typed, ad.distance < 0);
+    else if (commit && ad.applied)
+      params = arrayFromDrag(ad.base, axis, ad.extent[ad.axis], ad.distance, true);
+    if (params && arrayCount(params, ad.extent[ad.axis]) > 1) {
+      this.store.setArray(params);
+      this.store.endCoalesce();
+    } else {
+      this.store.restore(t.before);
+      this.store.cancelCoalesce();
+    }
+  }
+
   private finishTransform(commit: boolean): void {
     const t = this.tf;
     if (!t) return;
+    if (t.kind === 'array') {
+      this.finishArray(t, commit);
+      this.rig.enabled = true;
+      this.container.style.cursor = '';
+      this.tf = null;
+      this.snapFx.hide();
+      return;
+    }
     if (commit && t.kind === 'grab' && t.typed) {
       const v = parseLen(t.typed);
       if (v !== null) {
@@ -1294,7 +1408,7 @@ export class LumberScene {
         this.updateSize();
         return;
       }
-      if (t.kind !== 'grab') return;
+      if (t.kind !== 'grab' && t.kind !== 'array') return;
       if (!t.moved && this.downPos)
         t.moved = Math.hypot(e.clientX - this.downPos[0], e.clientY - this.downPos[1]) > 2;
       this.updateGrab();
@@ -1379,8 +1493,11 @@ export class LumberScene {
     const lower = k.toLowerCase();
     if (k === 'Escape') this.finishTransform(false);
     else if (k === 'Enter') this.finishTransform(true);
-    else if (t.kind === 'grab' && (lower === 'x' || lower === 'y' || lower === 'z')) {
-      const key = e.shiftKey ? lower.toUpperCase() : lower;
+    else if (
+      (t.kind === 'grab' || t.kind === 'array') &&
+      (lower === 'x' || lower === 'y' || lower === 'z')
+    ) {
+      const key = e.shiftKey && t.kind === 'grab' ? lower.toUpperCase() : lower;
       this.setConstraint(key === t.constraintKey ? '' : key);
       this.updateGrab();
     } else if (t.kind === 'rotate' && (lower === 'x' || lower === 'y' || lower === 'z')) {

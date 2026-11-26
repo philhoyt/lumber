@@ -87,6 +87,11 @@ snapshot to the store; cancel restores it.
 
 ## Groups and arrays
 
+Shift+R arrays by dragging: `arrayDrag.ts` turns a drag distance along an axis into
+array parameters (a count while dragging, the span filled once done, `reverse` when
+the drag went the negative way), and the scene applies them through `Store.setArray`
+inside a coalesced undo step, so the copies appear live and undo as one change.
+
 A group is an assembly: parts carry a `group` id and groups may nest through
 `parent`. A click in the view selects the whole assembly. An array modifier
 is a group with `array` parameters: its source cell (members with

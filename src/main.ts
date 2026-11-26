@@ -27,6 +27,7 @@ import { toast } from './ui/toast';
 import { browserPicker, FolderSync, idbHandleStore } from './folderSync';
 import { initTheme, type Theme } from './ui/theme';
 import { buildToolbar } from './ui/toolbar';
+import { parseLen } from './units';
 
 const theme = initTheme();
 const store = new Store();
@@ -98,6 +99,16 @@ const actions = {
   },
   onTheme: (t: Theme) => scene.setTheme(t),
   showProjects: () => projectsDialog.show(),
+  arrayDrag: () => {
+    if (!store.selected.size) return;
+    // The Part panel's spacing and mode, when it shows them; 16" on centre otherwise.
+    const spacing = parseLen(document.querySelector<HTMLInputElement>('#arrS')?.value);
+    const mode = document.querySelector<HTMLSelectElement>('#arrMode')?.value;
+    scene.beginArray({
+      ...(spacing !== null && spacing > 0 ? { spacing } : {}),
+      ...(mode === 'gap' || mode === 'center' ? { mode } : {}),
+    });
+  },
   showDrawings: () => drawings.toggle(),
   trackpad: () => scene.trackpad,
   setTrackpad: (on: boolean) => scene.setTrackpad(on),
@@ -109,13 +120,12 @@ wireLengthFields(store);
 buildToolbar($('toolbar'), store, scene, {
   togglePalette: () => togglePanels('palette'),
   focusArray: () => {
+    if (store.selected.size) {
+      actions.arrayDrag();
+      return;
+    }
     $('app').classList.remove('no-side');
     props.openSection('array');
-    (
-      document.getElementById('arrN') ??
-      document.getElementById('arrFit') ??
-      document.getElementById('arrS')
-    )?.focus();
   },
   mirror: () => beginMirror(store),
   showHelp: () => help.toggle(),

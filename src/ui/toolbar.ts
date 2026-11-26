@@ -71,7 +71,9 @@ export function buildToolbar(
   const dup = need(
     iconButton(Copy, 'Duplicate and grab (Shift+D)', () => scene.duplicateAndGrab()),
   );
-  const array = need(iconButton(Grid3x3, 'Array', () => actions.focusArray()));
+  const array = need(
+    iconButton(Grid3x3, 'Array by dragging (Shift+R)', () => actions.focusArray()),
+  );
   const group = need(iconButton(Boxes, 'Group (Ctrl+G)', () => store.groupSelected()));
   const ungroup = need(
     iconButton(Ungroup, 'Ungroup (Ctrl+Shift+G)', () => store.ungroupSelected()),

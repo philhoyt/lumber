@@ -127,6 +127,32 @@ test('the panel header names the selection and its actions work', async ({ page 
   await expect(page.locator('[data-align="0:min"]')).toBeVisible();
 });
 
+test('Shift+R arrays a part by dragging, or by a typed count', async ({ page }) => {
+  await openBench(page);
+  await selectPart(page, 'Leg LF');
+  const { x, y } = await hoverView(page);
+  await page.keyboard.press('Shift+R');
+  // Dragging pulls copies out live; the readout names the axis and count.
+  await page.mouse.move(x + 320, y, { steps: 12 });
+  await expect
+    .poll(async () => parseInt((await page.locator('#stat').textContent()) ?? '0', 10))
+    .toBeGreaterThan(12);
+  await expect(page.locator('.drag-label')).toContainText(/Array [+−][XY]: \d+ @ 16" o\.c\./);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#stat')).toContainText('12 parts');
+  // A typed count along a locked axis.
+  await page.keyboard.press('Shift+R');
+  await page.keyboard.press('x');
+  await page.keyboard.press('4');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#stat')).toContainText('15 parts');
+  await expect(page.locator('#arrN')).toHaveValue('4');
+  await expect(page.locator('#arrAxis')).toHaveValue('x');
+  await expect(page.locator('.out-row', { hasText: 'Leg LF 4' })).toBeVisible();
+  await page.locator('#bUndo').click();
+  await expect(page.locator('#stat')).toContainText('12 parts');
+});
+
 test('G moves by a typed distance along the constrained axis', async ({ page }) => {
   await openBench(page);
   await selectPart(page, 'Leg LF');

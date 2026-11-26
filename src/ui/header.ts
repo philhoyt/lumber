@@ -30,6 +30,8 @@ import { toast } from './toast';
 export interface AppActions {
   /** Shift+A: open the add-stock menu at the pointer. */
   addMenu(): void;
+  /** Shift+R: array the selection by dragging, with the Part panel's spacing. */
+  arrayDrag(): void;
   /** ? or F1: the key reference. */
   toggleHelp(): void;
   /** Close any overlay or menu; returns whether one was open. */
@@ -281,6 +283,7 @@ export function wireKeyboard(
     } else if (mod && e.code === 'Space') togglePanels('both');
     else if (e.shiftKey && k === 'e') scene.toggleAssembly();
     else if (e.shiftKey && k === 'd') scene.duplicateAndGrab();
+    else if (e.shiftKey && k === 'r') actions.arrayDrag();
     else if (e.shiftKey && k === 'a') actions.addMenu();
     else if (e.altKey && k === 'a') store.select([]);
     else if (e.altKey && k === 'h') store.unhideAll();

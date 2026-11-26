@@ -442,11 +442,15 @@ export class PropsPanel {
       sel(
         'arrAxis',
         [
-          ['x', 'X'],
-          ['y', 'Y'],
-          ['z', 'Z'],
+          ['x', '+X'],
+          ['y', '+Y'],
+          ['z', '+Z'],
+          ['-x', '−X'],
+          ['-y', '−Y'],
+          ['-z', '−Z'],
         ],
         value,
+        'Which way the copies run; Shift+R arrays by dragging instead',
       );
     const modeSel = (value: string) =>
       sel(
@@ -463,7 +467,7 @@ export class PropsPanel {
     if (arr && group) {
       const byFit = arr.fit !== undefined;
       arrayCount = 'live';
-      array = `<div class="row"><div><label class="small">Along</label>${axisSel(arr.axis)}</div>
+      array = `<div class="row"><div><label class="small">Along</label>${axisSel((arr.reverse ? '-' : '') + arr.axis)}</div>
         <div><label class="small">${sel(
           'arrHow',
           [
@@ -482,7 +486,8 @@ export class PropsPanel {
     } else {
       array = `<div class="row"><div><label class="small">Along</label>${axisSel('x')}</div>
         <div><label class="small">Count</label><input type="number" id="arrN" value="4" min="1" step="1"></div>
-        <div><label class="small">${modeSel('center')}</label><input type="text" class="len" data-min="0" id="arrS" value="16"></div><div class="grow0"><button id="bArr" class="primary" title="Make a live array you can keep adjusting">Array</button></div></div>`;
+        <div><label class="small">${modeSel('center')}</label><input type="text" class="len" data-min="0" id="arrS" value="16"></div><div class="grow0"><button id="bArr" class="primary" title="Make a live array you can keep adjusting; Shift+R in the view drags one out instead">Array</button></div></div>
+        <div class="muted note">Or press Shift+R and drag in the view: copies fill toward the pointer at this spacing.</div>`;
     }
 
     // ---- Header: what is selected, and what you can do with it ----
@@ -541,11 +546,13 @@ export class PropsPanel {
     restoreFocus();
 
     const readArray = (): ArrayParams => {
-      const axis = el.querySelector<HTMLSelectElement>('#arrAxis')!.value as Axis;
+      const along = el.querySelector<HTMLSelectElement>('#arrAxis')!.value;
+      const axis = along.replace('-', '') as Axis;
       const mode = el.querySelector<HTMLSelectElement>('#arrMode')!.value as ArrayParams['mode'];
       const spacing = parseLen(el.querySelector<HTMLInputElement>('#arrS')!.value) ?? 16;
       const how = el.querySelector<HTMLSelectElement>('#arrHow')?.value ?? 'count';
       const params: ArrayParams = { axis, mode, spacing };
+      if (along.startsWith('-')) params.reverse = true;
       if (how === 'fit') {
         const fit = el.querySelector<HTMLInputElement>('#arrFit');
         params.fit = fit ? (parseLen(fit.value) ?? 48) : (arr?.fit ?? 48);

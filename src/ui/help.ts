@@ -30,6 +30,11 @@ const SECTIONS: [string, [string, string][]][] = [
         '15° steps; Ctrl for 1°; the Part panel shows and sets angles',
       ],
       ['S', 'Scale the length with the mouse (grid steps), or type a length; Enter'],
+      [
+        'Shift+R, then drag',
+        'Array: copies fill toward the pointer at the Part panel spacing (16" o.c.); Enter',
+      ],
+      ['X / Y / Z while arraying', 'Lock the axis; type a count, or a length to fill'],
       ["Drag a handle at a part's end", 'Pull that end to meet another part; it snaps to faces'],
       [
         'Fit end A / B (Part panel)',
