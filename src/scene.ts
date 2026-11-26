@@ -33,6 +33,10 @@ import {
   rotatePartsBy,
   partSnapPoints,
   isSquare,
+  pivotLabel,
+  pivotPoint,
+  PIVOTS,
+  type PivotMode,
   unionAABB,
   withMinKept,
   AXIS_NAMES,
@@ -116,6 +120,8 @@ interface Transform {
   angles: Vec3;
   /** The axis the last X / Y / Z key or ring chose, which a typed angle applies to. */
   rotAxis: AxisIndex | null;
+  /** What the rotation turns about: the centre, or a bottom corner of the box as it was. */
+  pivot: PivotMode;
   /** A length change by the mouse, in size mode. */
   size: SizeDrag | null;
   /** Copies being pulled out of the selection, in array mode. */
@@ -223,6 +229,9 @@ export class LumberScene {
   };
   private gizmo = new Gizmo();
   private rotateGizmo = new RotateGizmo();
+  /** The pivot the last rotation used; the next one starts from it. */
+  private pivotMode: PivotMode = 'center';
+  private readonly pivotDot: THREE.Mesh;
   private endHandles = new EndHandles();
   private ray = new THREE.Raycaster();
   private ndc = new THREE.Vector2();
@@ -312,6 +321,13 @@ export class LumberScene {
     this.snapFx = new SnapFeedback(this.scene);
     this.measureTool = new MeasureTool(this.rig, this.scene);
     this.gapReadout = new GapReadout(this.rig, this.scene);
+    this.pivotDot = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 12, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffd27a, depthTest: false, transparent: true }),
+    );
+    this.pivotDot.renderOrder = 993;
+    this.pivotDot.visible = false;
+    this.scene.add(this.pivotDot);
     const alt = (e: KeyboardEvent) => {
       if (e.key !== 'Alt' || e.altKey === this.altHeld) return;
       this.altHeld = e.altKey;
@@ -643,7 +659,15 @@ export class LumberScene {
     const rotating = this.tf?.kind === 'rotate';
     const vh = center ? this.rig.viewHeightAt(center) : 0;
     this.gizmo.update(rotating || this.lookOnly ? null : center, vh, this.gizmoFrame());
-    this.rotateGizmo.update(rotating ? center : null, vh);
+    const t = this.tf;
+    const pivot = rotating && t ? this.pivotOf(t) : null;
+    this.rotateGizmo.update(pivot, vh);
+    this.pivotDot.visible = !!pivot && t?.pivot !== 'center';
+    if (pivot) {
+      this.pivotDot.position.copy(pivot);
+      const r = vh * 0.012;
+      this.pivotDot.scale.set(r, r, r);
+    }
     const one = this.store.selectedParts();
     this.endHandles.update(
       one.length === 1 &&
@@ -733,7 +757,12 @@ export class LumberScene {
         .filter((a) => signedDeg(t.angles[a]))
         .map((a) => `${LABELS[a]} ${signedDeg(t.angles[a])}°`)
         .join('  ');
-      return done || 'Rotate: X / Y / Z a quarter turn, type an angle, or drag a ring · Enter';
+      const pivot = t.pivot === 'center' ? '' : `  · about the ${pivotLabel(t.pivot)}`;
+      return (
+        (done ||
+          'Rotate: X / Y / Z a quarter turn, type an angle, or drag a ring · P pivot · Enter') +
+        pivot
+      );
     }
     if (t.kind === 'size') {
       if (t.typed) return `Length: ${t.typed}▏`;
@@ -1036,6 +1065,7 @@ export class LumberScene {
       ring: null,
       angles: [0, 0, 0],
       rotAxis: null,
+      pivot: this.pivotMode,
       size: null,
       array: null,
     };
@@ -1043,11 +1073,27 @@ export class LumberScene {
     return this.tf;
   }
 
+  /** The point the current rotation turns about, in world space. */
+  private pivotOf(t: Transform): THREE.Vector3 {
+    return new THREE.Vector3().fromArray(pivotPoint(t.aabb, t.pivot));
+  }
+
+  /** P while rotating: the next (or, with Shift, previous) pivot; the rings move to it. */
+  private cyclePivot(back: boolean): void {
+    const t = this.tf;
+    if (t?.kind !== 'rotate') return;
+    const i = PIVOTS.indexOf(t.pivot);
+    t.pivot = PIVOTS[(i + (back ? PIVOTS.length - 1 : 1)) % PIVOTS.length]!;
+    this.pivotMode = t.pivot;
+    t.origin = this.pivotOf(t);
+  }
+
   /** Turn the selection by degrees about an axis during rotate mode, keeping the readout. */
   private turn(axis: AxisIndex, deg: number): void {
     const t = this.tf;
     if (t?.kind !== 'rotate' || !deg) return;
-    rotatePartsBy(this.store.selectedParts(), AXIS_NAMES[axis]!, deg);
+    const pivot = t.pivot === 'center' ? undefined : pivotPoint(t.aabb, t.pivot);
+    rotatePartsBy(this.store.selectedParts(), AXIS_NAMES[axis]!, deg, pivot);
     t.angles[axis] = (((t.angles[axis] + deg) % 360) + 360) % 360;
     t.rotAxis = axis;
     t.moved = true;
@@ -1717,7 +1763,8 @@ export class LumberScene {
       else if (key === lower && !t.local) this.setConstraint(key, true);
       else this.setConstraint('');
       this.updateGrab();
-    } else if (t.kind === 'rotate' && (lower === 'x' || lower === 'y' || lower === 'z')) {
+    } else if (t.kind === 'rotate' && lower === 'p') this.cyclePivot(e.shiftKey);
+    else if (t.kind === 'rotate' && (lower === 'x' || lower === 'y' || lower === 'z')) {
       // An angle typed before the axis turns by it; otherwise a quarter turn.
       const axis = AXIS_NAMES.indexOf(lower) as AxisIndex;
       const typed = parseFloat(t.typed);

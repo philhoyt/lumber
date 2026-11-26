@@ -302,6 +302,26 @@ test('B adds a block between two parallel parts', async ({ page }) => {
   await expect(page.locator('#stat')).toContainText('12 parts');
 });
 
+test('P while rotating turns about a bottom corner instead of the centre', async ({ page }) => {
+  await openBench(page);
+  await selectPart(page, 'Leg LF');
+  const read = async (id: string) => parseLen(await page.locator(id).inputValue())!;
+  const x0 = await read('#pX');
+  const y0 = await read('#pY');
+  await hoverView(page);
+  await page.keyboard.press('r');
+  await page.keyboard.press('p');
+  await expect(page.locator('.drag-label')).toContainText('bottom front-left corner');
+  await page.keyboard.press('x');
+  await page.keyboard.press('Enter');
+  // Hinged on its front-left bottom corner, the leg lies down behind it along −Y, on the floor.
+  expect(await read('#pX')).toBeCloseTo(x0, 3);
+  expect(await read('#pZ')).toBeCloseTo(0, 3);
+  expect(await read('#pY')).toBeLessThan(y0 - 30);
+  await page.locator('#bUndo').click();
+  await expect.poll(() => read('#pY')).toBeCloseTo(y0, 3);
+});
+
 test('G moves by a typed distance along the constrained axis', async ({ page }) => {
   await openBench(page);
   await selectPart(page, 'Leg LF');

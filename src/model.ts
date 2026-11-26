@@ -502,19 +502,39 @@ export function rotateParts(list: Part[], axis: Axis, turns = 1): void {
  * the floor line they stood on. An angled part keeps an exact box in its own frame; its
  * world bounds enclose the tilted box.
  */
-export function rotatePartsBy(list: Part[], axis: Axis, deg: number): void {
+export function rotatePartsBy(list: Part[], axis: Axis, deg: number, pivot?: Vec3): void {
   if (!list.length || !deg) return;
   const u = unionAABB(list);
-  const c = new Vector3().fromArray(aabbCenter(u));
+  const c = new Vector3().fromArray(pivot ?? aabbCenter(u));
   const R = rotDeg(axis, deg);
   for (const p of list) {
     const v = new Vector3().fromArray(p.pos).sub(c).applyQuaternion(R).add(c);
     p.pos = v.toArray();
     p.q = cleanQ(R.clone().multiply(new Quaternion().fromArray(p.q)));
   }
+  // About a chosen pivot the parts turn exactly about it; about their centre they are
+  // set back on the floor line they stood on.
+  if (pivot) return;
   const u2 = unionAABB(list);
   const dz = u.min[UP] - u2.min[UP];
   for (const p of list) p.pos[UP] += dz;
+}
+
+/** Where a rotation may turn about: the selection's centre, or one of its bottom corners. */
+export const PIVOTS = ['center', 'front-left', 'front-right', 'back-right', 'back-left'] as const;
+export type PivotMode = (typeof PIVOTS)[number];
+
+/** The pivot point a mode means on a box: its centre, or a bottom corner (front is −Y, left −X). */
+export function pivotPoint(u: AABB, mode: PivotMode): Vec3 {
+  if (mode === 'center') return aabbCenter(u);
+  const x = mode.endsWith('left') ? u.min[0] : u.max[0];
+  const y = mode.startsWith('front') ? u.min[1] : u.max[1];
+  return [x, y, u.min[UP]];
+}
+
+/** How a pivot reads in the UI. */
+export function pivotLabel(mode: PivotMode): string {
+  return mode === 'center' ? 'centre' : `bottom ${mode} corner`;
 }
 
 /**

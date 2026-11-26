@@ -35,6 +35,7 @@ const SECTIONS: [string, [string, string][]][] = [
         'Drag a ring while rotating',
         '15° steps; Ctrl for 1°; the Part panel shows and sets angles',
       ],
+      ['P while rotating', 'Cycle the pivot: the centre, then each bottom corner; Shift+P back'],
       ['S', 'Scale the length with the mouse (grid steps), or type a length; Enter'],
       [
         'Shift+R, then drag',

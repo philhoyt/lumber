@@ -65,6 +65,7 @@ theme.
 | Enter / click, Esc / right-click    | Confirm or cancel a transform                                             |
 | R then X / Y / Z                    | Quarter turn; Shift reverses; type an angle after the axis (R X 15 Enter) |
 | Drag a ring while rotating          | Turn in 15° steps, Ctrl for 1°; the Part panel shows and sets angles      |
+| P while rotating                    | Cycle the pivot: the centre, then each bottom corner (Shift+P goes back)  |
 | S, move the mouse or type, Enter    | Scale the cut length with the mouse (grid steps) or set it by number      |
 | Drag a handle at a part's end       | Pull that end to meet another part; the end snaps to faces                |
 | Fit end A / B (Part panel)          | Cut the end to meet what it points at: miter, bevel and length            |
