@@ -4,6 +4,7 @@
  */
 import {
   AlignHorizontalJustifyStart,
+  AlignHorizontalSpaceAround,
   ArrowDownToLine,
   Boxes,
   Camera,
@@ -45,6 +46,7 @@ export interface MenuItem {
 /** What the menu needs from the scene. */
 export interface MenuActions {
   beginArray(): void;
+  beginCenterBetween(): void;
   beginGrab(): void;
   beginRotate(): void;
   beginSize(): void;
@@ -178,6 +180,12 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
       action: () => scene.beginArray(),
     },
     { label: 'Drop', key: 'Alt+G', icon: ArrowDownToLine, action: () => store.dropSelected() },
+    {
+      label: 'Center between…',
+      key: 'C',
+      icon: AlignHorizontalSpaceAround,
+      action: () => scene.beginCenterBetween(),
+    },
     {
       label: 'Mirror',
       key: 'Ctrl+M',

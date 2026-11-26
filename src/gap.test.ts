@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boxGap, gapText } from './gap';
+import { boxGap, centerBetween, gapText } from './gap';
 import type { AABB } from './model';
 import { fmt } from './units';
 
@@ -56,5 +56,22 @@ describe('gapText', () => {
       'Touching  ·  X 1 1/2" o.c.',
     );
     expect(gapText(boxGap(studA, studA), fmt)).toBe('Overlapping');
+  });
+});
+
+describe('centerBetween', () => {
+  it('moves the selection to the middle of the gap, on the gap axis only', () => {
+    // Inner joists hanging left of centre between studA (0..1 1/2) and a joist at 46 1/2..48.
+    const outer = box([46.5, 0, 0], [48, 3.5, 92.625]);
+    const inner = box([5, 0, 0], [35, 3.5, 92.625]);
+    expect(centerBetween(inner, studA, outer)).toEqual({ axis: 0, delta: 4 });
+    expect(centerBetween(inner, outer, studA)).toEqual({ axis: 0, delta: 4 });
+  });
+  it('uses the centres when the two overlap, and gives up when they coincide', () => {
+    const low = box([0, 0, 0], [10, 10, 1]);
+    const high = box([0, 0, 0.5], [10, 10, 1.5]);
+    const sel = box([0, 0, 5], [1, 1, 6]);
+    expect(centerBetween(sel, low, high)).toEqual({ axis: 2, delta: -4.75 });
+    expect(centerBetween(sel, low, low)).toBeNull();
   });
 });

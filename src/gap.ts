@@ -64,3 +64,26 @@ export function gapText(g: Gap, fmt: (n: number) => string): string {
   if (g.distance - g.gaps[g.axis] > 1 / 64) parts.push(`${fmt(g.distance)} straight`);
   return parts.join('  ·  ');
 }
+
+/**
+ * The move that centres box `sel` in the gap between `a` and `b`: along the axis the
+ * two are apart on (or, when they overlap, the axis their centres differ most on), to
+ * the middle of the space between them. Null when `a` and `b` sit on top of each other.
+ */
+export function centerBetween(
+  sel: AABB,
+  a: AABB,
+  b: AABB,
+): { axis: AxisIndex; delta: number } | null {
+  const g = boxGap(a, b);
+  let axis = g.axis;
+  if (axis === null) {
+    let best: AxisIndex = 0;
+    for (const i of [1, 2] as const) if (Math.abs(g.oc[i]) > Math.abs(g.oc[best])) best = i;
+    if (Math.abs(g.oc[best]) < 1e-9) return null;
+    axis = best;
+  }
+  const mid = (g.from[axis] + g.to[axis]) / 2;
+  const centre = (sel.min[axis] + sel.max[axis]) / 2;
+  return { axis, delta: Math.round((mid - centre) * 64) / 64 };
+}

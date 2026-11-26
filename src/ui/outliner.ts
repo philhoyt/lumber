@@ -15,6 +15,9 @@ import { hex } from './dom';
 
 export interface HoverTarget {
   hover(id: number | null): void;
+  /** The centre-between tool is waiting for a part: a row click picks it instead. */
+  readonly centering: boolean;
+  pickCenterBetween(id: number): void;
 }
 
 type Renaming = { kind: 'part' | 'group'; id: number } | null;
@@ -282,6 +285,10 @@ export class OutlinerPanel {
     el.append(name, size, eye);
     el.addEventListener('click', (e) => {
       if (p.hidden) return;
+      if (view.centering) {
+        view.pickCenterBetween(p.id);
+        return;
+      }
       if (e.shiftKey && this.anchor !== null && this.anchor !== p.id) {
         store.select(new Set([...store.selected, ...this.rowsBetween(this.anchor, p.id)]));
         return;

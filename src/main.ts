@@ -56,7 +56,22 @@ const drawings = new DrawingsOverlay(document.body, store, () => pm.current.name
 const stockEditor = new StockEditor(document.body, store);
 const projectsDialog = new ProjectsDialog(document.body, pm);
 $('bStockEdit').onclick = () => stockEditor.show();
-const props = new PropsPanel($('props'), store, () => scene.toggleFasten());
+const props = new PropsPanel(
+  $('props'),
+  store,
+  () => scene.toggleFasten(),
+  () => scene.beginCenterBetween(),
+);
+scene.onCenterBetween = (state, axis) => {
+  if (state === 'start') toast('Center between: click the first part, in the view or the list.');
+  else if (state === 'picked') toast('Now click the second part.');
+  else if (state === 'done')
+    toast(
+      axis === undefined
+        ? 'Those two sit on top of each other; nothing to center between.'
+        : `Centered between them on ${'XYZ'[axis]}.`,
+    );
+};
 wireFastenBar($('viewport'), store, scene);
 wireExplodeBar($('viewport'), scene);
 wireAssemblyBar($('viewport'), store, scene);

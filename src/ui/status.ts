@@ -18,6 +18,7 @@ const HINTS = {
     ['S', 'length'],
     ['Shift+D', 'duplicate'],
     ['Shift+R', 'array'],
+    ['C', 'center between'],
     ['X', 'delete'],
     ['?', 'keys'],
   ],

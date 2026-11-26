@@ -232,6 +232,11 @@ export class LumberScene {
   private readonly gapReadout: GapReadout;
   /** Alt is held: hovering another part shows the distance from the selection to it. */
   private altHeld = false;
+  /** C: the parts picked so far to centre the selection between. */
+  private centerPicks: number[] | null = null;
+  /** Told when the centre-between tool starts, ends, or picks, for the toolbar and toasts. */
+  onCenterBetween:
+    ((state: 'start' | 'picked' | 'done' | 'cancel', axis?: AxisIndex) => void) | null = null;
   private readonly fastenMode: FastenMode;
   /** E: how far the view is exploded, 0..1. Parts draw displaced; the model stays put. */
   explode = 0;
@@ -364,6 +369,43 @@ export class LumberScene {
   }
   get fastening(): boolean {
     return this.fastenMode.active;
+  }
+  get centering(): boolean {
+    return this.centerPicks !== null;
+  }
+
+  /**
+   * C: centre the selection between two parts. Click (in the view or the Parts list) the
+   * first part, then the second; the selection moves to the middle of the gap between
+   * them, along the axis they are apart on.
+   */
+  beginCenterBetween(): void {
+    if (this.tf || this.lookOnly || !this.store.selected.size) return;
+    if (this.measureTool.active) this.measureTool.end();
+    if (this.fastenMode.active) this.fastenMode.end();
+    this.centerPicks = [];
+    this.container.style.cursor = 'crosshair';
+    this.onCenterBetween?.('start');
+  }
+  endCenterBetween(): void {
+    if (!this.centerPicks) return;
+    this.centerPicks = null;
+    this.container.style.cursor = '';
+    this.onCenterBetween?.('cancel');
+  }
+  /** One of the two parts to centre between, from the view or the Parts list. */
+  pickCenterBetween(id: number): void {
+    const picks = this.centerPicks;
+    if (!picks || picks.includes(id) || this.store.selected.has(id)) return;
+    picks.push(id);
+    if (picks.length < 2) {
+      this.onCenterBetween?.('picked');
+      return;
+    }
+    const axis = this.store.centerSelectedBetween(picks[0]!, picks[1]!);
+    this.centerPicks = null;
+    this.container.style.cursor = '';
+    this.onCenterBetween?.('done', axis ?? undefined);
   }
   get transforming(): boolean {
     return this.tf !== null;
@@ -633,6 +675,14 @@ export class LumberScene {
       this.dragLabelEl.style.left = `${x}px`;
       this.dragLabelEl.style.top = `${y}px`;
       this.dragLabelEl.textContent = this.transformText(t);
+    } else if (this.centerPicks && c) {
+      const [x, y] = toScreen(this.rig, c);
+      this.dragLabelEl.style.display = 'block';
+      this.dragLabelEl.style.left = `${x}px`;
+      this.dragLabelEl.style.top = `${y}px`;
+      this.dragLabelEl.textContent = this.centerPicks.length
+        ? 'Center between: now click the second part · Esc'
+        : 'Center between: click the first part · Esc';
     } else this.dragLabelEl.style.display = 'none';
   }
 
@@ -1355,6 +1405,18 @@ export class LumberScene {
       if (e.button !== 0) return;
       const pt = this.snapUnderPointer(e.clientX, e.clientY);
       if (pt) this.measureTool.click(pt);
+      return;
+    }
+    if (this.centerPicks) {
+      if (e.button === 2) {
+        this.suppressMenu = true;
+        this.endCenterBetween();
+        return;
+      }
+      if (e.button !== 0) return;
+      this.setRay(e.clientX, e.clientY);
+      const hit = this.pickPart();
+      if (hit) this.pickCenterBetween(hit.object.userData.id as number);
       return;
     }
     if (e.button !== 0) return;

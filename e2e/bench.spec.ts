@@ -227,6 +227,24 @@ test('in the list, Ctrl+click toggles a row and Shift+click selects the run betw
   await expect(page.locator('#stat')).toContainText('4 selected');
 });
 
+test('C centres the selection between two parts picked from the list', async ({ page }) => {
+  await openBench(page);
+  await selectPart(page, 'Stretcher front');
+  // Shove it off centre, then centre it between the front legs.
+  await page.locator('#pX').fill('5');
+  await page.locator('#pX').press('Enter');
+  await expect(page.locator('#pX')).toHaveValue('5');
+  await page.locator('#pX').press('Escape');
+  await page.keyboard.press('c');
+  await expect(page.locator('.drag-label')).toContainText('click the first part');
+  await page.locator('.out-row', { hasText: 'Leg LF' }).click();
+  await expect(page.locator('.drag-label')).toContainText('second part');
+  await page.locator('.out-row', { hasText: 'Leg RF' }).click();
+  await expect(page.locator('#stat')).toContainText('1 selected');
+  await expect(page.locator('#pX')).toHaveValue('-22 1/2');
+  await expect(page.locator('.drag-label')).toBeHidden();
+});
+
 test('G moves by a typed distance along the constrained axis', async ({ page }) => {
   await openBench(page);
   await selectPart(page, 'Leg LF');

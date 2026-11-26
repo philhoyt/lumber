@@ -5,6 +5,7 @@
  */
 import { normalizeStep } from './assembly';
 import { applyFit, fitEnd, type EndFit } from './fit';
+import { centerBetween } from './gap';
 import { cloneStock, DEFAULT_STOCK, getStock, sanitizeStock, setStock, type Stock } from './stock';
 import { clampFastener, isFace, isFastenerKind, type Fastener } from './fastener';
 import {
@@ -22,6 +23,7 @@ import {
   squareUp,
   translateParts,
   unionAABB,
+  partAABB,
   AXIS_INDEX,
   arrayLayout,
   type AlignMode,
@@ -679,6 +681,24 @@ export class Store {
     const list = this.selectedParts();
     if (list.length < 2) return;
     this.mutate(() => alignParts(list, axis, mode));
+  }
+  /**
+   * Centre the selection between two other parts, along the axis those two are apart
+   * on. Returns the axis moved on, or null when there was nothing to do.
+   */
+  centerSelectedBetween(aId: number, bId: number): AxisIndex | null {
+    const a = this.partById(aId);
+    const b = this.partById(bId);
+    const list = this.selectedParts().filter((p) => p.id !== aId && p.id !== bId);
+    if (!a || !b || a === b || !list.length) return null;
+    const move = centerBetween(unionAABB(list), partAABB(a), partAABB(b));
+    if (!move) return null;
+    if (move.delta) {
+      const d: Vec3 = [0, 0, 0];
+      d[move.axis] = move.delta;
+      this.mutate(() => translateParts(list, d));
+    }
+    return move.axis;
   }
   /** Lower the selection until it rests on the floor or on the parts beneath it. */
   dropSelected(): void {

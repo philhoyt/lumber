@@ -157,3 +157,28 @@ describe('assembly steps', () => {
     expect(doc?.parts.map((p) => p.step)).toEqual([2, undefined]);
   });
 });
+
+describe('centerSelectedBetween', () => {
+  it('centres the selection in the gap between two parts', () => {
+    const s = new Store();
+    const left = s.addPart('2x4', [0, 0, 0]); // flat: 3 1/2 across Y, centred on y = 0
+    const right = s.addPart('2x4', [0, 20, 0]);
+    const mid = s.addPart('2x4', [0, 4, 0]);
+    s.select([mid.id]);
+    expect(s.centerSelectedBetween(left.id, right.id)).toBe(1);
+    expect(s.partById(mid.id)!.pos[1]).toBe(10);
+    expect(s.partById(left.id)!.pos[1]).toBe(0);
+    s.undo();
+    expect(s.partById(mid.id)!.pos[1]).toBe(4);
+  });
+  it('ignores a missing part, the same part twice, or an empty selection', () => {
+    const s = new Store();
+    const a = s.addPart('2x4');
+    const b = s.addPart('2x4', [0, 20, 0]);
+    s.select([]);
+    expect(s.centerSelectedBetween(a.id, b.id)).toBeNull();
+    s.select([a.id]);
+    expect(s.centerSelectedBetween(a.id, b.id)).toBeNull(); // only a and b: nothing else to move
+    expect(s.centerSelectedBetween(a.id, 99)).toBeNull();
+  });
+});

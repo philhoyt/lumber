@@ -265,6 +265,7 @@ export function wireKeyboard(
 
     if (e.key === 'Escape') {
       if (scene.measuring) scene.endMeasure();
+      else if (scene.centering) scene.endCenterBetween();
       else if (scene.fastening) scene.endFasten();
       else if (!actions.closeOverlays()) store.select([]);
     } else if (e.key === '?' || e.key === 'F1' || (e.shiftKey && e.code === 'Slash'))
@@ -293,6 +294,7 @@ export function wireKeyboard(
     else if (k === 'r') scene.beginRotate();
     else if (k === 's') scene.beginSize();
     else if (k === 'h') store.hideSelected();
+    else if (k === 'c') scene.beginCenterBetween();
     else if (k === 'm') scene.toggleMeasure();
     else if (k === 'f') scene.toggleFasten();
     else if (k === 'e') scene.toggleExplode();
