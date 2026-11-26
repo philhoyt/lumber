@@ -10,10 +10,13 @@ const KEY = 'lumber.recentStock';
 const MAX = 5;
 let memory: string[] | null = null;
 
+/** The browser's storage, or nothing under Node (tests), where it only warns. */
+const storage = (): Storage | null => (typeof window === 'undefined' ? null : window.localStorage);
+
 function read(): string[] {
   if (memory) return memory;
   try {
-    const v = JSON.parse(localStorage.getItem(KEY) ?? '[]') as unknown;
+    const v = JSON.parse(storage()?.getItem(KEY) ?? '[]') as unknown;
     memory = Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
   } catch {
     memory = [];
@@ -31,7 +34,7 @@ export function noteStockUsed(id: string): void {
   const list = [id, ...read().filter((x) => x !== id)].slice(0, MAX);
   memory = list;
   try {
-    localStorage.setItem(KEY, JSON.stringify(list));
+    storage()?.setItem(KEY, JSON.stringify(list));
   } catch {
     /* best effort */
   }
@@ -41,7 +44,7 @@ export function noteStockUsed(id: string): void {
 export function clearRecentStock(): void {
   memory = [];
   try {
-    localStorage.removeItem(KEY);
+    storage()?.removeItem(KEY);
   } catch {
     /* best effort */
   }
