@@ -14,12 +14,14 @@
  *   Enter or left-click confirms, Escape or right-click cancels
  * - R then X / Y / Z turns the selection a quarter turn about that axis (Shift for the
  *   other way); type an angle after the axis for any other turn (R X 15 Enter), or drag
- *   a ring in 15° steps (Ctrl for 1°); S then a length sets the cut length
+ *   a ring in 15° steps (Ctrl for 1°)
+ * - S scales the cut length with the mouse (snapping to the grid) or takes a typed
+ *   length; the handles on a part's ends pull one end to meet another part
  * - the gizmo and a part's body can also be dragged directly with the mouse
  */
 import * as THREE from 'three';
 import { dragGesture } from './gestures';
-import { axisParam, Gizmo, ringAngle, RotateGizmo } from './gizmo';
+import { axisParam, EndHandles, Gizmo, ringAngle, RotateGizmo } from './gizmo';
 import {
   aabbCenter,
   hasMiter,
@@ -28,6 +30,7 @@ import {
   partDims,
   rotatePartsBy,
   partSnapPoints,
+  isSquare,
   unionAABB,
   withMinKept,
   AXIS_NAMES,
@@ -42,6 +45,7 @@ import { explodeOffsets, offsetAABB } from './explode';
 import { fastenersOf } from './fastener';
 import { buildMarkers } from './markers';
 import { nearestSnap } from './measure';
+import { pullEnd, scaleFactor, snapEnd, snapLength } from './scale';
 import { coplanarFaces, snapWithHits, type SnapHit } from './snap';
 import { stockById, type Stock } from './stock';
 import type { Store } from './store';
@@ -87,6 +91,23 @@ interface Transform {
   angles: Vec3;
   /** The axis the last X / Y / Z key or ring chose, which a typed angle applies to. */
   rotAxis: AxisIndex | null;
+  /** A length change by the mouse, in size mode. */
+  size: SizeDrag | null;
+}
+
+interface SizeDrag {
+  startLens: number[];
+  /** S: the length scales with the pointer's distance from the pivot, both in client pixels. */
+  pivot: [number, number];
+  start: [number, number];
+  /** An end handle: which end, the world direction of the part's length, where the end was. */
+  end: 0 | 1 | -1;
+  dir: THREE.Vector3;
+  at: THREE.Vector3;
+  ref: number;
+  /** For a square part, the world axis the moving face lies across and where it started. */
+  faceAxis: AxisIndex | null;
+  faceAt: number;
 }
 
 interface RingDrag {
@@ -161,6 +182,7 @@ export class LumberScene {
   };
   private gizmo = new Gizmo();
   private rotateGizmo = new RotateGizmo();
+  private endHandles = new EndHandles();
   private ray = new THREE.Raycaster();
   private ndc = new THREE.Vector2();
   private tf: Transform | null = null;
@@ -229,7 +251,12 @@ export class LumberScene {
     const axes = new THREE.AxesHelper(12);
     axes.position.z = 0.02;
     this.scene.add(axes);
-    this.scene.add(this.partsGroup, this.gizmo.group, this.rotateGizmo.group);
+    this.scene.add(
+      this.partsGroup,
+      this.gizmo.group,
+      this.rotateGizmo.group,
+      this.endHandles.group,
+    );
     this.dims = new DimLabels(this.rig, this.scene);
     this.snapFx = new SnapFeedback(this.scene);
     this.measureTool = new MeasureTool(this.rig, this.scene);
@@ -500,6 +527,17 @@ export class LumberScene {
     const vh = center ? this.rig.viewHeightAt(center) : 0;
     this.gizmo.update(rotating || this.lookOnly ? null : center, vh);
     this.rotateGizmo.update(rotating ? center : null, vh);
+    const one = this.store.selectedParts();
+    this.endHandles.update(
+      one.length === 1 &&
+        !this.tf &&
+        !this.lookOnly &&
+        !this.measureTool.active &&
+        !this.fastenMode.active
+        ? one[0]!
+        : null,
+      vh,
+    );
     this.scaleMarkers();
     this.snapFx.tick();
     this.renderer.render(this.scene, this.rig.camera);
@@ -549,12 +587,28 @@ export class LumberScene {
         .join('  ');
       return done || 'Rotate: X / Y / Z a quarter turn, type an angle, or drag a ring · Enter';
     }
-    if (t.kind === 'size') return `Length: ${t.typed}▏`;
+    if (t.kind === 'size') {
+      if (t.typed) return `Length: ${t.typed}▏`;
+      const list = this.store.selectedParts();
+      const len =
+        list.length === 1
+          ? `Length ${fmt(list[0]!.len)}`
+          : `Scale ${list.map((p) => fmt(p.len)).join(', ')}`;
+      return len + this.snapTargets(t);
+    }
     const c = t.constraint;
     const plane = c?.kind === 'plane' && t.constraintKey ? `Shift+${t.constraintKey} ` : '';
     if (t.typed) return `${plane}${LABELS[this.typedAxis(t)]} ${t.typed}▏`;
     const axes = c?.kind === 'axis' ? [c.axis] : (c?.axes ?? []);
-    // Group the targets by relation: "against Leg LF, Leg RF · flush with Apron left".
+    return (
+      plane +
+      axes.map((a) => `${LABELS[a]} ${t.delta[a] >= 0 ? '+' : ''}${fmt(t.delta[a])}`).join('  ') +
+      this.snapTargets(t)
+    );
+  }
+
+  /** " · against Leg LF, Leg RF · flush with Apron left" for the transform's snaps, or ''. */
+  private snapTargets(t: Transform): string {
     const byRelation = new Map<string, string[]>();
     for (const h of t.snaps) {
       if (h.kind === 'grid') continue;
@@ -574,11 +628,7 @@ export class LumberScene {
     const targets = [...byRelation]
       .map(([rel, names]) => (names.length ? `${rel} ${names.join(', ')}` : rel))
       .join(' · ');
-    return (
-      plane +
-      axes.map((a) => `${LABELS[a]} ${t.delta[a] >= 0 ? '+' : ''}${fmt(t.delta[a])}`).join('  ') +
-      (targets ? `  · ${targets}` : '')
-    );
+    return targets ? `  · ${targets}` : '';
   }
 
   // ---- dimensions, measuring, fasteners ----
@@ -829,6 +879,7 @@ export class LumberScene {
       ring: null,
       angles: [0, 0, 0],
       rotAxis: null,
+      size: null,
     };
     if (modal) this.container.style.cursor = kind === 'rotate' ? '' : 'move';
     return this.tf;
@@ -894,10 +945,94 @@ export class LumberScene {
     if (this.tf) return;
     this.startTransform('rotate', true);
   }
-  /** S: type a length and press Enter to set the cut length of the selection. */
+  /** S: the length follows the mouse (Blender's scale) or a typed length; Enter confirms. */
   beginSize(): void {
     if (this.tf) return;
-    this.startTransform('size', true);
+    const t = this.startTransform('size', true);
+    if (!t) return;
+    const r = this.container.getBoundingClientRect();
+    const [px, py] = toScreen(this.rig, t.origin);
+    const pivot: [number, number] = [px + r.left, py + r.top];
+    t.size = {
+      startLens: this.store.selectedParts().map((p) => p.len),
+      pivot,
+      start: this.lastPointer ?? pivot,
+      end: 0,
+      dir: new THREE.Vector3(1, 0, 0),
+      at: t.origin.clone(),
+      ref: 0,
+      faceAxis: null,
+      faceAt: 0,
+    };
+  }
+
+  /** Drag on an end handle: pull that end of the one selected part, the other end fixed. */
+  private beginEndDrag(end: 1 | -1): Transform | null {
+    const p = this.store.selectedParts()[0];
+    if (!p) return null;
+    const t = this.startTransform('size', false);
+    if (!t) return null;
+    const dir = new THREE.Vector3(1, 0, 0).applyQuaternion(new THREE.Quaternion().fromArray(p.q));
+    const at = new THREE.Vector3().fromArray(p.pos).addScaledVector(dir, (end * p.len) / 2);
+    let faceAxis: AxisIndex | null = null;
+    if (isSquare(p.q)) {
+      faceAxis = 0;
+      for (const a of [1, 2] as const)
+        if (Math.abs(dir.getComponent(a)) > Math.abs(dir.getComponent(faceAxis))) faceAxis = a;
+    }
+    t.size = {
+      startLens: [p.len],
+      pivot: [0, 0],
+      start: [0, 0],
+      end,
+      dir,
+      at,
+      ref: axisParam(at, dir, this.currentRay()),
+      faceAxis,
+      faceAt: faceAxis === null ? 0 : at.getComponent(faceAxis),
+    };
+    t.moved = true;
+    return t;
+  }
+
+  /** Size mode with the mouse: scale from S, or pull an end from a handle. */
+  private updateSize(): void {
+    const t = this.tf;
+    const sz = t?.size;
+    if (t?.kind !== 'size' || !sz || t.typed) return;
+    const list = this.store.selectedParts();
+    const grid = this.store.settings.grid;
+    t.snaps = [];
+    if (sz.end === 0) {
+      const f = scaleFactor(sz.pivot, sz.start, this.lastPointer ?? sz.start);
+      list.forEach((p, i) =>
+        withMinKept(p, () => (p.len = snapLength(sz.startLens[i]! * f, grid))),
+      );
+      this.snapFx.hide();
+    } else {
+      const p = list[0];
+      if (!p) return;
+      const start = sz.startLens[0]!;
+      let delta = axisParam(sz.at, sz.dir, this.currentRay()) - sz.ref;
+      if (sz.faceAxis !== null) {
+        // A square part: the moving end face snaps to other faces (or the grid) along its axis.
+        const a = sz.faceAxis;
+        const sign = sz.dir.getComponent(a) < 0 ? -1 : 1;
+        const slab: AABB = { min: [...t.aabb.min], max: [...t.aabb.max] };
+        slab.min[a] = slab.max[a] = sz.faceAt;
+        const r = snapEnd(slab, a, delta * sign, t.others, this.store.settings);
+        delta = r.delta * sign;
+        t.snaps = r.hits;
+        this.snapFx.show(r.hits, r.moved, t.others);
+      } else delta = (snapLength(start + sz.end * delta, grid) - start) * sz.end;
+      const { len, shift } = pullEnd(start, sz.end, delta);
+      p.len = len;
+      const sp = t.startPos[0]!;
+      p.pos = [sp[0] + sz.dir.x * shift, sp[1] + sz.dir.y * shift, sp[2] + sz.dir.z * shift];
+    }
+    t.moved = true;
+    for (const p of list) this.syncMesh(p);
+    this.store.notify('drag');
   }
   /** Shift+D: copy in place and grab the copies. */
   duplicateAndGrab(): void {
@@ -1004,11 +1139,13 @@ export class LumberScene {
       if (Number.isFinite(deg)) this.turn(axis, deg - t.angles[axis]);
     }
     if (commit && t.kind === 'size') {
-      const v = parseLen(t.typed);
-      if (v !== null && v > 0) {
-        for (const p of this.store.selectedParts()) withMinKept(p, () => (p.len = v));
-        t.moved = true;
-      } else commit = false;
+      if (t.typed) {
+        const v = parseLen(t.typed);
+        if (v !== null && v > 0) {
+          for (const p of this.store.selectedParts()) withMinKept(p, () => (p.len = v));
+          t.moved = true;
+        } else commit = false;
+      } else commit = t.moved && t.size !== null;
     }
     if (commit && t.moved) this.store.commit(t.before);
     else this.store.restore(t.before);
@@ -1075,7 +1212,12 @@ export class LumberScene {
     this.downPos = [e.clientX, e.clientY];
     this.setRay(e.clientX, e.clientY);
 
-    // Gizmo handles win over parts.
+    // End handles, then gizmo handles, win over parts.
+    const eh = this.lookOnly ? null : this.endHandles.pick(this.ray);
+    if (eh) {
+      if (this.beginEndDrag(eh.end)) this.capture(e);
+      return;
+    }
     const gh = this.lookOnly ? null : this.gizmo.pick(this.ray);
     const center = this.selectionCenter();
     if (gh && center) {
@@ -1143,6 +1285,10 @@ export class LumberScene {
         }
         return;
       }
+      if (t.kind === 'size') {
+        this.updateSize();
+        return;
+      }
       if (t.kind !== 'grab') return;
       if (!t.moved && this.downPos)
         t.moved = Math.hypot(e.clientX - this.downPos[0], e.clientY - this.downPos[1]) > 2;
@@ -1168,11 +1314,13 @@ export class LumberScene {
       return;
     }
     this.setRay(e.clientX, e.clientY);
-    const gh = this.lookOnly ? null : this.gizmo.pick(this.ray);
+    const eh = this.lookOnly ? null : this.endHandles.pick(this.ray);
+    this.endHandles.setHover(eh?.object ?? null);
+    const gh = eh || this.lookOnly ? null : this.gizmo.pick(this.ray);
     this.gizmo.setHover(gh?.object ?? null);
-    const hit = gh ? null : this.pickPart();
+    const hit = eh || gh ? null : this.pickPart();
     this.setHover(hit ? (hit.object.userData.id as number) : null);
-    this.container.style.cursor = gh ? 'move' : hit ? 'grab' : '';
+    this.container.style.cursor = eh ? 'ew-resize' : gh ? 'move' : hit ? 'grab' : '';
   }
 
   private onPointerUp(e: PointerEvent): void {

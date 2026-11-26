@@ -4,6 +4,7 @@
  * that axis only; dragging a square moves in that plane.
  */
 import * as THREE from 'three';
+import { partDims, type Part } from './model';
 
 export type AxisIndex = 0 | 1 | 2;
 export type Handle =
@@ -229,5 +230,67 @@ export class Gizmo {
       v.opacity = 1;
       v.color.set(0xffe08a);
     }
+  }
+}
+
+/**
+ * Two handles at the ends of a single selected part: drag one to pull that end while the
+ * other stays put. Drawn at a constant screen size, on top, turned with the part.
+ */
+export class EndHandles {
+  readonly group = new THREE.Group();
+  private ends = new Map<THREE.Object3D, 1 | -1>();
+  private visuals = new Map<THREE.Object3D, THREE.MeshBasicMaterial>();
+  private hovered: THREE.Object3D | null = null;
+  private dir = new THREE.Vector3();
+
+  constructor() {
+    this.group.visible = false;
+    for (const end of [1, -1] as const) {
+      const m = new THREE.MeshBasicMaterial({
+        color: 0xe0a94b,
+        transparent: true,
+        opacity: 0.9,
+        depthTest: false,
+        depthWrite: false,
+      });
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), m);
+      mesh.renderOrder = 1002;
+      this.ends.set(mesh, end);
+      this.visuals.set(mesh, m);
+      this.group.add(mesh);
+    }
+  }
+
+  /** Show the handles on `p`'s ends, or hide them; `viewHeight` sets their screen size. */
+  update(p: Part | null, viewHeight: number): void {
+    if (!p) {
+      this.group.visible = false;
+      return;
+    }
+    this.group.visible = true;
+    const q = new THREE.Quaternion().fromArray(p.q);
+    this.dir.set(1, 0, 0).applyQuaternion(q);
+    const [len, w, t] = partDims(p);
+    const s = Math.min(viewHeight * 0.022, Math.max(w, t));
+    for (const [mesh, end] of this.ends) {
+      mesh.position.fromArray(p.pos).addScaledVector(this.dir, (end * len) / 2);
+      mesh.quaternion.copy(q);
+      mesh.scale.set(s * 0.6, s, s);
+    }
+  }
+
+  pick(ray: THREE.Raycaster): { object: THREE.Object3D; end: 1 | -1 } | null {
+    if (!this.group.visible) return null;
+    const hit = ray.intersectObjects([...this.ends.keys()], false)[0];
+    if (!hit) return null;
+    return { object: hit.object, end: this.ends.get(hit.object)! };
+  }
+
+  setHover(o: THREE.Object3D | null): void {
+    if (o === this.hovered) return;
+    if (this.hovered) this.visuals.get(this.hovered)!.color.set(0xe0a94b);
+    this.hovered = o;
+    if (o) this.visuals.get(o)!.color.set(0xffe08a);
   }
 }

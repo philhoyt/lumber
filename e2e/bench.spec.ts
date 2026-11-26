@@ -278,3 +278,28 @@ test('R with a typed angle tilts a part, and Square up brings it back', async ({
   await page.locator('#bUndo').click();
   await expect(page.locator('#rotX')).toHaveValue('15');
 });
+
+test('S scales the length with the mouse and keeps the part in place', async ({ page }) => {
+  await openBench(page);
+  await selectPart(page, 'Apron front');
+  await expect(page.locator('#pLen')).toHaveValue('45');
+  const x0 = await page.locator('#pX').inputValue();
+  const v = await hoverView(page);
+  await page.mouse.move(v.x + v.w * 0.5, v.y + v.h * 0.62);
+  await page.keyboard.press('s');
+  await page.mouse.move(v.x + v.w * 0.5, v.y + v.h * 0.85, { steps: 4 });
+  await expect(page.locator('.drag-label')).toContainText('Length');
+  await page.keyboard.press('Enter');
+  const len = await page.locator('#pLen').inputValue();
+  expect(len).not.toBe('45');
+  await expect(page.locator('#pX')).toHaveValue(x0); // the min corner stays put
+  await page.locator('#bUndo').click();
+  await expect(page.locator('#pLen')).toHaveValue('45');
+  // Escape cancels a scale in progress.
+  await hoverView(page);
+  await page.keyboard.press('s');
+  await page.mouse.move(v.x + v.w * 0.5, v.y + v.h * 0.9, { steps: 4 });
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#pLen')).toHaveValue('45');
+  await expect(page.locator('#bUndo')).toBeDisabled();
+});
