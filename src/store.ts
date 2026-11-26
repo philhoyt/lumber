@@ -187,9 +187,11 @@ export class Store {
     this.undoStack.push(this.snapshot());
     this.restore(s);
   }
+  /** Forget the history, and any coalescing in flight, when a different model is loaded. */
   clearHistory(): void {
     this.undoStack = [];
     this.redoStack = [];
+    this.coalescing = null;
   }
 
   // ---- selection ----

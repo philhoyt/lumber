@@ -405,6 +405,43 @@ test('Ctrl+Z undoes an angle typed in the panel while the field still has focus'
   await expect(page.locator('#rotX')).toHaveValue('30');
 });
 
+test('a project switch during a rotation drops it instead of carrying the old parts', async ({
+  page,
+}) => {
+  await openBench(page);
+  await selectPart(page, 'Leg LF');
+  const view = await hoverView(page);
+  await page.keyboard.press('r');
+  await page.keyboard.press('x');
+  await expect(page.locator('.drag-label')).toContainText('X 90°');
+  // A new project arrives while the rotate is still live.
+  await page.locator('#bNew').click();
+  await expect(page.locator('#stat')).toContainText('0 parts');
+  // The next click in the view used to commit the bench's snapshot as this project's
+  // undo point; now the rotate is gone and the history is empty.
+  await page.mouse.click(view.x + view.w / 2, view.y + view.h / 2);
+  await expect(page.locator('.drag-label')).toBeHidden();
+  await expect(page.locator('#bUndo')).toBeDisabled();
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('#stat')).toContainText('0 parts');
+});
+
+test('R then Enter with no turn, and a click that only selects, leave undo alone', async ({
+  page,
+}) => {
+  await openBench(page);
+  await selectPart(page, 'Leg LF');
+  await expect(page.locator('#bUndo')).toBeDisabled();
+  const view = await hoverView(page);
+  await page.keyboard.press('r');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#bUndo')).toBeDisabled();
+  // Clicking a part in the view (the bench top) starts a grab that goes nowhere.
+  await page.mouse.click(view.x + view.w * 0.48, view.y + view.h * 0.37);
+  await expect(page.locator('#stat')).toContainText('selected');
+  await expect(page.locator('#bUndo')).toBeDisabled();
+});
+
 test('G moves by a typed distance along the constrained axis', async ({ page }) => {
   await openBench(page);
   await selectPart(page, 'Leg LF');

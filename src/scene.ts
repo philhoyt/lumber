@@ -229,6 +229,9 @@ export class LumberScene {
   };
   private gizmo = new Gizmo();
   private rotateGizmo = new RotateGizmo();
+  /** True while a transform of ours is writing to the store, so its notifies are not
+   * mistaken for someone else's change. */
+  private applying = false;
   /** The pivot the last rotation used; the next one starts from it. */
   private pivotMode: PivotMode = 'center';
   private readonly pivotDot: THREE.Mesh;
@@ -367,6 +370,10 @@ export class LumberScene {
     window.addEventListener('keydown', (e) => this.onKeyDown(e), { capture: true });
 
     store.subscribe((kind) => {
+      // A change the transform did not make (a project load, a panel edit, a toolbar
+      // button) means its starting snapshot no longer describes the model: drop it.
+      if (this.tf && !this.applying && (kind === 'model' || kind === 'selection'))
+        this.abandonTransform();
       if (kind === 'model' || kind === 'selection') this.syncAll();
       if (kind === 'selection') this.updateGap();
     });
@@ -1423,7 +1430,7 @@ export class LumberScene {
       const params = arrayFromDrag(base, AXIS_NAMES[axis]!, ad.extentLocal[axis], t.along, false);
       if (!sameArray(params, ad.applied)) {
         ad.applied = params;
-        this.store.setArray(params);
+        this.applyArray(params);
       }
       return;
     }
@@ -1437,13 +1444,23 @@ export class LumberScene {
     const params = arrayFromDrag(ad.base, AXIS_NAMES[axis]!, ad.extent[axis], d[axis], false);
     if (!sameArray(params, ad.applied)) {
       ad.applied = params;
-      this.store.setArray(params);
+      this.applyArray(params);
     }
     const moved: AABB = {
       min: [t.aabb.min[0] + d[0], t.aabb.min[1] + d[1], t.aabb.min[2] + d[2]],
       max: [t.aabb.max[0] + d[0], t.aabb.max[1] + d[1], t.aabb.max[2] + d[2]],
     };
     this.snapFx.show(t.snaps, moved, t.others);
+  }
+
+  /** A live array edit during the drag, marked as ours so the notify does not end it. */
+  private applyArray(params: ArrayParams): void {
+    this.applying = true;
+    try {
+      this.store.setArray(params);
+    } finally {
+      this.applying = false;
+    }
   }
 
   /** End an array drag: keep the array as the span dragged or the value typed, or undo it. */
@@ -1466,17 +1483,53 @@ export class LumberScene {
     }
   }
 
+  /** Put the view back the way it is between transforms. */
+  private endTransformUi(): void {
+    this.rig.enabled = true;
+    this.container.style.cursor = '';
+    this.snapFx.hide();
+  }
+
+  /**
+   * Drop a transform whose starting point the model has moved away from, without
+   * committing or restoring it. An array drag's coalesced changes become one undo step,
+   * together with whatever else changed, rather than being lost.
+   */
+  private abandonTransform(): void {
+    const t = this.tf;
+    if (!t) return;
+    this.tf = null;
+    if (t.kind === 'array') this.store.endCoalesce();
+    this.endTransformUi();
+  }
+
   private finishTransform(commit: boolean): void {
     const t = this.tf;
     if (!t) return;
-    if (t.kind === 'array') {
-      this.finishArray(t, commit);
-      this.rig.enabled = true;
-      this.container.style.cursor = '';
-      this.tf = null;
-      this.snapFx.hide();
-      return;
+    if (t.kind !== 'array') commit = this.applyTyped(t, commit);
+    // From here the transform is over: its own commit or restore must not read as an
+    // outside change, and nothing below needs `this.tf`.
+    this.tf = null;
+    this.applying = true;
+    try {
+      if (t.kind === 'array') this.finishArray(t, commit);
+      else if (t.moved && this.store.snapshot() !== t.before) {
+        // Only a transform that changed something touches the history: a click that
+        // merely selected, or R then Enter, leaves the model and the undo stack alone.
+        if (commit) this.store.commit(t.before);
+        else this.store.restore(t.before);
+      }
+    } finally {
+      this.applying = false;
+      this.endTransformUi();
     }
+  }
+
+  /**
+   * Apply what was typed during a grab, rotate or size before it ends, and say whether
+   * the result is to be kept: a size with nothing typed is kept only if it was dragged.
+   */
+  private applyTyped(t: Transform, commit: boolean): boolean {
     if (commit && t.kind === 'grab' && t.typed) {
       const v = parseLen(t.typed);
       if (v !== null) {
@@ -1506,12 +1559,7 @@ export class LumberScene {
         } else commit = false;
       } else commit = t.moved && t.size !== null;
     }
-    if (commit && t.moved) this.store.commit(t.before);
-    else this.store.restore(t.before);
-    this.rig.enabled = true;
-    this.container.style.cursor = '';
-    this.tf = null;
-    this.snapFx.hide();
+    return commit;
   }
 
   /** The axis a typed distance applies to: the only one, or the one moved furthest so far. */

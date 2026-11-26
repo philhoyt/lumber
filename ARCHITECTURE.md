@@ -83,7 +83,10 @@ body), a rotate (R) or a size (S). A grab has a constraint, either one axis or
 a plane, and converts the mouse ray into a delta along it; changing the
 constraint mid-drag re-anchors so the parts do not jump. Typed digits are kept
 on the transform and applied on Enter. Confirm commits the pre-transform
-snapshot to the store; cancel restores it.
+snapshot to the store; cancel restores it; a transform that changed nothing (a
+click that only selected, R then Enter) touches neither. A model or selection
+change the transform did not make, such as a project load or a panel edit, drops
+the transform outright, since its snapshot no longer describes the model.
 
 ## Reference boxes
 

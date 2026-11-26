@@ -106,6 +106,16 @@ describe('Store', () => {
   });
 });
 
+describe('clearHistory', () => {
+  it('also ends any coalescing, so a load mid-scrub cannot swallow later undo points', () => {
+    const s = new Store();
+    s.beginCoalesce();
+    s.clearHistory();
+    s.addPart('2x4');
+    expect(s.canUndo).toBe(true);
+  });
+});
+
 describe('parseDocument', () => {
   it('rejects things that are not a model', () => {
     expect(parseDocument(null)).toBeNull();
