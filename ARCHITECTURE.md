@@ -79,8 +79,11 @@ Rules of the layering:
 
 ## Transforms
 
-The scene owns one `Transform` at a time: a grab (from G, the gizmo or a part's
-body), a rotate (R) or a size (S). A grab has a constraint, either one axis or
+`view/transform.ts` `TransformController` runs one `Transform` at a time: a grab
+(from G, the gizmo or a part's body), a rotate (R), a size (S or an end handle) or
+an array drag (Shift+R). The scene owns it, hands it the pointer and key events
+while one is live, and asks it for the drag label's text and the rotate rings'
+pivot. A grab has a constraint, either one axis or
 a plane, and converts the mouse ray into a delta along it; changing the
 constraint mid-drag re-anchors so the parts do not jump. Typed digits are kept
 on the transform and applied on Enter. Confirm commits the pre-transform
