@@ -224,3 +224,27 @@ describe('spaceSelectedBetween', () => {
     expect(s.partById(b.id)!.pos[1]).toBe(22);
   });
 });
+
+describe('addBlockBetween', () => {
+  it("adds a selected block of the first part's stock, in its group", () => {
+    const s = new Store();
+    const a = s.addPart('2x6', [0, 0, 0]);
+    const b = s.addPart('2x6', [0, 24, 0]); // flat boards 5 1/2 wide, 18 1/2 apart
+    s.mutate(() => {
+      a.pos[2] = 40; // up in the air: the block must sit at their height, not on the floor
+      b.pos[2] = 40;
+    });
+    s.select([a.id, b.id]);
+    s.groupSelected('Frame');
+    const p = s.addBlockBetween(a.id, b.id)!;
+    expect(p.stock).toBe('2x6');
+    expect(p.len).toBe(18.5);
+    expect(p.pos[2]).toBe(40);
+    expect(p.name).toBe('Block');
+    expect(p.group).toBe(a.group);
+    expect([...s.selected]).toEqual([p.id]);
+    expect(s.addBlockBetween(a.id, a.id)).toBeNull();
+    s.undo();
+    expect(s.parts).toHaveLength(2);
+  });
+});

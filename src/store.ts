@@ -6,8 +6,16 @@
 import { normalizeStep } from './assembly';
 import { applyFit, fitEnd, type EndFit } from './fit';
 import { centerBetween, spaceBetween, type SpaceUnit } from './gap';
-import { extentAlong, localAxisDir } from './frame';
-import { cloneStock, DEFAULT_STOCK, getStock, sanitizeStock, setStock, type Stock } from './stock';
+import { blockBetween, extentAlong, localAxisDir } from './frame';
+import {
+  cloneStock,
+  DEFAULT_STOCK,
+  getStock,
+  sanitizeStock,
+  setStock,
+  stockById,
+  type Stock,
+} from './stock';
 import { clampFastener, isFace, isFastenerKind, type Fastener } from './fastener';
 import {
   aabbSize,
@@ -15,6 +23,7 @@ import {
   alignParts,
   clonePart,
   createPart,
+  MIN_LEN,
   dropDistance,
   migrateFromYUp,
   mirrorParts,
@@ -767,6 +776,30 @@ export class Store {
       }
     });
     return r.axis;
+  }
+  /**
+   * Add a piece of blocking between two parallel parts (see `blockBetween`): the first
+   * part's stock, cut to the clear gap, flush with their faces, at their lower end. The
+   * new part is selected. Null when the two cannot take a block.
+   */
+  addBlockBetween(aId: number, bId: number): Part | null {
+    const a = this.partById(aId);
+    const b = this.partById(bId);
+    if (!a || !b || a === b || stockById(a.stock).sheet) return null;
+    const fit = blockBetween(a, b);
+    if (!fit || fit.len < MIN_LEN) return null;
+    let p!: Part;
+    this.mutate(() => {
+      p = createPart(this.nextId++, a.stock, fit.pos);
+      p.pos = [...fit.pos]; // createPart rests parts on the floor; the fit says where
+      p.name = 'Block';
+      p.len = fit.len;
+      p.q = fit.q;
+      if (a.group !== undefined) p.group = a.group;
+      this.parts.push(p);
+    });
+    this.select([p.id]);
+    return p;
   }
   /** Lower the selection until it rests on the floor or on the parts beneath it. */
   dropSelected(): void {

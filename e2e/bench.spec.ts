@@ -288,6 +288,20 @@ test("tapping an axis key twice moves along the part's own axis", async ({ page 
   await page.keyboard.press('Escape');
 });
 
+test('B adds a block between two parallel parts', async ({ page }) => {
+  await openBench(page);
+  await selectPart(page, 'Leg LF');
+  await page.locator('.out-row', { hasText: 'Leg RF' }).click({ modifiers: ['Control'] });
+  await expect(page.locator('#stat')).toContainText('2 selected');
+  await hoverView(page);
+  await page.keyboard.press('b');
+  await expect(page.locator('#stat')).toContainText('13 parts');
+  await expect(page.locator('.out-row', { hasText: 'Block' })).toContainText('45"');
+  await expect(page.locator('#pLen')).toHaveValue('45');
+  await page.locator('#bUndo').click();
+  await expect(page.locator('#stat')).toContainText('12 parts');
+});
+
 test('G moves by a typed distance along the constrained axis', async ({ page }) => {
   await openBench(page);
   await selectPart(page, 'Leg LF');

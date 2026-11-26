@@ -5,6 +5,7 @@ import { buildListMenu, buildMenu, menuTitle, type MenuActions } from './menu';
 const actions = (): MenuActions => ({
   beginArray: vi.fn(),
   beginCenterBetween: vi.fn(),
+  blockBetween: vi.fn(),
   beginGrab: vi.fn(),
   beginRotate: vi.fn(),
   beginSize: vi.fn(),

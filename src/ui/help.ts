@@ -55,6 +55,7 @@ const SECTIONS: [string, [string, string][]][] = [
       ['Alt+G', 'Drop onto the floor or the parts below'],
       ['C, then click two parts', 'Center the selection in the gap between them; Esc'],
       ['Shift+C, then click two parts', 'Space the selected pieces evenly between them'],
+      ['B, two parallel parts selected', 'A block between them: cut to the gap, flush, at the end'],
       ['Ctrl+M then X / Y / Z', 'Mirror across that axis through the centre'],
     ],
   ],

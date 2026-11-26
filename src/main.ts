@@ -27,7 +27,8 @@ import { toast } from './ui/toast';
 import { browserPicker, FolderSync, idbHandleStore } from './folderSync';
 import { initTheme, type Theme } from './ui/theme';
 import { buildToolbar } from './ui/toolbar';
-import { parseLen } from './units';
+import { fmt, parseLen } from './units';
+import type { Part } from './model';
 
 const theme = initTheme();
 const store = new Store();
@@ -62,6 +63,7 @@ const props = new PropsPanel(
   () => scene.toggleFasten(),
   (mode) => scene.beginCenterBetween(mode),
 );
+scene.onBlockBetween = () => actions.blockBetween();
 scene.onCenterBetween = (state, mode, axis) => {
   const what = mode === 'space' ? 'Space evenly between' : 'Center between';
   if (state === 'start') toast(`${what}: click the first part, in the view or the list.`);
@@ -132,6 +134,20 @@ const actions = {
   },
   onTheme: (t: Theme) => scene.setTheme(t),
   showProjects: () => projectsDialog.show(),
+  blockBetween: () => {
+    const list = store.selectedParts();
+    if (list.length !== 2) {
+      toast('Block between: select exactly two parallel parts first.');
+      return;
+    }
+    const [a, b] = list as [Part, Part];
+    const p = store.addBlockBetween(a.id, b.id);
+    if (!p) toast(`${a.name} and ${b.name} are not parallel, or have no gap between them.`);
+    else
+      toast(
+        `Added a ${fmt(p.len)} block between ${a.name} and ${b.name}. G, then X X, slides it along them.`,
+      );
+  },
   arrayDrag: () => {
     if (!store.selected.size) return;
     // The Part panel's spacing and mode, when it shows them; 16" on centre otherwise.

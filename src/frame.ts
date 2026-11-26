@@ -3,9 +3,11 @@
  * arraying and snapping along those axes is how a piece in a tilted panel slides up the
  * slope or lands flush with its neighbours. Pure geometry; the scene and store use it.
  */
-import { Quaternion, Vector3 } from 'three';
+import { Matrix4, Quaternion, Vector3 } from 'three';
+import { boxGap } from './gap';
 import {
   bevelOf,
+  cleanQ,
   endCutCorners,
   hasEndCut,
   isSquare,
@@ -116,4 +118,55 @@ export function coframedBoxes(
       names.push(o.name);
     }
   return { boxes, names };
+}
+
+/** Where a block between two parallel parts goes: its length, orientation and centre. */
+export interface BlockFit {
+  len: number;
+  q: Quat;
+  pos: Vec3;
+}
+
+/**
+ * A piece of blocking between parts `a` and `b`, which must share a frame: `a`'s stock,
+ * cut to the clear gap between them, its width along `a`'s width (so its faces are flush
+ * with theirs) and its thickness along their length, at whichever end sits lower. Null
+ * when the two are not parallel or have no gap.
+ */
+export function blockBetween(a: Part, b: Part): BlockFit | null {
+  if (!isCoframed(a.q, b.q)) return null;
+  const A = boxInFrame(a, a.q);
+  const B = boxInFrame(b, a.q);
+  const g = boxGap(A, B);
+  if (g.axis === null) return null;
+  const ga = g.axis;
+  const [, w, t] = partDims(a);
+  // The block's width runs along a's width unless the gap does; then along a's length.
+  const widthAxis: AxisIndex = ga === 1 ? 0 : 1;
+  const thickAxis = (3 - ga - widthAxis) as AxisIndex;
+  const size: Vec3 = [0, 0, 0];
+  size[ga] = Math.abs(g.to[ga] - g.from[ga]);
+  size[widthAxis] = w;
+  size[thickAxis] = t;
+  // Block local X along the gap, local Y along its width, local Z a proper right-hand third.
+  const unit = (k: AxisIndex) => new Vector3(k === 0 ? 1 : 0, k === 1 ? 1 : 0, k === 2 ? 1 : 0);
+  const ex = unit(ga);
+  const ey = unit(widthAxis);
+  const ez = ex.clone().cross(ey);
+  const rel = new Quaternion().setFromRotationMatrix(new Matrix4().makeBasis(ex, ey, ez));
+  const q = cleanQ(new Quaternion().fromArray(a.q).multiply(rel));
+  // Centre: mid-gap, centred on a's width, and at a's end along its length (unless the
+  // gap runs that way), whichever end is lower in the world.
+  const c: Vec3 = [0, 0, 0];
+  c[ga] = (g.from[ga] + g.to[ga]) / 2;
+  for (const k of [widthAxis, thickAxis]) c[k] = (A.min[k] + A.max[k]) / 2;
+  if (ga !== 0) {
+    const atMin: Vec3 = [...c];
+    const atMax: Vec3 = [...c];
+    atMin[0] = A.min[0] + size[0] / 2;
+    atMax[0] = A.max[0] - size[0] / 2;
+    const lower = fromFrame(a.q, atMin)[2] <= fromFrame(a.q, atMax)[2] ? atMin : atMax;
+    c[0] = lower[0];
+  }
+  return { len: Math.round(size[ga] * 64) / 64, q, pos: fromFrame(a.q, c) };
 }

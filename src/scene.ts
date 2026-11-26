@@ -1092,6 +1092,12 @@ export class LumberScene {
     t.ring = null;
   }
 
+  /** B from the menu: the app's block-between action, wired by main. */
+  onBlockBetween: (() => void) | null = null;
+  blockBetween(): void {
+    this.onBlockBetween?.();
+  }
+
   /**
    * Shift+R: array the selection by dragging. Copies fill toward the pointer at the
    * given spacing (16" on centre unless told otherwise), X / Y / Z lock the axis, a typed

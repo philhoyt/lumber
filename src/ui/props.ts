@@ -422,7 +422,9 @@ export class PropsPanel {
     if (list.length > 1) {
       const btn = (axis: number, mode: string, label: string, title: string) =>
         `<button data-align="${axis}:${mode}" title="${title}">${label}</button>`;
-      arrange = `<div class="row btns align">${btn(0, 'min', 'Left', 'Flush on the left (min X)')}${btn(0, 'center', 'Center X', 'Centre on X')}${btn(0, 'max', 'Right', 'Flush on the right (max X)')}</div>
+      if (list.length === 2)
+        arrange += `<div class="row btns"><button id="bBlock" title="B: a piece of the first part's stock cut to the gap between these two, flush with their faces, at their lower end">Block between (B)</button></div>`;
+      arrange += `<div class="row btns align">${btn(0, 'min', 'Left', 'Flush on the left (min X)')}${btn(0, 'center', 'Center X', 'Centre on X')}${btn(0, 'max', 'Right', 'Flush on the right (max X)')}</div>
       <div class="row btns align">${btn(1, 'min', 'Front', 'Flush at the front (min Y)')}${btn(1, 'center', 'Center Y', 'Centre on Y')}${btn(1, 'max', 'Back', 'Flush at the back (max Y)')}</div>
       <div class="row btns align">${btn(2, 'min', 'Bottom', 'Flush on the bottom (min Z)')}${btn(2, 'center', 'Center Z', 'Centre on Z')}${btn(2, 'max', 'Top', 'Flush on top (max Z)')}</div>`;
     }
@@ -718,5 +720,10 @@ export class PropsPanel {
       }),
     );
     if (list.length > 1) onClick(el, 'bPlaceFast', this.place);
+    onClick(el, 'bBlock', () => {
+      const [a, b] = list as [Part, Part];
+      if (!store.addBlockBetween(a.id, b.id))
+        toast(`${a.name} and ${b.name} are not parallel, or have no gap between them.`);
+    });
   }
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  blockBetween,
   boxInFrame,
   coframedBoxes,
   extentAlong,
@@ -11,6 +12,7 @@ import { createPart, makeQ, quatFromEuler, type Part } from './model';
 
 const part = (q: Part['q'], pos: [number, number, number] = [0, 0, 0], len = 96): Part => {
   const p = createPart(1, '2x4', pos);
+  p.pos = [...pos];
   p.len = len;
   p.q = q;
   return p;
@@ -68,5 +70,36 @@ describe('coframedBoxes', () => {
     const r = coframedBoxes([rail, flat], joist.q);
     expect(r.names).toEqual(['Rail']);
     expect(r.boxes[0]!.max[0] - r.boxes[0]!.min[0]).toBeCloseTo(60);
+  });
+});
+
+describe('blockBetween', () => {
+  it('fits a block between two standing posts at their lower end, flush with their faces', () => {
+    const left = part(makeQ(['y']), [0, 0, 48], 96); // 1 1/2 along X, 3 1/2 along Y, 96 tall
+    const right = part(makeQ(['y']), [20, 0, 48], 96);
+    const f = blockBetween(left, right)!;
+    expect(f.len).toBe(18.5);
+    // The block runs along X, lies flat between the posts and sits at the bottom.
+    const d = localAxisDir(f.q, 0);
+    expect(Math.abs(d.x)).toBeCloseTo(1);
+    expect(f.pos[0]).toBeCloseTo(10);
+    expect(f.pos[1]).toBeCloseTo(0);
+    expect(f.pos[2]).toBeCloseTo(0.75);
+  });
+  it('follows tilted joists up their slope and refuses parts that are not parallel', () => {
+    // A 40° wall's joists: length up the slope, width into the panel, thickness along X.
+    const q: Part['q'] = [-0.2418447626, -0.6644630244, 0.2418447626, 0.6644630244];
+    const a = part(q, [0, 20, 50], 60);
+    const b = part(q, [16, 20, 50], 60);
+    const f = blockBetween(a, b)!;
+    expect(f.len).toBe(14.5);
+    expect(isCoframed(f.q, q)).toBe(true);
+    // The block runs along X between them, centred at x = 8, and sits at their lower end.
+    expect(Math.abs(localAxisDir(f.q, 0).x)).toBeCloseTo(1);
+    expect(f.pos[0]).toBeCloseTo(8);
+    expect(f.pos[2]).toBeLessThan(50);
+    expect(blockBetween(a, part(makeQ([]), [16, 20, 50], 60))).toBeNull();
+    // Overlapping parts have no gap.
+    expect(blockBetween(a, part(q, [1, 20, 50], 60))).toBeNull();
   });
 });

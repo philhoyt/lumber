@@ -32,6 +32,8 @@ export interface AppActions {
   addMenu(): void;
   /** Shift+R: array the selection by dragging, with the Part panel's spacing. */
   arrayDrag(): void;
+  /** B: a piece of blocking between the two selected parallel parts. */
+  blockBetween(): void;
   /** ? or F1: the key reference. */
   toggleHelp(): void;
   /** Close any overlay or menu; returns whether one was open. */
@@ -295,6 +297,7 @@ export function wireKeyboard(
     else if (k === 's') scene.beginSize();
     else if (k === 'h') store.hideSelected();
     else if (k === 'c') scene.beginCenterBetween(e.shiftKey ? 'space' : 'center');
+    else if (k === 'b') actions.blockBetween();
     else if (k === 'm') scene.toggleMeasure();
     else if (k === 'f') scene.toggleFasten();
     else if (k === 'e') scene.toggleExplode();

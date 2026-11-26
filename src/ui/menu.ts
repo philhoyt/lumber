@@ -7,6 +7,7 @@ import {
   AlignHorizontalJustifyStart,
   AlignHorizontalSpaceAround,
   ArrowDownToLine,
+  BetweenHorizontalStart,
   Boxes,
   Camera,
   ChevronRight,
@@ -47,6 +48,7 @@ export interface MenuItem {
 /** What the menu needs from the scene. */
 export interface MenuActions {
   beginArray(): void;
+  blockBetween(): void;
   beginCenterBetween(mode?: 'center' | 'space'): void;
   beginGrab(): void;
   beginRotate(): void;
@@ -212,6 +214,13 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
         label,
         action: () => store.alignSelected(axis, mode),
       })),
+    });
+  if (store.selected.size === 2)
+    arrange.push({
+      label: 'Block between',
+      key: 'B',
+      icon: BetweenHorizontalStart,
+      action: () => scene.blockBetween(),
     });
   const grouping: MenuItem[] = [];
   if (store.selected.size > 1 && !store.selectedGroup())
