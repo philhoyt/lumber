@@ -1382,7 +1382,12 @@ export class LumberScene {
     if (hit) {
       const id = hit.object.userData.id as number;
       // A click takes the whole assembly; a double-click (below) narrows to the one part.
-      if (e.shiftKey || e.ctrlKey || e.metaKey) {
+      // Shift+click extends by the same rule; Ctrl+click toggles just the part under it.
+      if (e.ctrlKey || e.metaKey) {
+        this.store.toggleSelect(id);
+        return;
+      }
+      if (e.shiftKey) {
         this.store.toggleSelectMany(this.store.selectionForClick(id));
         return;
       }

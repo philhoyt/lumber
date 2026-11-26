@@ -83,7 +83,7 @@ test('dragging a field label scrubs its value as one undo step, and Escape rever
 test('several parts show Mixed and a relative edit changes each of them', async ({ page }) => {
   await openBench(page);
   await selectPart(page, 'Apron back');
-  await page.locator('.out-row', { hasText: 'Leg LF' }).click({ modifiers: ['Shift'] });
+  await page.locator('.out-row', { hasText: 'Leg LF' }).click({ modifiers: ['Control'] });
   await expect(page.locator('#stat')).toContainText('2 selected');
   const len = page.locator('#pLen');
   await expect(len).toHaveValue('');
@@ -121,7 +121,7 @@ test('the panel header names the selection and its actions work', async ({ page 
   await head.locator('#bDel').click();
   await expect(page.locator('#stat')).toContainText('12 parts');
   await page.locator('.out-row', { hasText: 'Apron back' }).click();
-  await page.locator('.out-row', { hasText: 'Leg LF' }).click({ modifiers: ['Shift'] });
+  await page.locator('.out-row', { hasText: 'Leg LF' }).click({ modifiers: ['Control'] });
   await expect(head).toContainText('2 parts');
   await expect(head.locator('#bGroup')).toBeVisible();
   await expect(page.locator('[data-align="0:min"]')).toBeVisible();
@@ -164,7 +164,7 @@ test('right-clicking a Parts-list row opens its menu', async ({ page }) => {
   await page.keyboard.press('Alt+h');
   // Two rows, then Group from the menu.
   await page.locator('.out-row', { hasText: 'Leg LF' }).click();
-  await page.locator('.out-row', { hasText: 'Leg RF' }).click({ modifiers: ['Shift'] });
+  await page.locator('.out-row', { hasText: 'Leg RF' }).click({ modifiers: ['Control'] });
   await page.locator('.out-row', { hasText: 'Leg RF' }).click({ button: 'right' });
   await expect(menu).toContainText('2 parts');
   await menu.getByText('Group', { exact: true }).click();
@@ -210,6 +210,21 @@ test('rows drag onto each other, into groups and back out', async ({ page }) => 
   await page.locator('#boards .stock', { hasText: '2x6' }).first().dragTo(group);
   await expect(group).toContainText('3 parts');
   await expect(page.locator('#stat')).toContainText('13 parts');
+});
+
+test('in the list, Ctrl+click toggles a row and Shift+click selects the run between', async ({
+  page,
+}) => {
+  await openBench(page);
+  await selectPart(page, 'Apron back');
+  await page.locator('.out-row', { hasText: 'Apron left' }).click({ modifiers: ['Control'] });
+  await expect(page.locator('#stat')).toContainText('2 selected');
+  await page.locator('.out-row', { hasText: 'Apron left' }).click({ modifiers: ['Control'] });
+  await expect(page.locator('#stat')).toContainText('1 selected');
+  // The run starts at the last plain click: Apron back .. Apron right are four rows.
+  await selectPart(page, 'Apron back');
+  await page.locator('.out-row', { hasText: 'Apron right' }).click({ modifiers: ['Shift'] });
+  await expect(page.locator('#stat')).toContainText('4 selected');
 });
 
 test('G moves by a typed distance along the constrained axis', async ({ page }) => {
@@ -319,7 +334,7 @@ test('assembly steps walk the build in the order the Part panel sets', async ({ 
     await rows
       .filter({ hasText: n })
       .first()
-      .click({ modifiers: ['Shift'] });
+      .click({ modifiers: ['Control'] });
   await expect(page.locator('#stat')).toContainText('4 selected');
   await page.locator('#pStep').fill('1');
   await page.locator('#pStep').press('Enter');

@@ -56,7 +56,8 @@ theme.
 | ----------------------------------- | ------------------------------------------------------------------------- |
 | Right-click                         | Menu with the actions for the part, selection or scene                    |
 | Right-click a row in the Parts list | Rename, frame, hide others, group and the rest for that part or group     |
-| Click, Shift+click, drag on empty   | Select, extend the selection, box select                                  |
+| Click, Shift+click, drag on empty   | Select (a group as one), extend by the same rule, box select              |
+| Ctrl+click                          | Toggle the one part under the pointer, even inside a group                |
 | A, Alt+A                            | Select all, select none                                                   |
 | G                                   | Grab: the selection follows the mouse on the floor plane                  |
 | X / Y / Z during a grab             | Move along that axis only; Shift+X / Y / Z: in the plane without it       |
@@ -109,7 +110,8 @@ Groups are assemblies: clicking any part in the view selects the whole
 group, double-click picks the single part, groups nest, and duplicating a
 whole group makes a new group. The Parts list shows groups as expandable
 nodes, then loose parts grouped by
-stock: click to select, Shift+click to extend, double-click (or F2) to rename,
+stock: click to select, Ctrl+click to toggle one, Shift+click to select the run of
+rows from the last click, double-click (or F2) to rename,
 drag a row onto a group to move the part into it, onto another loose part to group
 the two, or onto the list's background to take it out of its group (a group dragged
 onto another nests inside it); stock dragged from the palette onto the list is added,

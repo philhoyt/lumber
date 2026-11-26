@@ -8,7 +8,8 @@ const SECTIONS: [string, [string, string][]][] = [
     [
       ['Click', 'Select a part, or its whole assembly'],
       ['Double-click', 'Select just that part inside a group'],
-      ['Shift+click', 'Add or remove from the selection'],
+      ['Shift+click', 'Add or remove from the selection (a group as one)'],
+      ['Ctrl+click', 'Toggle the one part, even inside a group; in the list, Shift selects a run'],
       ['Drag on empty space', 'Box select (Shift adds)'],
       ['A / Alt+A', 'Select all / none'],
       ['Right-click', 'Menu for the selection or the scene'],

@@ -56,6 +56,8 @@ export class OutlinerPanel {
   onContextMenu: ((x: number, y: number, target: ListTarget) => void) | null = null;
   private filter = '';
   private renaming: Renaming = null;
+  /** The part row last clicked without Shift: where a Shift+click's run starts. */
+  private anchor: number | null = null;
   private collapsed = new Set<number>();
 
   constructor(
@@ -280,7 +282,12 @@ export class OutlinerPanel {
     el.append(name, size, eye);
     el.addEventListener('click', (e) => {
       if (p.hidden) return;
-      if (e.shiftKey || e.ctrlKey || e.metaKey) store.toggleSelect(p.id);
+      if (e.shiftKey && this.anchor !== null && this.anchor !== p.id) {
+        store.select(new Set([...store.selected, ...this.rowsBetween(this.anchor, p.id)]));
+        return;
+      }
+      this.anchor = p.id;
+      if (e.ctrlKey || e.metaKey || e.shiftKey) store.toggleSelect(p.id);
       else store.select([p.id]);
     });
     el.addEventListener('dblclick', () => this.startRename({ kind: 'part', id: p.id }));
@@ -320,6 +327,20 @@ export class OutlinerPanel {
       onClick();
     });
     return eye;
+  }
+
+  /** The visible part rows from one part to another, in the order the list shows them. */
+  private rowsBetween(fromId: number, toId: number): number[] {
+    const ids: number[] = [];
+    for (const el of this.body.querySelectorAll<HTMLElement>('.out-row:not(.group)')) {
+      const key = el.dataset.key ?? '';
+      if (!key.startsWith('p') || el.classList.contains('hidden-part')) continue;
+      ids.push(Number(key.slice(1)));
+    }
+    const a = ids.indexOf(fromId);
+    const b = ids.indexOf(toId);
+    if (a < 0 || b < 0) return [toId];
+    return ids.slice(Math.min(a, b), Math.max(a, b) + 1);
   }
 
   /** What a drop means: into a group (or none), or onto a part. */
