@@ -60,7 +60,8 @@ import {
   dominantAxis,
   sameArray,
 } from './arrayDrag';
-import type { ArrayParams } from './model';
+import type { ArrayParams, Quat } from './model';
+import { extentAlong, localAxisDir } from './frame';
 import { CameraRig, Z_UP, type Projection, type ViewName } from './view/camera';
 import { DimLabels } from './view/dimLabels';
 import { GapReadout } from './view/gapReadout';
@@ -86,6 +87,12 @@ interface Transform {
   constraint: Constraint | null;
   /** '' for the floor plane, 'x' | 'y' | 'z' for an axis, 'X' | 'Y' | 'Z' for a plane. */
   constraintKey: string;
+  /** The first selected part's orientation: what "local" axes mean for this transform. */
+  frame: Quat;
+  /** The constraint is in that frame (an axis key tapped twice, or a tilted gizmo). */
+  local: boolean;
+  /** Distance moved along a local axis so far, for the readout and a typed length. */
+  along: number;
   origin: THREE.Vector3;
   ids: Set<number>;
   startPos: Vec3[];
@@ -122,6 +129,8 @@ interface ArrayDrag {
   /** Signed drag distance along `axis`, snapped. */
   distance: number;
   axis: AxisIndex;
+  /** The source cell's size along each of its own axes, for a local array. */
+  extentLocal: Vec3;
 }
 
 interface SizeDrag {
@@ -630,7 +639,7 @@ export class LumberScene {
     const center = this.selectionCenter();
     const rotating = this.tf?.kind === 'rotate';
     const vh = center ? this.rig.viewHeightAt(center) : 0;
-    this.gizmo.update(rotating || this.lookOnly ? null : center, vh);
+    this.gizmo.update(rotating || this.lookOnly ? null : center, vh, this.gizmoFrame());
     this.rotateGizmo.update(rotating ? center : null, vh);
     const one = this.store.selectedParts();
     this.endHandles.update(
@@ -651,6 +660,12 @@ export class LumberScene {
     this.measureTool.update();
     this.gapReadout.update();
   };
+
+  /** The frame the gizmo draws in: a tilted first part's own; none for a square one. */
+  private gizmoFrame(): Quat | undefined {
+    const p = this.store.selectedParts()[0];
+    return p && !isSquare(p.q) ? p.q : undefined;
+  }
 
   private selectionCenter(): THREE.Vector3 | null {
     const list = this.store.selectedParts();
@@ -703,11 +718,11 @@ export class LumberScene {
       const axis = LABELS[ad.axis];
       if (t.typed) return `Array ${axis}: ${t.typed}▏  (a count, or a length to fill)`;
       if (!ad.applied)
-        return 'Array: drag along an axis (X / Y / Z locks it), or type a count or a length · Enter';
+        return "Array: drag along an axis (X / Y / Z locks it, twice for the part's own), or type a count or a length · Enter";
       const way = ad.distance < 0 ? '−' : '+';
-      return (
-        `Array ${way}${axis}: ${arrayText(ad.applied, ad.extent[ad.axis])}` + this.snapTargets(t)
-      );
+      const local = t.local ? 'Local ' : '';
+      const extent = t.local ? ad.extentLocal[ad.axis] : ad.extent[ad.axis];
+      return `Array ${local}${way}${axis}: ${arrayText(ad.applied, extent)}` + this.snapTargets(t);
     }
     if (t.kind === 'rotate') {
       if (t.typed) return `Rotate ${LABELS[t.rotAxis ?? UP]} ${t.typed}▏°`;
@@ -728,7 +743,10 @@ export class LumberScene {
     }
     const c = t.constraint;
     const plane = c?.kind === 'plane' && t.constraintKey ? `Shift+${t.constraintKey} ` : '';
-    if (t.typed) return `${plane}${LABELS[this.typedAxis(t)]} ${t.typed}▏`;
+    const local = t.local ? 'Local ' : '';
+    if (t.typed) return `${plane}${local}${LABELS[this.typedAxis(t)]} ${t.typed}▏`;
+    if (t.local && c?.kind === 'axis')
+      return `${local}${LABELS[c.axis]} ${t.along >= 0 ? '+' : ''}${fmt(t.along)}${this.snapTargets(t)}`;
     const axes = c?.kind === 'axis' ? [c.axis] : (c?.axes ?? []);
     return (
       plane +
@@ -995,6 +1013,9 @@ export class LumberScene {
       modal,
       constraint: null,
       constraintKey: '',
+      frame: list[0]!.q,
+      local: false,
+      along: 0,
       origin: new THREE.Vector3().fromArray(aabbCenter(aabb)),
       ids,
       startPos: list.map((p) => [...p.pos] as Vec3),
@@ -1085,7 +1106,11 @@ export class LumberScene {
     };
     if (reverse) params.reverse = true;
     const size = t.aabb.max.map((v, i) => v - t.aabb.min[i]!) as Vec3;
-    t.array = { base: params, extent: size, applied: null, distance: 0, axis: 0 };
+    const cell = this.store.selectedParts();
+    const extentLocal = ([0, 1, 2] as AxisIndex[]).map((a) =>
+      extentAlong(cell, localAxisDir(t.frame, a)),
+    ) as Vec3;
+    t.array = { base: params, extent: size, applied: null, distance: 0, axis: 0, extentLocal };
     this.store.beginCoalesce();
     this.setConstraint('');
   }
@@ -1202,26 +1227,23 @@ export class LumberScene {
    * 'X' | 'Y' | 'Z' the plane without that axis. The reference is set so the parts stay
    * where they are at the moment of the change.
    */
-  private setConstraint(key: string): void {
+  private setConstraint(key: string, local = false): void {
     const t = this.tf;
     if (t?.kind !== 'grab' && t?.kind !== 'array') return;
     const ray = this.currentRay();
     const delta = new THREE.Vector3().fromArray(t.delta);
+    const axisDir = (a: AxisIndex) => (local ? localAxisDir(t.frame, a) : Gizmo.axisDir(a));
     if (key !== '' && key === key.toLowerCase()) {
       const axis = AXIS_NAMES.indexOf(key as 'x' | 'y' | 'z') as AxisIndex;
-      const dir = Gizmo.axisDir(axis);
-      t.constraint = {
-        kind: 'axis',
-        axis,
-        dir,
-        ref: axisParam(t.origin, dir, ray) - t.delta[axis],
-      };
+      const dir = axisDir(axis);
+      t.along = delta.dot(dir);
+      t.constraint = { kind: 'axis', axis, dir, ref: axisParam(t.origin, dir, ray) - t.along };
     } else {
       const normal: AxisIndex = key
         ? (AXIS_NAMES.indexOf(key.toLowerCase() as 'x' | 'y' | 'z') as AxisIndex)
         : UP;
       const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(
-        Gizmo.axisDir(normal),
+        axisDir(normal),
         t.origin.clone().add(delta),
       );
       const pt = new THREE.Vector3();
@@ -1230,6 +1252,7 @@ export class LumberScene {
       t.constraint = { kind: 'plane', axes, plane, ref: pt.sub(delta) };
     }
     t.constraintKey = key;
+    t.local = local && key !== '';
   }
 
   private rawDelta(t: Transform): Vec3 | null {
@@ -1237,10 +1260,18 @@ export class LumberScene {
     if (!c) return null;
     const ray = this.currentRay();
     const raw: Vec3 = [0, 0, 0];
-    if (c.kind === 'axis') raw[c.axis] = axisParam(t.origin, c.dir, ray) - c.ref;
-    else {
+    if (c.kind === 'axis') {
+      const s = axisParam(t.origin, c.dir, ray) - c.ref;
+      if (t.local) {
+        // Along the frame's axis: the move is that far along the axis's world direction.
+        t.along = s;
+        return c.dir.clone().multiplyScalar(s).toArray();
+      }
+      raw[c.axis] = s;
+    } else {
       const pt = new THREE.Vector3();
       if (!ray.intersectPlane(c.plane, pt)) return null;
+      if (t.local) return pt.clone().sub(c.ref).toArray();
       for (const a of c.axes) raw[a] = pt.getComponent(a) - c.ref.getComponent(a);
     }
     return raw;
@@ -1269,6 +1300,12 @@ export class LumberScene {
       this.updateArray(t, raw, axes);
       return;
     }
+    if (t.local) {
+      this.applyDelta(raw);
+      t.snaps = [];
+      this.snapFx.hide();
+      return;
+    }
     t.snaps = snapWithHits(t.aabb, raw, axes, t.others, this.store.settings).hits;
     this.applyDelta(raw);
     const moved: AABB = {
@@ -1282,6 +1319,22 @@ export class LumberScene {
   private updateArray(t: Transform, raw: Vec3, axes: readonly AxisIndex[]): void {
     const ad = t.array;
     if (!ad) return;
+    if (t.local && t.constraint?.kind === 'axis') {
+      // Along the cell's own axis: no face snapping, the distance is the drag along it.
+      const axis = t.constraint.axis;
+      t.delta = raw;
+      t.snaps = [];
+      this.snapFx.hide();
+      ad.axis = axis;
+      ad.distance = t.along;
+      const base: ArrayParams = { ...ad.base, local: true };
+      const params = arrayFromDrag(base, AXIS_NAMES[axis]!, ad.extentLocal[axis], t.along, false);
+      if (!sameArray(params, ad.applied)) {
+        ad.applied = params;
+        this.store.setArray(params);
+      }
+      return;
+    }
     const axis = axes.length === 1 ? axes[0]! : dominantAxis(raw, axes);
     const d: Vec3 = [0, 0, 0];
     d[axis] = raw[axis];
@@ -1306,11 +1359,13 @@ export class LumberScene {
     const ad = t.array;
     if (!ad) return;
     const axis = AXIS_NAMES[ad.axis]!;
+    const local = t.local && t.constraint?.kind === 'axis';
+    const base: ArrayParams = local ? { ...ad.base, local: true } : ad.base;
+    const extent = local ? ad.extentLocal[ad.axis] : ad.extent[ad.axis];
     let params: ArrayParams | null = null;
-    if (commit && t.typed) params = arrayFromTyped(ad.base, axis, t.typed, ad.distance < 0);
-    else if (commit && ad.applied)
-      params = arrayFromDrag(ad.base, axis, ad.extent[ad.axis], ad.distance, true);
-    if (params && arrayCount(params, ad.extent[ad.axis]) > 1) {
+    if (commit && t.typed) params = arrayFromTyped(base, axis, t.typed, ad.distance < 0);
+    else if (commit && ad.applied) params = arrayFromDrag(base, axis, extent, ad.distance, true);
+    if (params && arrayCount(params, extent) > 1) {
       this.store.setArray(params);
       this.store.endCoalesce();
     } else {
@@ -1335,7 +1390,10 @@ export class LumberScene {
       if (v !== null) {
         const axis = this.typedAxis(t);
         const d: Vec3 = [0, 0, 0];
-        d[axis] = (t.delta[axis] < 0 ? -1 : 1) * v;
+        if (t.local && t.constraint?.kind === 'axis') {
+          const s = (t.along < 0 ? -1 : 1) * v;
+          t.constraint.dir.clone().multiplyScalar(s).toArray(d);
+        } else d[axis] = (t.delta[axis] < 0 ? -1 : 1) * v;
         t.moved = true;
         this.applyDelta(d);
       }
@@ -1444,8 +1502,13 @@ export class LumberScene {
     if (gh && center) {
       const t = this.startTransform('grab', false);
       if (!t) return;
-      if (gh.handle.kind === 'axis') this.setConstraint(AXIS_NAMES[gh.handle.axis]!);
-      else this.setConstraint(AXIS_NAMES[3 - gh.handle.axes[0] - gh.handle.axes[1]]!.toUpperCase());
+      const local = this.gizmoFrame() !== undefined;
+      if (gh.handle.kind === 'axis') this.setConstraint(AXIS_NAMES[gh.handle.axis]!, local);
+      else
+        this.setConstraint(
+          AXIS_NAMES[3 - gh.handle.axes[0] - gh.handle.axes[1]]!.toUpperCase(),
+          local,
+        );
       this.capture(e);
       return;
     }
@@ -1608,8 +1671,11 @@ export class LumberScene {
       (t.kind === 'grab' || t.kind === 'array') &&
       (lower === 'x' || lower === 'y' || lower === 'z')
     ) {
+      // The same axis key again goes from the world axis to the part's own, then off.
       const key = e.shiftKey && t.kind === 'grab' ? lower.toUpperCase() : lower;
-      this.setConstraint(key === t.constraintKey ? '' : key);
+      if (key !== t.constraintKey) this.setConstraint(key);
+      else if (key === lower && !t.local) this.setConstraint(key, true);
+      else this.setConstraint('');
       this.updateGrab();
     } else if (t.kind === 'rotate' && (lower === 'x' || lower === 'y' || lower === 'z')) {
       // An angle typed before the axis turns by it; otherwise a quarter turn.

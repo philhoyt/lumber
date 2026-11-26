@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arrayLayout } from './model';
+import { arrayLayout, quatFromEuler } from './model';
 import { parseDocument, Store } from './store';
 
 describe('arrayLayout', () => {
@@ -47,6 +47,24 @@ describe('array modifier', () => {
     const s = slat();
     s.setArray({ axis: 'y', count: 3, spacing: 1.5, mode: 'gap', reverse: true });
     expect(s.parts.map((p) => p.pos[1])).toEqual([0, -5, -10]);
+  });
+
+  it("runs along the source part's own axis when local", () => {
+    const s = new Store();
+    const p = s.addPart('2x4');
+    const q = quatFromEuler([-40, 0, 0]); // width tilted: local Y runs up a slope
+    s.mutate(() => (p.q = q));
+    s.setArray({ axis: 'y', count: 3, spacing: 10, mode: 'center', local: true });
+    const c = Math.cos((40 * Math.PI) / 180);
+    const sn = Math.sin((40 * Math.PI) / 180);
+    const ys = s.parts.map((x) => x.pos[1]);
+    const zs = s.parts.map((x) => x.pos[2]);
+    expect(ys[1]! - ys[0]!).toBeCloseTo(10 * c);
+    expect(zs[1]! - zs[0]!).toBeCloseTo(-10 * sn);
+    expect(ys[2]! - ys[0]!).toBeCloseTo(20 * c);
+    // Gap spacing measures the cell along that same axis: 3 1/2 wide plus the gap.
+    s.setArray({ axis: 'y', count: 2, spacing: 1, mode: 'gap', local: true });
+    expect(s.parts[1]!.pos[1] - s.parts[0]!.pos[1]).toBeCloseTo(4.5 * c);
   });
 
   it('regenerates when the parameters or the source change', () => {

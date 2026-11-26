@@ -466,6 +466,8 @@ export class PropsPanel {
         value,
         'How the spacing is measured',
       );
+    const localChk = (on: boolean) =>
+      `<label class="switch small" title="Along the source part's own length, width or thickness: up a slope, say"><input type="checkbox" id="arrLocal"${on ? ' checked' : ''}> Along the part's own axes</label>`;
     let array: string;
     let arrayCount = '';
     if (arr && group) {
@@ -486,12 +488,14 @@ export class PropsPanel {
             : `<input type="number" id="arrN" value="${arr.count ?? 2}" min="1" step="1">`
         }</div>
         <div><label class="small">${modeSel(arr.mode)}</label><input type="text" class="len" data-min="0" id="arrS" value="${fmt(arr.spacing)}"></div></div>
+      ${localChk(!!arr.local)}
       <div class="row btns"><button id="bApplyArr" title="Keep the copies as ordinary parts">Apply</button><button id="bRemoveArr" class="danger" title="Drop the copies, keep the source">Remove array</button></div>`;
     } else {
       array = `<div class="row"><div><label class="small">Along</label>${axisSel('x')}</div>
         <div><label class="small">Count</label><input type="number" id="arrN" value="4" min="1" step="1"></div>
         <div><label class="small">${modeSel('center')}</label><input type="text" class="len" data-min="0" id="arrS" value="16"></div><div class="grow0"><button id="bArr" class="primary" title="Make a live array you can keep adjusting; Shift+R in the view drags one out instead">Array</button></div></div>
-        <div class="muted note">Or press Shift+R and drag in the view: copies fill toward the pointer at this spacing.</div>`;
+        ${localChk(false)}
+        <div class="muted note">Or press Shift+R and drag in the view: copies fill toward the pointer at this spacing; tap the axis key twice for the part's own axis.</div>`;
     }
 
     // ---- Header: what is selected, and what you can do with it ----
@@ -557,6 +561,7 @@ export class PropsPanel {
       const how = el.querySelector<HTMLSelectElement>('#arrHow')?.value ?? 'count';
       const params: ArrayParams = { axis, mode, spacing };
       if (along.startsWith('-')) params.reverse = true;
+      if (el.querySelector<HTMLInputElement>('#arrLocal')?.checked) params.local = true;
       if (how === 'fit') {
         const fit = el.querySelector<HTMLInputElement>('#arrFit');
         params.fit = fit ? (parseLen(fit.value) ?? 48) : (arr?.fit ?? 48);
@@ -567,7 +572,7 @@ export class PropsPanel {
       return params;
     };
     if (arr && group) {
-      for (const id of ['arrAxis', 'arrHow', 'arrMode', 'arrS', 'arrN', 'arrFit'])
+      for (const id of ['arrAxis', 'arrHow', 'arrMode', 'arrS', 'arrN', 'arrFit', 'arrLocal'])
         onChange(el, id, () => store.setArray(readArray()));
       onClick(el, 'bApplyArr', () => store.applyArray(group.id));
       onClick(el, 'bRemoveArr', () => store.removeArray(group.id));

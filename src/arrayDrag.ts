@@ -30,6 +30,7 @@ export function arrayFromDrag(
   final: boolean,
 ): ArrayParams {
   const p: ArrayParams = { axis, mode: base.mode, spacing: base.spacing };
+  if (base.local) p.local = true;
   if (distance < 0) p.reverse = true;
   if (final) p.fit = Math.round((Math.abs(distance) + extent) * 64) / 64;
   else p.count = dragCount(arrayLayout(p, extent).step, distance);
@@ -44,6 +45,7 @@ export function arrayFromTyped(
   reverse: boolean,
 ): ArrayParams | null {
   const p: ArrayParams = { axis, mode: base.mode, spacing: base.spacing };
+  if (base.local) p.local = true;
   if (reverse) p.reverse = true;
   const t = text.trim();
   if (/^\d+$/.test(t)) {

@@ -24,7 +24,7 @@ const SECTIONS: [string, [string, string][]][] = [
     'Transform',
     [
       ['G', 'Grab: follows the mouse on the floor'],
-      ['X / Y / Z while grabbing', 'Move along one axis'],
+      ['X / Y / Z while grabbing', "Move along one axis; again for the part's own axis"],
       ['Shift+X / Y / Z', 'Move in the plane without that axis'],
       ['Type a length, Enter', "Move exactly that far (16, 3/4, 2'6, 48 - 3/4)"],
       [
@@ -40,7 +40,10 @@ const SECTIONS: [string, [string, string][]][] = [
         'Shift+R, then drag',
         'Array: copies fill toward the pointer at the Part panel spacing (16" o.c.); Enter',
       ],
-      ['X / Y / Z while arraying', 'Lock the axis; type a count, or a length to fill'],
+      [
+        'X / Y / Z while arraying',
+        "Lock the axis (twice: the part's own); type a count or a length",
+      ],
       ["Drag a handle at a part's end", 'Pull that end to meet another part; it snaps to faces'],
       [
         'Fit end A / B (Part panel)',

@@ -301,6 +301,8 @@ export interface ArrayParams {
   spacing: number;
   /** Copies run toward −axis instead of +axis. */
   reverse?: boolean;
+  /** The axis is the source part's own (its length, width or thickness), not the world's. */
+  local?: boolean;
   mode: 'center' | 'gap';
 }
 

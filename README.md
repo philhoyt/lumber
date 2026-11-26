@@ -70,6 +70,7 @@ theme.
 | Fit end A / B (Part panel)          | Cut the end to meet what it points at: miter, bevel and length            |
 | Shift+A                             | Add stock at the pointer                                                  |
 | Shift+D                             | Duplicate and grab the copy; Ctrl+D duplicates with an offset             |
+| X / Y / Z twice while grabbing      | Move along the part's own axis; the gizmo turns with a tilted part        |
 | Shift+R, then drag                  | Array: copies fill toward the pointer, 16" o.c. or the panel's spacing    |
 | X / Y / Z while arraying            | Lock the axis; type a count, or a length to fill; Enter or click keeps it |
 | Array (Part panel)                  | The live array's direction, count or span, spacing and mode; Apply bakes  |

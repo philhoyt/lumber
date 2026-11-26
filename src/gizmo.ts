@@ -4,7 +4,7 @@
  * that axis only; dragging a square moves in that plane.
  */
 import * as THREE from 'three';
-import { partDims, type Part } from './model';
+import { partDims, type Part, type Quat } from './model';
 
 export type AxisIndex = 0 | 1 | 2;
 export type Handle =
@@ -194,14 +194,20 @@ export class Gizmo {
     return AXIS_DIRS[axis].clone();
   }
 
-  /** Place the gizmo and size it to a fraction of `viewHeight`, the world height on screen. */
-  update(origin: THREE.Vector3 | null, viewHeight: number): void {
+  /**
+   * Place the gizmo and size it to a fraction of `viewHeight`, the world height on
+   * screen. With `frame`, its arrows point along that orientation's axes instead of
+   * the world's, so a tilted part drags along its own length and width.
+   */
+  update(origin: THREE.Vector3 | null, viewHeight: number, frame?: Quat): void {
     if (!origin) {
       this.group.visible = false;
       return;
     }
     this.group.visible = true;
     this.group.position.copy(origin);
+    if (frame) this.group.quaternion.fromArray(frame);
+    else this.group.quaternion.identity();
     const s = viewHeight * 0.17;
     this.group.scale.set(s, s, s);
   }

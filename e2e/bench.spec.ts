@@ -3,6 +3,7 @@
  * because they live in the scene, the panels and the keyboard wiring together.
  */
 import { expect, test, type Page } from '@playwright/test';
+import { parseLen } from '../src/units';
 
 /** Open a fresh app (no saved projects) showing the sample bench. */
 async function openBench(page: Page): Promise<void> {
@@ -260,6 +261,31 @@ test('Shift+C spaces the selection evenly between two parts', async ({ page }) =
   await expect(page.locator('#pY')).toHaveValue('-3 13/16');
   await page.locator('#bUndo').click();
   await expect(page.locator('#pY')).toHaveValue('-12');
+});
+
+test("tapping an axis key twice moves along the part's own axis", async ({ page }) => {
+  await openBench(page);
+  // Apron right runs along Y: its own X axis is the world Y.
+  await selectPart(page, 'Apron right');
+  const read = async (id: string) => parseLen(await page.locator(id).inputValue())!;
+  const x0 = await read('#pX');
+  const y0 = await read('#pY');
+  await hoverView(page);
+  await page.keyboard.press('g');
+  await page.keyboard.press('x');
+  await page.keyboard.press('x');
+  await expect(page.locator('.drag-label')).toContainText('Local X');
+  await page.keyboard.type('10');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => read('#pY')).toBeCloseTo(y0 + 10, 3);
+  expect(await read('#pX')).toBeCloseTo(x0, 3);
+  // A third tap goes back to the free floor plane.
+  await page.keyboard.press('g');
+  await page.keyboard.press('y');
+  await page.keyboard.press('y');
+  await page.keyboard.press('y');
+  await expect(page.locator('.drag-label')).not.toContainText('Local');
+  await page.keyboard.press('Escape');
 });
 
 test('G moves by a typed distance along the constrained axis', async ({ page }) => {

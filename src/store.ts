@@ -6,6 +6,7 @@
 import { normalizeStep } from './assembly';
 import { applyFit, fitEnd, type EndFit } from './fit';
 import { centerBetween, spaceBetween, type SpaceUnit } from './gap';
+import { extentAlong, localAxisDir } from './frame';
 import { cloneStock, DEFAULT_STOCK, getStock, sanitizeStock, setStock, type Stock } from './stock';
 import { clampFastener, isFace, isFastenerKind, type Fastener } from './fastener';
 import {
@@ -421,10 +422,17 @@ export class Store {
       for (const p of this.parts) if (p.group === g.id && p.arrayIndex) this.selected.delete(p.id);
       this.parts = this.parts.filter((p) => p.group !== g.id || !p.arrayIndex);
       const a = AXIS_INDEX[g.array.axis];
-      const { step, count } = arrayLayout(g.array, aabbSize(unionAABB(source))[a]);
+      // The copies run along a world axis, or along the source's own axis (up a slope).
+      const dir: Vec3 = g.array.local
+        ? localAxisDir(source[0]!.q, a).toArray()
+        : [a === 0 ? 1 : 0, a === 1 ? 1 : 0, a === 2 ? 1 : 0];
+      const extent = g.array.local
+        ? extentAlong(source, localAxisDir(source[0]!.q, a))
+        : aabbSize(unionAABB(source))[a];
+      const { step, count } = arrayLayout(g.array, extent);
       for (let i = 1; i < count; i++) {
-        const offset: Vec3 = [0, 0, 0];
-        offset[a] = g.array.reverse ? -step * i : step * i;
+        const along = g.array.reverse ? -step * i : step * i;
+        const offset: Vec3 = [dir[0] * along, dir[1] * along, dir[2] * along];
         for (const s of source) {
           const c = clonePart(s, this.nextId++, offset);
           c.name = `${s.name} ${i + 1}`;
