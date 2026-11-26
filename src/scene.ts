@@ -63,6 +63,7 @@ import {
 import type { ArrayParams } from './model';
 import { CameraRig, Z_UP, type Projection, type ViewName } from './view/camera';
 import { DimLabels } from './view/dimLabels';
+import { GapReadout } from './view/gapReadout';
 import { FastenMode } from './view/fastenMode';
 import { toScreen } from './view/labels';
 import { MeasureTool } from './view/measureTool';
@@ -228,6 +229,9 @@ export class LumberScene {
   private readonly dims: DimLabels;
   private readonly snapFx: SnapFeedback;
   private readonly measureTool: MeasureTool;
+  private readonly gapReadout: GapReadout;
+  /** Alt is held: hovering another part shows the distance from the selection to it. */
+  private altHeld = false;
   private readonly fastenMode: FastenMode;
   /** E: how far the view is exploded, 0..1. Parts draw displaced; the model stays put. */
   explode = 0;
@@ -285,6 +289,18 @@ export class LumberScene {
     this.dims = new DimLabels(this.rig, this.scene);
     this.snapFx = new SnapFeedback(this.scene);
     this.measureTool = new MeasureTool(this.rig, this.scene);
+    this.gapReadout = new GapReadout(this.rig, this.scene);
+    const alt = (e: KeyboardEvent) => {
+      if (e.key !== 'Alt' || e.altKey === this.altHeld) return;
+      this.altHeld = e.altKey;
+      this.updateGap();
+    };
+    window.addEventListener('keydown', alt);
+    window.addEventListener('keyup', alt);
+    window.addEventListener('blur', () => {
+      this.altHeld = false;
+      this.updateGap();
+    });
     this.fastenMode = new FastenMode(this.scene, container, store, {
       pick: (x, y) => {
         this.setRay(x, y);
@@ -314,6 +330,7 @@ export class LumberScene {
 
     store.subscribe((kind) => {
       if (kind === 'model' || kind === 'selection') this.syncAll();
+      if (kind === 'selection') this.updateGap();
     });
     this.syncAll();
     this.animate();
@@ -523,6 +540,18 @@ export class LumberScene {
       const g = pid === null ? undefined : this.meshes.get(pid);
       if (p && g) this.applyState(g, p);
     }
+    this.updateGap();
+  }
+
+  /** With Alt held, the distance from the selection to the hovered part. */
+  private updateGap(): void {
+    const p = this.hoverId === null ? undefined : this.store.partById(this.hoverId);
+    const sel = this.store.selectedParts();
+    if (!this.altHeld || !p || !sel.length || this.store.selected.has(p.id) || this.tf) {
+      this.gapReadout.hide();
+      return;
+    }
+    this.gapReadout.show(this.displayBounds(sel), this.displayAABB(p));
   }
   /** Markers are real size, but never shrink below a few pixels on screen. */
   private scaleMarkers(): void {
@@ -569,6 +598,7 @@ export class LumberScene {
     this.updateLabels();
     this.dims.update(this.store);
     this.measureTool.update();
+    this.gapReadout.update();
   };
 
   private selectionCenter(): THREE.Vector3 | null {
@@ -1389,6 +1419,10 @@ export class LumberScene {
   private onPointerMove(e: PointerEvent): void {
     this.lastPointer = [e.clientX, e.clientY];
     this.fine = e.ctrlKey || e.metaKey;
+    if (e.altKey !== this.altHeld) {
+      this.altHeld = e.altKey;
+      this.updateGap();
+    }
     const t = this.tf;
     if (t) {
       if (t.kind === 'rotate') {

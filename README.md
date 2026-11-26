@@ -95,6 +95,7 @@ theme.
 | Numpad . , Home                     | Frame the selection, fit the model                                        |
 | D                                   | Dimension labels on each part and the selection's W × D × H               |
 | M                                   | Measure: click two points (snaps to corners, edges, faces); Esc           |
+| Alt + hover another part            | Distance from the selection to it: the gap, on centre, and straight line  |
 | N, T, Tab                           | Toggle the side panel, the palette, both                                  |
 | Drag the view's edges               | Resize the palette and side panel; double-click resets; remembered        |
 | Up / Down in a length field         | Step by the grid; Shift 1", Ctrl 1/16"                                    |

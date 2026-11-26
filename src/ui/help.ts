@@ -43,6 +43,7 @@ const SECTIONS: [string, [string, string][]][] = [
       ],
       ['Enter / click · Esc / right-click', 'Confirm · cancel'],
       ['Arrows, PgUp / PgDn', 'Nudge by the grid step'],
+      ['Alt + hover another part', 'Distance from the selection to it: gap, on centre, straight'],
       ['Alt+G', 'Drop onto the floor or the parts below'],
       ['Ctrl+M then X / Y / Z', 'Mirror across that axis through the centre'],
     ],

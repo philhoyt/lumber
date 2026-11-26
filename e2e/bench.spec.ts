@@ -178,6 +178,21 @@ test('right-clicking a Parts-list row opens its menu', async ({ page }) => {
   await expect(page.locator('.out-row.group')).toHaveCount(0);
 });
 
+test('Alt + hover shows the distance from the selection to another part', async ({ page }) => {
+  await openBench(page);
+  await selectPart(page, 'Leg LF');
+  // The outliner's hover reaches the view too, so Alt + hovering a row works as well.
+  await page.keyboard.down('Alt');
+  await page.locator('.out-row', { hasText: 'Leg RF' }).hover();
+  const label = page.locator('.gap-label');
+  await expect(label).toBeVisible();
+  // The front legs stand 46 1/2" apart on centre and are 1 1/2" thick along X.
+  await expect(label).toContainText('Gap X 45"');
+  await expect(label).toContainText('46 1/2" o.c.');
+  await page.keyboard.up('Alt');
+  await expect(label).toBeHidden();
+});
+
 test('G moves by a typed distance along the constrained axis', async ({ page }) => {
   await openBench(page);
   await selectPart(page, 'Leg LF');

@@ -578,6 +578,9 @@ footer .saved.warn {
   border: 1px solid var(--line);
   opacity: 0.9;
 }
+.gap-label {
+  z-index: 3;
+}
 .dim-label.extent {
   background: #ffd27a;
   color: #1b1c1f;
