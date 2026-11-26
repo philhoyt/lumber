@@ -93,6 +93,7 @@ theme.
 | D                                  | Dimension labels on each part and the selection's W × D × H               |
 | M                                  | Measure: click two points (snaps to corners, edges, faces); Esc           |
 | N, T, Tab                          | Toggle the side panel, the palette, both                                  |
+| Drag the view's edges              | Resize the palette and side panel; double-click resets; remembered        |
 | Up / Down in a length field        | Step by the grid; Shift 1", Ctrl 1/16"                                    |
 | Arithmetic in a length field       | 48 - 3/4, (96 - 2 * 1.5) / 3, 2 ft + 3 1/2; a spaced slash divides        |
 | Arrows, PgUp / PgDn                | Nudge by the grid step                                                    |

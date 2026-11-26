@@ -1438,3 +1438,44 @@ svg.drawing text {
 .nav-gizmo button.dragging {
   cursor: grabbing;
 }
+
+/* ---- panel splitters: drag the view's edges to resize the palette and side panel ---- */
+.splitter {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  z-index: 6;
+  cursor: col-resize;
+  touch-action: none;
+}
+.splitter.left {
+  left: 0;
+}
+.splitter.right {
+  right: 0;
+}
+.splitter::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.splitter.left::after {
+  left: 0;
+}
+.splitter.right::after {
+  right: 0;
+}
+.splitter:hover::after,
+.splitter.dragging::after {
+  opacity: 0.9;
+}
+#app.no-palette .splitter.left,
+#app.no-side .splitter.right {
+  display: none;
+}

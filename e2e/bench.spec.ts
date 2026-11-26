@@ -334,3 +334,25 @@ test('bevels reach the cut list, and Fit end cuts a tilted leg to sit on the flo
   await expect(page.locator('#pMiterB')).toHaveValue('-15');
   await expect(page.locator('#pZ')).toHaveValue('0');
 });
+
+test('the panels resize by dragging the view edges and remember it', async ({ page }) => {
+  await openBench(page);
+  const side = page.locator('#side');
+  const before = (await side.boundingBox())!.width;
+  expect(Math.round(before)).toBe(340);
+  const bar = page.locator('.splitter.right');
+  const b = (await bar.boundingBox())!;
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width / 2 - 120, b.y + b.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await expect.poll(async () => Math.round((await side.boundingBox())!.width)).toBe(460);
+  await page.reload();
+  await expect(page.locator('#stat')).toContainText('12 parts');
+  expect(Math.round((await side.boundingBox())!.width)).toBe(460);
+  await bar.dblclick();
+  await expect.poll(async () => Math.round((await side.boundingBox())!.width)).toBe(340);
+  // The palette's splitter goes away with the palette.
+  await page.keyboard.press('t');
+  await expect(page.locator('.splitter.left')).toBeHidden();
+});

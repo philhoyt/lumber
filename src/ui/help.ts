@@ -54,6 +54,7 @@ const SECTIONS: [string, [string, string][]][] = [
       ['Ctrl+Z / Ctrl+Shift+Z', 'Undo / redo'],
       ['Ctrl+S / Ctrl+O', 'Save / open'],
       ['Up / Down in a length field', 'Step by the grid; Shift 1", Ctrl 1/16"'],
+      ["Drag the view's edges", 'Resize the palette and side panel; double-click resets'],
       ['Arithmetic in a length field', '48 - 3/4, (96 - 2 * 1.5) / 3, 2 ft + 3 1/2'],
     ],
   ],
