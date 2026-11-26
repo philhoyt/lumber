@@ -55,6 +55,31 @@ test('selecting a part shows its length, and the field takes arithmetic', async 
   await expect(page.locator('#pLen')).toHaveValue('33 1/4');
 });
 
+test('dragging a field label scrubs its value as one undo step, and Escape reverts', async ({
+  page,
+}) => {
+  await openBench(page);
+  await selectPart(page, 'Apron back');
+  const len = page.locator('#pLen');
+  await expect(len).toHaveValue('45');
+  const label = page.locator('label[for="pLen"], label:has(+ #pLen)').first();
+  const b = (await label.boundingBox())!;
+  await page.mouse.move(b.x + 8, b.y + b.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b.x + 48, b.y + b.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect(len).toHaveValue('50');
+  await page.locator('#bUndo').click();
+  await expect(page.locator('#pLen')).toHaveValue('45');
+  await expect(page.locator('#bUndo')).toBeDisabled();
+  // Escape puts back what the field held and leaves it without applying.
+  await page.locator('#pLen').fill('99');
+  await page.locator('#pLen').press('Escape');
+  await expect(page.locator('#pLen')).toHaveValue('45');
+  await expect(page.locator('#pLen')).not.toBeFocused();
+  await expect(page.locator('.out-row', { hasText: 'Apron back' })).toContainText('45"');
+});
+
 test('G moves by a typed distance along the constrained axis', async ({ page }) => {
   await openBench(page);
   await selectPart(page, 'Leg LF');

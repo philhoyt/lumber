@@ -120,8 +120,25 @@ export class Store {
     );
     this.notify('model');
   }
+  private coalescing: string | null = null;
+  /**
+   * Fold the changes until `endCoalesce` into one undo step: a scrub or a held arrow
+   * key makes many small mutates that should undo together.
+   */
+  beginCoalesce(): void {
+    this.coalescing ??= this.snapshot();
+  }
+  endCoalesce(): void {
+    const before = this.coalescing;
+    this.coalescing = null;
+    if (before !== null && before !== this.snapshot()) this.commit(before);
+  }
   /** Record `before` as the undo point for a change that has already been applied. */
   commit(before: string): void {
+    if (this.coalescing !== null) {
+      this.notify('model');
+      return;
+    }
     this.undoStack.push(before);
     if (this.undoStack.length > 200) this.undoStack.shift();
     this.redoStack = [];

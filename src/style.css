@@ -813,6 +813,17 @@ label.small {
   display: block;
   margin-bottom: 2px;
 }
+/* A label that drives a field scrubs it: drag left or right to slide the value. */
+label.small:has(+ input[type='text']),
+label.small:has(+ input[type='number']) {
+  cursor: ew-resize;
+  user-select: none;
+}
+body.scrubbing,
+body.scrubbing * {
+  cursor: ew-resize !important;
+  user-select: none;
+}
 label.small select.inline {
   font: inherit;
   font-size: 11px;

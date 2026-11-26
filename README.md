@@ -95,6 +95,8 @@ theme.
 | N, T, Tab                          | Toggle the side panel, the palette, both                                  |
 | Drag the view's edges              | Resize the palette and side panel; double-click resets; remembered        |
 | Up / Down in a length field        | Step by the grid; Shift 1", Ctrl 1/16"                                    |
+| Drag a field's label               | Scrub the value with the same steps; Alt-drag the field itself            |
+| Esc in a field                     | Put back the value it had and leave the field                             |
 | Arithmetic in a length field       | 48 - 3/4, (96 - 2 * 1.5) / 3, 2 ft + 3 1/2; a spaced slash divides        |
 | Arrows, PgUp / PgDn                | Nudge by the grid step                                                    |
 
