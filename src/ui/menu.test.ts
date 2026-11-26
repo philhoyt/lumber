@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Store } from '../store';
-import { buildMenu, menuTitle, type MenuActions } from './menu';
+import { buildListMenu, buildMenu, menuTitle, type MenuActions } from './menu';
 
 const actions = (): MenuActions => ({
   beginArray: vi.fn(),
@@ -71,5 +71,49 @@ describe('buildMenu', () => {
     store.addPart('2x6');
     store.selectAll();
     expect(menuTitle(store)).toBe('2 parts');
+  });
+});
+
+describe('buildListMenu', () => {
+  const list = () => ({ rename: vi.fn() });
+  it('leads with the row actions, then the selection actions, without the scene tail', () => {
+    const store = new Store();
+    store.addPart('2x4');
+    store.addPart('2x4');
+    store.select([1]);
+    const l = list();
+    const m = buildListMenu({ kind: 'part', id: 1 }, store, actions(), l);
+    expect(labels(m)[0]).toEqual(['Rename', 'Frame in view', 'Hide others']);
+    expect(labels(m).at(-1)).toEqual(['Hide', 'Delete']);
+    expect(labels(m).flat()).not.toContain('Add stock');
+    m[0]![0]!.action!();
+    expect(l.rename).toHaveBeenCalled();
+    m[0]![2]!.action!();
+    expect(store.parts.map((p) => !!p.hidden)).toEqual([false, true]);
+  });
+  it('offers the group for a part inside one, and Ungroup for the group row', () => {
+    const store = new Store();
+    store.addPart('2x4');
+    store.addPart('2x4');
+    store.selectAll();
+    const g = store.groupSelected()!;
+    store.select([1]);
+    const m = buildListMenu({ kind: 'part', id: 1 }, store, actions(), list());
+    expect(labels(m)[0]).toContain('Select its group');
+    m[0]!.find((i) => i.label === 'Select its group')!.action!();
+    expect(store.selected.size).toBe(2);
+    const gm = buildListMenu({ kind: 'group', id: g.id }, store, actions(), list());
+    expect(labels(gm).flat()).toContain('Ungroup');
+    expect(labels(gm)[0]).not.toContain('Select its group');
+  });
+  it('only renames or shows a hidden part', () => {
+    const store = new Store();
+    store.addPart('2x4');
+    store.select([1]);
+    store.hideSelected();
+    const m = buildListMenu({ kind: 'part', id: 1 }, store, actions(), list());
+    expect(labels(m)).toEqual([['Rename'], ['Show']]);
+    m[1]![0]!.action!();
+    expect(store.parts[0]!.hidden).toBeFalsy();
   });
 });

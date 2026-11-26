@@ -8,6 +8,7 @@ import { createElement, ChevronDown, ChevronRight, Eye, EyeOff, Boxes } from 'lu
 import { partDims, type Group, type Part } from '../model';
 import { getStock, stockById } from '../stock';
 import type { Store } from '../store';
+import type { ListTarget } from './menu';
 import { fmt } from '../units';
 import { hex } from './dom';
 
@@ -17,7 +18,20 @@ export interface HoverTarget {
 
 type Renaming = { kind: 'part' | 'group'; id: number } | null;
 
+/** The context-menu key, or Shift+F10, on a focused row. */
+function isMenuKey(e: KeyboardEvent): boolean {
+  return e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10');
+}
+
+/** Where a keyboard-opened menu goes: just inside the row's left edge. */
+function rowPoint(el: HTMLElement): [number, number] {
+  const r = el.getBoundingClientRect();
+  return [r.left + 24, r.bottom - 4];
+}
+
 export class OutlinerPanel {
+  /** Set by the app: open a menu for a row at a screen point. */
+  onContextMenu: ((x: number, y: number, target: ListTarget) => void) | null = null;
   private filter = '';
   private renaming: Renaming = null;
   private collapsed = new Set<number>();
@@ -165,9 +179,18 @@ export class OutlinerPanel {
       else store.select(ids);
     });
     el.addEventListener('dblclick', () => this.startRename({ kind: 'group', id: g.id }));
+    const menu = (x: number, y: number) => {
+      if (!allSelected) store.select(ids);
+      this.onContextMenu?.(x, y, { kind: 'group', id: g.id });
+    };
+    el.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      menu(e.clientX, e.clientY);
+    });
     el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') store.select(ids);
       else if (e.key === 'F2') this.startRename({ kind: 'group', id: g.id });
+      else if (isMenuKey(e)) menu(...rowPoint(el));
       else if (e.key === 'ArrowLeft') this.collapsed.add(g.id);
       else if (e.key === 'ArrowRight') this.collapsed.delete(g.id);
       else return;
@@ -222,9 +245,18 @@ export class OutlinerPanel {
       else store.select([p.id]);
     });
     el.addEventListener('dblclick', () => this.startRename({ kind: 'part', id: p.id }));
+    const menu = (x: number, y: number) => {
+      if (!p.hidden && !store.selected.has(p.id)) store.select([p.id]);
+      this.onContextMenu?.(x, y, { kind: 'part', id: p.id });
+    };
+    el.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      menu(e.clientX, e.clientY);
+    });
     el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') store.select([p.id]);
       else if (e.key === 'F2') this.startRename({ kind: 'part', id: p.id });
+      else if (isMenuKey(e)) menu(...rowPoint(el));
       else return;
       e.preventDefault();
       e.stopPropagation();
@@ -244,6 +276,11 @@ export class OutlinerPanel {
       onClick();
     });
     return eye;
+  }
+
+  /** Start renaming a row in place, as F2 does. */
+  rename(target: ListTarget): void {
+    this.startRename(target);
   }
 
   private startRename(target: Renaming): void {

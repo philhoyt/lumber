@@ -15,10 +15,12 @@ import {
   Eye,
   EyeOff,
   FlipHorizontal2,
+  Focus,
   Grid3x3,
   ListOrdered,
   Maximize,
   Move3d,
+  PenLine,
   Plus,
   RotateCw,
   Ruler,
@@ -224,6 +226,65 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
   const sections = [edit, arrange];
   if (grouping.length) sections.push(grouping);
   return [...sections, visibility, [addStock, selectAll, views, exploded, assembly]];
+}
+
+/** A row in the Parts list: one part, or a group. */
+export type ListTarget = { kind: 'part'; id: number } | { kind: 'group'; id: number };
+
+/** What a Parts-list menu needs from the list itself. */
+export interface ListActions {
+  /** Start renaming the row in place. */
+  rename(): void;
+}
+
+/**
+ * The menu for a right click on a Parts-list row. The row is selected first (the list
+ * does that), so the selection's own actions follow the list's: rename, frame in the
+ * view, hide everything else, pick the whole group a part belongs to.
+ */
+export function buildListMenu(
+  target: ListTarget,
+  store: Store,
+  scene: MenuActions,
+  list: ListActions,
+): MenuItem[][] {
+  const rename: MenuItem = {
+    label: 'Rename',
+    key: 'F2',
+    icon: PenLine,
+    action: () => list.rename(),
+  };
+  const part = target.kind === 'part' ? store.partById(target.id) : undefined;
+  if (part?.hidden) {
+    return [
+      [rename],
+      [{ label: 'Show', icon: Eye, action: () => store.setHidden([part.id], false) }],
+    ];
+  }
+  const own: MenuItem[] = [
+    rename,
+    { label: 'Frame in view', key: '.', icon: Focus, action: () => scene.setView('selected') },
+  ];
+  const others = store.parts.filter((p) => !store.selected.has(p.id) && !p.hidden);
+  if (others.length)
+    own.push({
+      label: 'Hide others',
+      icon: EyeOff,
+      action: () =>
+        store.setHidden(
+          others.map((p) => p.id),
+          true,
+        ),
+    });
+  if (part?.group !== undefined && !store.selectedGroup())
+    own.push({
+      label: 'Select its group',
+      icon: Boxes,
+      action: () => store.select(store.selectionForClick(part.id)),
+    });
+  // The selection's actions, without the scene-wide tail (add stock, views...).
+  const ctx: MenuContext = { x: 0, y: 0, partId: part?.id ?? null, ground: null };
+  return [own, ...buildMenu(ctx, store, scene).slice(0, -1)];
 }
 
 /** A title for the menu: the part's name, or how many parts are selected. */

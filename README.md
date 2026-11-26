@@ -52,56 +52,57 @@ palette, N the side panel with its Parts and Cut list tabs and the properties
 sections. ? opens the full key reference. The sun/moon button switches the
 theme.
 
-| Keys                               | What                                                                      |
-| ---------------------------------- | ------------------------------------------------------------------------- |
-| Right-click                        | Menu with the actions for the part, selection or scene                    |
-| Click, Shift+click, drag on empty  | Select, extend the selection, box select                                  |
-| A, Alt+A                           | Select all, select none                                                   |
-| G                                  | Grab: the selection follows the mouse on the floor plane                  |
-| X / Y / Z during a grab            | Move along that axis only; Shift+X / Y / Z: in the plane without it       |
-| Type a length during a grab, Enter | Move that far (`16`, `3/4`, `2'6`)                                        |
-| Enter / click, Esc / right-click   | Confirm or cancel a transform                                             |
-| R then X / Y / Z                   | Quarter turn; Shift reverses; type an angle after the axis (R X 15 Enter) |
-| Drag a ring while rotating         | Turn in 15° steps, Ctrl for 1°; the Part panel shows and sets angles      |
-| S, move the mouse or type, Enter   | Scale the cut length with the mouse (grid steps) or set it by number      |
-| Drag a handle at a part's end      | Pull that end to meet another part; the end snaps to faces                |
-| Fit end A / B (Part panel)         | Cut the end to meet what it points at: miter, bevel and length            |
-| Shift+A                            | Add stock at the pointer                                                  |
-| Shift+D                            | Duplicate and grab the copy; Ctrl+D duplicates with an offset             |
-| Shift+R, then drag                 | Array: copies fill toward the pointer, 16" o.c. or the panel's spacing    |
-| X / Y / Z while arraying           | Lock the axis; type a count, or a length to fill; Enter or click keeps it |
-| Array (Part panel)                 | The live array's direction, count or span, spacing and mode; Apply bakes  |
-| Ctrl+G, Ctrl+Shift+G               | Group the selection into an assembly, ungroup                             |
-| Double-click a part                | Select that one part inside its group                                     |
-| Alt+G                              | Drop onto the floor or the parts beneath                                  |
-| Ctrl+M then X / Y / Z              | Mirror across that axis through the selection's centre                    |
-| F                                  | Fastener markers: click a face to place one, a marker to remove it        |
-| H, Alt+H                           | Hide the selection, show everything                                       |
-| X or Delete                        | Delete                                                                    |
-| Ctrl+Z, Ctrl+Shift+Z               | Undo, redo                                                                |
-| Ctrl+S, Ctrl+O                     | Save, open                                                                |
-| Middle-drag, Shift+middle, wheel   | Orbit, pan, zoom (right-drag pans too)                                    |
-| Alt+drag                           | Orbit without a middle button; Shift+Alt pans, Ctrl+Alt zooms             |
-| Trackpad switch (header)           | Two-finger drag orbits, pinch zooms, Shift+two-finger pans                |
-| Corner gizmo                       | Click an axis to look along it, again for the other side; drag orbits     |
-| Numpad 1 / 3 / 7, with Ctrl        | Front / right / top, back / left / bottom (top-row digits too)            |
-| Numpad 9                           | Look from the opposite side                                               |
-| Numpad 5                           | Perspective or orthographic; axis views are ortho, orbiting returns       |
-| E                                  | Exploded view: pull the parts apart to look; slider sets how far          |
-| Shift+E, [ / ]                     | Assembly steps: walk the build; the Part panel sets each part's step      |
-| Numpad 2 / 4 / 6 / 8, with Ctrl    | Orbit in 15° steps, pan                                                   |
-| Numpad + / -                       | Zoom in, out                                                              |
-| Numpad . , Home                    | Frame the selection, fit the model                                        |
-| D                                  | Dimension labels on each part and the selection's W × D × H               |
-| M                                  | Measure: click two points (snaps to corners, edges, faces); Esc           |
-| N, T, Tab                          | Toggle the side panel, the palette, both                                  |
-| Drag the view's edges              | Resize the palette and side panel; double-click resets; remembered        |
-| Up / Down in a length field        | Step by the grid; Shift 1", Ctrl 1/16"                                    |
-| Drag a field's label               | Scrub the value with the same steps; Alt-drag the field itself            |
-| Esc in a field                     | Put back the value it had and leave the field                             |
-| Arithmetic in a length field       | 48 - 3/4, (96 - 2 * 1.5) / 3, 2 ft + 3 1/2; a spaced slash divides        |
-| +1/2, -1/2, *2, /3 in a field      | Change what is there; with several parts selected, each one               |
-| Arrows, PgUp / PgDn                | Nudge by the grid step                                                    |
+| Keys                                | What                                                                      |
+| ----------------------------------- | ------------------------------------------------------------------------- |
+| Right-click                         | Menu with the actions for the part, selection or scene                    |
+| Right-click a row in the Parts list | Rename, frame, hide others, group and the rest for that part or group     |
+| Click, Shift+click, drag on empty   | Select, extend the selection, box select                                  |
+| A, Alt+A                            | Select all, select none                                                   |
+| G                                   | Grab: the selection follows the mouse on the floor plane                  |
+| X / Y / Z during a grab             | Move along that axis only; Shift+X / Y / Z: in the plane without it       |
+| Type a length during a grab, Enter  | Move that far (`16`, `3/4`, `2'6`)                                        |
+| Enter / click, Esc / right-click    | Confirm or cancel a transform                                             |
+| R then X / Y / Z                    | Quarter turn; Shift reverses; type an angle after the axis (R X 15 Enter) |
+| Drag a ring while rotating          | Turn in 15° steps, Ctrl for 1°; the Part panel shows and sets angles      |
+| S, move the mouse or type, Enter    | Scale the cut length with the mouse (grid steps) or set it by number      |
+| Drag a handle at a part's end       | Pull that end to meet another part; the end snaps to faces                |
+| Fit end A / B (Part panel)          | Cut the end to meet what it points at: miter, bevel and length            |
+| Shift+A                             | Add stock at the pointer                                                  |
+| Shift+D                             | Duplicate and grab the copy; Ctrl+D duplicates with an offset             |
+| Shift+R, then drag                  | Array: copies fill toward the pointer, 16" o.c. or the panel's spacing    |
+| X / Y / Z while arraying            | Lock the axis; type a count, or a length to fill; Enter or click keeps it |
+| Array (Part panel)                  | The live array's direction, count or span, spacing and mode; Apply bakes  |
+| Ctrl+G, Ctrl+Shift+G                | Group the selection into an assembly, ungroup                             |
+| Double-click a part                 | Select that one part inside its group                                     |
+| Alt+G                               | Drop onto the floor or the parts beneath                                  |
+| Ctrl+M then X / Y / Z               | Mirror across that axis through the selection's centre                    |
+| F                                   | Fastener markers: click a face to place one, a marker to remove it        |
+| H, Alt+H                            | Hide the selection, show everything                                       |
+| X or Delete                         | Delete                                                                    |
+| Ctrl+Z, Ctrl+Shift+Z                | Undo, redo                                                                |
+| Ctrl+S, Ctrl+O                      | Save, open                                                                |
+| Middle-drag, Shift+middle, wheel    | Orbit, pan, zoom (right-drag pans too)                                    |
+| Alt+drag                            | Orbit without a middle button; Shift+Alt pans, Ctrl+Alt zooms             |
+| Trackpad switch (header)            | Two-finger drag orbits, pinch zooms, Shift+two-finger pans                |
+| Corner gizmo                        | Click an axis to look along it, again for the other side; drag orbits     |
+| Numpad 1 / 3 / 7, with Ctrl         | Front / right / top, back / left / bottom (top-row digits too)            |
+| Numpad 9                            | Look from the opposite side                                               |
+| Numpad 5                            | Perspective or orthographic; axis views are ortho, orbiting returns       |
+| E                                   | Exploded view: pull the parts apart to look; slider sets how far          |
+| Shift+E, [ / ]                      | Assembly steps: walk the build; the Part panel sets each part's step      |
+| Numpad 2 / 4 / 6 / 8, with Ctrl     | Orbit in 15° steps, pan                                                   |
+| Numpad + / -                        | Zoom in, out                                                              |
+| Numpad . , Home                     | Frame the selection, fit the model                                        |
+| D                                   | Dimension labels on each part and the selection's W × D × H               |
+| M                                   | Measure: click two points (snaps to corners, edges, faces); Esc           |
+| N, T, Tab                           | Toggle the side panel, the palette, both                                  |
+| Drag the view's edges               | Resize the palette and side panel; double-click resets; remembered        |
+| Up / Down in a length field         | Step by the grid; Shift 1", Ctrl 1/16"                                    |
+| Drag a field's label                | Scrub the value with the same steps; Alt-drag the field itself            |
+| Esc in a field                      | Put back the value it had and leave the field                             |
+| Arithmetic in a length field        | 48 - 3/4, (96 - 2 * 1.5) / 3, 2 ft + 3 1/2; a spaced slash divides        |
+| +1/2, -1/2, *2, /3 in a field       | Change what is there; with several parts selected, each one               |
+| Arrows, PgUp / PgDn                 | Nudge by the grid step                                                    |
 
 Groups are assemblies: clicking any part in the view selects the whole
 group, double-click picks the single part, groups nest, and duplicating a

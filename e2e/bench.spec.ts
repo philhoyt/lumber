@@ -153,6 +153,31 @@ test('Shift+R arrays a part by dragging, or by a typed count', async ({ page }) 
   await expect(page.locator('#stat')).toContainText('12 parts');
 });
 
+test('right-clicking a Parts-list row opens its menu', async ({ page }) => {
+  await openBench(page);
+  await page.locator('.out-row', { hasText: 'Leg LF' }).click({ button: 'right' });
+  const menu = page.locator('.cmenu');
+  await expect(menu).toContainText('Leg LF');
+  await expect(page.locator('#stat')).toContainText('1 selected');
+  await menu.getByText('Hide others').click();
+  await expect(page.locator('#outCount')).toContainText('11 hidden');
+  await page.keyboard.press('Alt+h');
+  // Two rows, then Group from the menu.
+  await page.locator('.out-row', { hasText: 'Leg LF' }).click();
+  await page.locator('.out-row', { hasText: 'Leg RF' }).click({ modifiers: ['Shift'] });
+  await page.locator('.out-row', { hasText: 'Leg RF' }).click({ button: 'right' });
+  await expect(menu).toContainText('2 parts');
+  await menu.getByText('Group', { exact: true }).click();
+  await expect(page.locator('.out-row.group')).toContainText('2 parts');
+  // Rename from the menu puts an input in the row.
+  await page.locator('.out-row.group').click({ button: 'right' });
+  await menu.getByText('Rename').click();
+  await expect(page.locator('.out-row.group input')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.locator('#bUndo').click();
+  await expect(page.locator('.out-row.group')).toHaveCount(0);
+});
+
 test('G moves by a typed distance along the constrained axis', async ({ page }) => {
   await openBench(page);
   await selectPart(page, 'Leg LF');

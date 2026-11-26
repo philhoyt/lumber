@@ -12,6 +12,7 @@ const SECTIONS: [string, [string, string][]][] = [
       ['Drag on empty space', 'Box select (Shift adds)'],
       ['A / Alt+A', 'Select all / none'],
       ['Right-click', 'Menu for the selection or the scene'],
+      ['Right-click a Parts-list row', 'Rename, frame, hide others, group, and the rest'],
     ],
   ],
   [

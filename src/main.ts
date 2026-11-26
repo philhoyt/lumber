@@ -12,7 +12,7 @@ import { wireLengthFields } from './ui/fields';
 import { togglePanels, wireDrop, wireHeader, wireKeyboard, wireTabs } from './ui/header';
 import { DrawingsOverlay } from './ui/drawings';
 import { HelpOverlay } from './ui/help';
-import { buildMenu, ContextMenu, menuTitle, stockItems } from './ui/menu';
+import { buildListMenu, buildMenu, ContextMenu, menuTitle, stockItems } from './ui/menu';
 import { OutlinerPanel } from './ui/outliner';
 import { renderPalette } from './ui/palette';
 import { PropsPanel } from './ui/props';
@@ -63,7 +63,24 @@ wireAssemblyBar($('viewport'), store, scene);
 wireNavGizmo($('viewport'), scene);
 wireSplitters($('viewport'));
 renderPalette($('boards'), $('sheets'), $<HTMLInputElement>('palSearch'), store);
-new OutlinerPanel($('outBody'), $('outCount'), $<HTMLInputElement>('outFilter'), store, scene);
+const outliner = new OutlinerPanel(
+  $('outBody'),
+  $('outCount'),
+  $<HTMLInputElement>('outFilter'),
+  store,
+  scene,
+);
+outliner.onContextMenu = (x, y, target) => {
+  // The row is selected by now, so the usual title fits; a hidden part is not selected.
+  const part = target.kind === 'part' ? store.partById(target.id) : undefined;
+  const title = part?.hidden ? part.name : menuTitle(store);
+  menu.open(
+    x,
+    y,
+    title,
+    buildListMenu(target, store, scene, { rename: () => outliner.rename(target) }),
+  );
+};
 new CutlistPanel($('cutBody'), store);
 wireStatus($('stat'), $('hints'), $('overall'), store);
 wireTabs();
