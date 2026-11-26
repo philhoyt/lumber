@@ -59,8 +59,8 @@ export class StockEditor {
   private render(): void {
     const { store, body } = this;
     const restore = keepFocus(body);
-    const boards = store.stock.filter((s) => !s.sheet);
-    const sheets = store.stock.filter((s) => s.sheet);
+    const boards = store.stock.filter((s) => !s.sheet && !s.reference);
+    const sheets = store.stock.filter((s) => s.sheet && !s.reference);
     const len = (id: string, field: string, value: number, min = 0.0625) =>
       `<input type="text" class="len" data-min="${min}" id="st-${id}-${field}" value="${fmt(value)}">`;
     const common = (s: (typeof boards)[number]) =>

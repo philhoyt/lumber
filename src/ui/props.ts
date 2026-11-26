@@ -335,8 +335,19 @@ export class PropsPanel {
                 `<input type="text" class="len" data-min="0.0625" id="pW" value="${fmt(p.w ?? s.sheet[0])}">`,
               )
             : `<div><div class="static muted" title="Thickness × width of the stock">${fmt(s.t)} × ${fmt(s.w ?? 0)} section</div></div>`
+        }${
+          s.reference
+            ? inlineField(
+                'pH',
+                'H',
+                'Height of the reference box',
+                `<input type="text" class="len" data-min="0.0625" id="pH" value="${fmt(p.t ?? s.t)}">`,
+              )
+            : ''
         }</div>`;
-      if (s.sheet && s.grain !== false) {
+      if (s.reference)
+        part += `<div class="muted note">A stand-in to design around: it moves, snaps and stacks like a part, but stays out of the cut list, buy list and drawings.</div>`;
+      if (s.sheet && s.grain !== false && !s.reference) {
         const labels: Record<string, string> = {
           any: 'Either way',
           length: 'Along the length',
@@ -345,7 +356,7 @@ export class PropsPanel {
         part += `<div class="row"><div><label class="small">Grain</label><select id="pGrain">${GRAINS.map((g) => `<option value="${g}"${g === grainOf(p) ? ' selected' : ''}>${labels[g]}</option>`).join('')}</select></div></div>
         <div class="muted note">Plywood grain runs the long way of the sheet. The nesting only turns the part the way you allow.</div>`;
       }
-      if (!s.sheet) {
+      if (!s.sheet && !s.reference) {
         // One row per end: miter, bevel and Fit. The sign conventions live in the tooltips.
         const m = miterOf(p);
         const b = bevelOf(p);
@@ -366,7 +377,7 @@ export class PropsPanel {
         };
         part += `<label class="small" title="M is the miter, B the bevel, in degrees from square">End cuts</label>${endRow(0)}${endRow(1)}`;
       }
-      if (!s.sheet) part += cutsEditorHtml(p);
+      if (!s.sheet && !s.reference) part += cutsEditorHtml(p);
       if (inGroup) {
         const g = store.groupById(p.group!);
         part += `<div class="muted note">In ${esc(g?.name ?? 'a group')} · click the part in the view to select the whole group</div>`;
@@ -594,6 +605,7 @@ export class PropsPanel {
               p.len = ns.sheet[1];
             }
             if (!ns.sheet) p.w = undefined;
+            if (!ns.reference) delete p.t;
           }),
         ),
       );
@@ -621,6 +633,13 @@ export class PropsPanel {
       });
     sizeEdit('pLen', 'len');
     sizeEdit('pW', 'w');
+    if (list.length === 1)
+      onChange(el, 'pH', (i) => {
+        const p = list[0]!;
+        const v = parseLen(i.value);
+        if (v !== null && v > 0) store.mutate(() => withMinKept(p, () => (p.t = v)));
+        else this.render();
+      });
     if (list.length === 1) {
       const p = list[0]!;
       onChange(el, 'pName', (i) => store.mutate(() => (p.name = i.value)));

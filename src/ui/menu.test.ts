@@ -141,7 +141,13 @@ describe('buildListMenu', () => {
 describe('stockGroups and stockSections', () => {
   it('sorts stock into 1x, 2x, 4x and sheet groups', () => {
     const g = stockGroups(getStock());
-    expect(g.map((x) => x.label)).toEqual(['1x boards', '2x lumber', '4x posts', 'Sheets']);
+    expect(g.map((x) => x.label)).toEqual([
+      '1x boards',
+      '2x lumber',
+      '4x posts',
+      'Sheets',
+      'Reference',
+    ]);
     expect(g[1]!.items.map((s) => s.id)).toContain('2x6');
     expect(g[3]!.items.every((s) => !!s.sheet)).toBe(true);
   });
@@ -155,6 +161,7 @@ describe('stockGroups and stockSections', () => {
       '2x lumber',
       '4x posts',
       'Sheets',
+      'Reference',
     ]);
     expect(sections[0]![1]!.children!.some((i) => i.label === '2x4')).toBe(true);
     noteStockUsed('2x6');

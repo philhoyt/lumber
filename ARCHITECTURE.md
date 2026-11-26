@@ -85,6 +85,14 @@ constraint mid-drag re-anchors so the parts do not jump. Typed digits are kept
 on the transform and applied on Enter. Confirm commits the pre-transform
 snapshot to the store; cancel restores it.
 
+## Reference boxes
+
+Stock with `reference: true` (one entry, `ref`, always present in a model's stock
+table) is a stand-in with a per-part height (`Part.t`). The cut rows, stock grouping,
+drawing rows and model views skip reference parts, the status bar counts them apart,
+and the view draws them translucent. Everything else, moving, snapping, grouping,
+treats them as parts.
+
 ## Local frames
 
 `frame.ts` is the geometry of a part's own axes: the world direction of a local axis,

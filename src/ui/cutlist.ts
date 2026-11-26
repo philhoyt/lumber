@@ -1,5 +1,6 @@
 /** The cut list and buy list panel, with cutting diagrams and a cost estimate. */
 import { cutRows, packBoards, packBoardsAuto, packSheets, partsByStock } from '../pack';
+import { isReferencePart } from '../model';
 import { hardwareRows, kindInfo } from '../fastener';
 import { describeCut, grainOf } from '../model';
 import { sawBevel } from '../model';
@@ -26,7 +27,8 @@ export class CutlistPanel {
 
   render(): void {
     const { store, el } = this;
-    const { parts, settings } = store;
+    const { settings } = store;
+    const parts = store.parts.filter((p) => !isReferencePart(p));
     if (!parts.length) {
       el.innerHTML = '<div class="muted">Add parts and the cut list writes itself.</div>';
       return;

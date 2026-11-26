@@ -80,7 +80,14 @@ wireExplodeBar($('viewport'), scene);
 wireAssemblyBar($('viewport'), store, scene);
 wireNavGizmo($('viewport'), scene);
 wireSplitters($('viewport'));
-renderPalette($('recent'), $('boards'), $('sheets'), $<HTMLInputElement>('palSearch'), store);
+renderPalette(
+  $('recent'),
+  $('boards'),
+  $('sheets'),
+  $('reference'),
+  $<HTMLInputElement>('palSearch'),
+  store,
+);
 const outliner = new OutlinerPanel(
   $('outBody'),
   $('outCount'),

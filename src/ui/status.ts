@@ -1,5 +1,5 @@
 /** The status bar: part count, what you can do right now, and the model's overall size. */
-import { aabbSize, unionAABB } from '../model';
+import { aabbSize, isReferencePart, unionAABB } from '../model';
 import type { Store } from '../store';
 import { fmt } from '../units';
 
@@ -42,7 +42,9 @@ export function wireStatus(
   const render = () => {
     const n = store.parts.length;
     const sel = store.selected.size;
-    countEl.textContent = `${n} part${n === 1 ? '' : 's'}${sel ? ` · ${sel} selected` : ''}`;
+    const refs = store.parts.filter(isReferencePart).length;
+    const built = n - refs;
+    countEl.textContent = `${built} part${built === 1 ? '' : 's'}${refs ? ` · ${refs} reference` : ''}${sel ? ` · ${sel} selected` : ''}`;
     const hints = sel === 0 ? HINTS.none : sel === 1 ? HINTS.one : HINTS.many;
     hintsEl.textContent = '';
     hints.forEach(([k, what], i) => {
@@ -54,7 +56,12 @@ export function wireStatus(
       overallEl.textContent = '—';
       return;
     }
-    const s = aabbSize(unionAABB(store.parts));
+    const real = store.parts.filter((p) => !isReferencePart(p));
+    if (!real.length) {
+      overallEl.textContent = '—';
+      return;
+    }
+    const s = aabbSize(unionAABB(real));
     overallEl.textContent = `${fmt(s[0])} W × ${fmt(s[1])} D × ${fmt(s[2])} H`;
   };
   store.subscribe((kind) => {

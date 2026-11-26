@@ -151,6 +151,13 @@ the ways you allow and no other, the cut list marks the direction, and the
 diagrams draw grain lines the long way of the sheet. MDF and OSB have no grain,
 which the stock table's Grain tick controls.
 
+A reference box is a stand-in for something you are building around: a stereo,
+a window, a water heater. Add one from the palette's Reference section or the add
+menu, set its length, width and height in the Part section, and design to it. It
+moves, snaps and stacks like any part and shows up translucent, but it is never cut
+or bought: the cut list, buy list, nesting, drawings and the overall size ignore it,
+and the status bar counts it separately.
+
 Boards can carry joinery: Add cut in the Part section adds a dado (across the
 width), groove (along the length), rabbet (along an end or edge) or notch
 (through the thickness into an edge), each with its face or edge, position,

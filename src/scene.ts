@@ -521,11 +521,13 @@ export class LumberScene {
     let m = this.matCache.get(key);
     if (!m) {
       const pending = state === 'pending';
+      // Reference boxes are see-through stand-ins; pending assembly steps are ghosts.
+      const ghost = pending || !!stock.reference;
       m = new THREE.MeshLambertMaterial({
         color: stock.color,
         emissive: EMISSIVE[state],
-        transparent: pending,
-        opacity: pending ? 0.25 : 1,
+        transparent: ghost,
+        opacity: pending ? 0.25 : stock.reference ? 0.5 : 1,
         depthWrite: !pending,
       });
       this.matCache.set(key, m);

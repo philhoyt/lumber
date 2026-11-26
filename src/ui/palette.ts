@@ -31,6 +31,7 @@ export function renderPalette(
   recentEl: HTMLElement,
   boardsEl: HTMLElement,
   sheetsEl: HTMLElement,
+  refEl: HTMLElement,
   searchEl: HTMLInputElement,
   store: Store,
 ): void {
@@ -44,7 +45,9 @@ export function renderPalette(
     const el = document.createElement('div');
     el.className = 'stock';
     el.draggable = true;
-    el.title = `Click to add a ${s.name} at the center, or drag it onto the scene`;
+    el.title = s.reference
+      ? 'A stand-in for something to design around. It is not cut or bought. Click to add, or drag it onto the scene'
+      : `Click to add a ${s.name} at the center, or drag it onto the scene`;
     const dim = s.sheet
       ? `${fmt(s.t)} · ${fmtSheet(s.sheet[0], s.sheet[1])}`
       : `${fmt(s.t)} × ${fmt(s.w ?? 0)}`;
@@ -83,10 +86,11 @@ export function renderPalette(
     built = stockVersion();
     boardsEl.textContent = '';
     sheetsEl.textContent = '';
+    refEl.textContent = '';
     items = [];
     for (const s of getStock()) {
       const it = makeItem(s);
-      (s.sheet ? sheetsEl : boardsEl).appendChild(it.el);
+      (s.reference ? refEl : s.sheet ? sheetsEl : boardsEl).appendChild(it.el);
       items.push(it);
     }
     applyFilter();

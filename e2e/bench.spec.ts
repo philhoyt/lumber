@@ -340,6 +340,28 @@ test('Shift+A offers stock in groups, with the recent ones first', async ({ page
   await expect(page.locator('#recent .stock')).toHaveCount(1);
 });
 
+test('a reference box is a part to design around, not to cut', async ({ page }) => {
+  await openBench(page);
+  await hoverView(page);
+  await page.keyboard.press('Shift+A');
+  await page.locator('.cmenu').first().getByText('Reference').hover();
+  await page.locator('.cmenu.sub').getByText('Reference box').click();
+  await expect(page.locator('#stat')).toContainText('12 parts · 1 reference · 1 selected');
+  await page.locator('#pH').fill('30');
+  await page.locator('#pH').press('Enter');
+  await expect(page.locator('#pH')).toHaveValue('30');
+  // The overall size and the cut list stay the bench's.
+  await expect(page.locator('#overall')).toContainText('48" W × 24" D × 34" H');
+  await page.locator('[data-tab="cut"]').click();
+  await expect(page.locator('#cutBody')).toContainText('2x4');
+  await expect(page.locator('#cutBody')).not.toContainText('Reference box');
+  await page.locator('[data-tab="parts"]').click();
+  await page.locator('#bUndo').click();
+  await page.locator('#bUndo').click();
+  await expect(page.locator('#stat')).toContainText('12 parts');
+  await expect(page.locator('#stat')).not.toContainText('reference');
+});
+
 test('G moves by a typed distance along the constrained axis', async ({ page }) => {
   await openBench(page);
   await selectPart(page, 'Leg LF');

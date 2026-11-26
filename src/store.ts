@@ -14,6 +14,7 @@ import {
   sanitizeStock,
   setStock,
   stockById,
+  withReferenceStock,
   type Stock,
 } from './stock';
 import { clampFastener, isFace, isFastenerKind, type Fastener } from './fastener';
@@ -883,7 +884,7 @@ export class Store {
   loadDocument(doc: Document): void {
     this.settings.stockLen = doc.stockLen ?? {};
     // Older files carried price overrides instead of a stock table: fold them in.
-    const stock = cloneStock(doc.stock ?? DEFAULT_STOCK);
+    const stock = withReferenceStock(cloneStock(doc.stock ?? DEFAULT_STOCK));
     for (const s of stock) if (doc.prices?.[s.id] !== undefined) s.price = doc.prices[s.id]!;
     this.replaceParts(doc.parts, doc.groups ?? [], stock);
     this.notify('settings');
@@ -933,6 +934,7 @@ export function parseDocument(o: unknown): Document | null {
       if (ok.length) x.cuts = ok;
       else delete x.cuts;
     }
+    if (x.t !== undefined && !(typeof x.t === 'number' && x.t > 0)) delete x.t;
     if (x.step !== undefined) {
       const s = normalizeStep(typeof x.step === 'number' ? x.step : null);
       if (s === undefined) delete x.step;

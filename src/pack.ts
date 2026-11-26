@@ -13,6 +13,7 @@ import {
   type Cut,
   type Grain,
   type Part,
+  isReferencePart,
 } from './model';
 import { getStock, stockById, stockWidth, type Stock } from './stock';
 import { r32 } from './units';
@@ -265,6 +266,7 @@ const order = (s: Stock): number => {
 export function cutRows(parts: readonly Part[]): CutRow[] {
   const map = new Map<string, CutRow>();
   for (const p of parts) {
+    if (isReferencePart(p)) continue;
     const s = stockById(p.stock);
     const len = r32(p.len);
     const w = r32(stockWidth(s, p.w));
@@ -301,6 +303,7 @@ export function cutRows(parts: readonly Part[]): CutRow[] {
 export function partsByStock(parts: readonly Part[]): Map<string, Part[]> {
   const by = new Map<string, Part[]>();
   for (const s of getStock()) {
+    if (s.reference) continue;
     const list = parts.filter((p) => p.stock === s.id);
     if (list.length) by.set(s.id, list);
   }

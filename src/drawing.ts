@@ -21,6 +21,7 @@ import {
   type Grain,
   type Part,
   type Vec3,
+  isReferencePart,
 } from './model';
 import { getStock, stockById, stockWidth, type Stock } from './stock';
 import { fmt, r32 } from './units';
@@ -49,6 +50,7 @@ const stockOrder = (s: Stock): number => {
 export function drawingRows(parts: readonly Part[]): DrawingRow[] {
   const map = new Map<string, DrawingRow>();
   for (const p of parts) {
+    if (isReferencePart(p)) continue;
     const s = stockById(p.stock);
     const len = r32(p.len);
     const w = r32(stockWidth(s, p.w));
@@ -185,7 +187,7 @@ export interface ViewsResult {
  * it, top view below the front, all to one scale, with overall dimensions.
  */
 export function modelViewsSvg(parts: readonly Part[], pageW = 760): ViewsResult {
-  const visible = parts.filter((p) => !p.hidden);
+  const visible = parts.filter((p) => !p.hidden && !isReferencePart(p));
   if (!visible.length) return { svg: '', size: [0, 0, 0] };
   const corners = visible.flatMap(partCorners);
   const min: Vec3 = [Infinity, Infinity, Infinity];

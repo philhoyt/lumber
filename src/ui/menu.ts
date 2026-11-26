@@ -94,16 +94,19 @@ const ALIGN: [AxisIndex, AlignMode, string][] = [
 export function stockGroups(stocks: readonly Stock[]): { label: string; items: Stock[] }[] {
   const groups = new Map<string, { label: string; order: number; items: Stock[] }>();
   for (const s of stocks) {
-    const m = /^(\d+)x/i.exec(s.name);
-    const key = s.sheet ? 'sheets' : m ? m[1]! : 'other';
+    const m = s.reference ? null : /^(\d+)x/i.exec(s.name);
+    const key = s.reference ? 'reference' : s.sheet ? 'sheets' : m ? m[1]! : 'other';
     if (!groups.has(key)) {
       const n = m ? Number(m[1]) : 0;
-      const label = s.sheet
-        ? 'Sheets'
-        : m
-          ? `${m[1]}x ${n === 1 ? 'boards' : n >= 4 ? 'posts' : 'lumber'}`
-          : 'Other';
-      groups.set(key, { label, order: s.sheet ? 1e6 : m ? n : 1e5, items: [] });
+      const label = s.reference
+        ? 'Reference'
+        : s.sheet
+          ? 'Sheets'
+          : m
+            ? `${m[1]}x ${n === 1 ? 'boards' : n >= 4 ? 'posts' : 'lumber'}`
+            : 'Other';
+      const order = s.reference ? 2e6 : s.sheet ? 1e6 : m ? n : 1e5;
+      groups.set(key, { label, order, items: [] });
     }
     groups.get(key)!.items.push(s);
   }
