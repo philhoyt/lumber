@@ -4,6 +4,7 @@
  * can be undone, then tells subscribers (the project manager saves on those).
  */
 import { normalizeStep } from './assembly';
+import { applyFit, fitEnd, type EndFit } from './fit';
 import { cloneStock, DEFAULT_STOCK, getStock, sanitizeStock, setStock, type Stock } from './stock';
 import { clampFastener, isFace, isFastenerKind, type Fastener } from './fastener';
 import {
@@ -531,6 +532,19 @@ export class Store {
       for (const p of list) p.q = [...q];
     });
   }
+  /**
+   * Cut one end of a part (0 for A, 1 for B) to lie flat on what it points at, and move
+   * its long point onto that surface. Returns what was done, or null when nothing is in reach.
+   */
+  fitEnd(partId: number, end: 0 | 1): EndFit | null {
+    const p = this.partById(partId);
+    if (!p) return null;
+    const others = this.parts.filter((o) => o.id !== partId && !o.hidden);
+    const fit = fitEnd(p, end, others);
+    if (!fit) return null;
+    this.mutate(() => applyFit(p, end, fit));
+    return fit;
+  }
   /** Snap each selected part to the nearest quarter-turn orientation, in place. */
   squareUpSelected(): void {
     const list = this.selectedParts();
@@ -736,16 +750,21 @@ export function parseDocument(o: unknown): Document | null {
     }
     if (x.grain !== undefined && !GRAINS.includes(x.grain)) delete x.grain;
     if (x.grain === 'any') delete x.grain;
-    // Miters must be a pair of angles within range; anything else reads as square.
-    if (x.miter !== undefined) {
-      const m = x.miter as unknown;
+    const clear = (part: Partial<Part>, key: 'miter' | 'bevel') => {
+      if (key === 'miter') delete part.miter;
+      else delete part.bevel;
+    };
+    // Miters and bevels must be a pair of angles within range; anything else reads as square.
+    for (const key of ['miter', 'bevel'] as const) {
+      if (x[key] === undefined) continue;
+      const m = x[key] as unknown;
       if (
         Array.isArray(m) &&
         m.length === 2 &&
         m.every((n) => typeof n === 'number' && Math.abs(n) <= MAX_MITER)
       ) {
-        if (m[0] === 0 && m[1] === 0) delete x.miter;
-      } else delete x.miter;
+        if (m[0] === 0 && m[1] === 0) clear(x, key);
+      } else clear(x, key);
     }
   }
   let parts = d.parts as Part[];

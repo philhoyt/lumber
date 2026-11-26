@@ -3,11 +3,10 @@
  * the selection's centre on screen, as Blender's scale does, and an end handle pulls one
  * end while the other stays put. Pure numbers; the scene applies them.
  */
-import type { AABB, AxisIndex, Vec3 } from './model';
+import { MIN_LEN, type AABB, type AxisIndex, type Vec3 } from './model';
 import { snapWithHits, type SnapHit, type SnapOptions } from './snap';
 
-/** The shortest a part may be cut, inches. */
-export const MIN_LEN = 1 / 16;
+export { MIN_LEN };
 
 /** How much to scale by: the pointer's distance from the pivot now, over its distance at the start. */
 export function scaleFactor(

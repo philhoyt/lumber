@@ -2,6 +2,7 @@
 import { cutRows, packBoards, packBoardsAuto, packSheets, partsByStock } from '../pack';
 import { hardwareRows, kindInfo } from '../fastener';
 import { describeCut, grainOf } from '../model';
+import { sawBevel } from '../model';
 import { boardFeet, stockById } from '../stock';
 import type { Store } from '../store';
 import { fmt, fmtFt, fmtSheet, money, parseLen } from '../units';
@@ -33,6 +34,19 @@ export class CutlistPanel {
     let html = `<table><tr><th>Stock</th><th>Cut</th><th class="r">Qty</th><th>Parts</th></tr>`;
     for (const r of cutRows(parts)) {
       const mitered = r.miter[0] !== 0 || r.miter[1] !== 0;
+      const beveled = r.bevel[0] !== 0 || r.bevel[1] !== 0;
+      const ends = [
+        mitered ? `miter ${angleText(r.miter)}` : '',
+        beveled ? `bevel ${angleText(r.bevel, 'top', 'bottom')}` : '',
+        ...([0, 1] as const)
+          .filter((e) => r.miter[e] && r.bevel[e])
+          .map(
+            (e) =>
+              `saw ${e ? 'B' : 'A'}: ${Math.abs(r.miter[e])}° / ${sawBevel(r.miter[e], r.bevel[e])}°`,
+          ),
+      ]
+        .filter(Boolean)
+        .join(' · ');
       const grainMark =
         r.grain === 'length'
           ? ' <span class="muted" title="Length runs with the grain">∥ grain</span>'
@@ -41,8 +55,8 @@ export class CutlistPanel {
             : '';
       const cut = r.stock.sheet
         ? `${fmt(r.w)} × ${fmt(r.len)}${grainMark}`
-        : mitered
-          ? `${fmt(r.len)} <span class="muted">long · ${fmt(r.short)} short · ${angleText(r.miter)}</span>`
+        : mitered || beveled
+          ? `${fmt(r.len)} <span class="muted">long · ${fmt(r.short)} short · ${ends}</span>`
           : fmt(r.len);
       const joinery = r.cuts.length
         ? `<div class="muted joinery">${r.cuts.map((c) => esc(describeCut(c, fmt))).join('<br>')}</div>`
@@ -192,8 +206,12 @@ export class CutlistPanel {
 }
 
 /** "45°/45°" with the short-point edge marked. */
-export function angleText(m: [number, number]): string {
-  const one = (a: number) => (a === 0 ? 'square' : `${Math.abs(a)}°${a > 0 ? '▴' : '▾'}`);
+/** "20°▴ / square": each end's angle with where the short point is (▴ back or top, ▾ front or bottom). */
+export function angleText(m: [number, number], up = 'back', down = 'front'): string {
+  const one = (a: number) =>
+    a === 0
+      ? 'square'
+      : `<span title="Short point on the ${a > 0 ? up : down}">${Math.abs(a)}°${a > 0 ? '▴' : '▾'}</span>`;
   return `${one(m[0])} / ${one(m[1])}`;
 }
 
@@ -209,6 +227,8 @@ export function cutListCsv(store: Store): string {
       'Short point',
       'Miter A',
       'Miter B',
+      'Bevel A',
+      'Bevel B',
       'Grain',
       'Cuts',
       'Qty',
@@ -225,6 +245,8 @@ export function cutListCsv(store: Store): string {
       r.short,
       r.miter[0],
       r.miter[1],
+      r.bevel[0],
+      r.bevel[1],
       r.grain,
       r.cuts.map((c) => describeCut(c, fmt)).join('; '),
       r.qty,

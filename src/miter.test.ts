@@ -25,9 +25,9 @@ describe('miter math', () => {
   });
 
   it('short-point length counts both setbacks on one edge, one each on a parallelogram', () => {
-    expect(shortLength(96, 3.5, [45, 45])).toBeCloseTo(89);
-    expect(shortLength(96, 3.5, [45, -45])).toBeCloseTo(92.5);
-    expect(shortLength(96, 3.5, [0, 0])).toBe(96);
+    expect(shortLength([96, 3.5, 1.5], [45, 45])).toBeCloseTo(89);
+    expect(shortLength([96, 3.5, 1.5], [45, -45])).toBeCloseTo(92.5);
+    expect(shortLength([96, 3.5, 1.5], [0, 0])).toBe(96);
   });
 
   it('clamps typed angles to half degrees within range', () => {

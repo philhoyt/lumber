@@ -303,3 +303,34 @@ test('S scales the length with the mouse and keeps the part in place', async ({ 
   await expect(page.locator('#pLen')).toHaveValue('45');
   await expect(page.locator('#bUndo')).toBeDisabled();
 });
+
+test('bevels reach the cut list, and Fit end cuts a tilted leg to sit on the floor', async ({
+  page,
+}) => {
+  await openBench(page);
+  await selectPart(page, 'Leg LF');
+  await page.locator('#pBevelB').fill('20');
+  await page.locator('#pBevelB').press('Enter');
+  await page.locator('#pBevelB').press('Escape');
+  await expect(page.locator('.part-label')).toContainText('bevel 0°/20°');
+  await page.locator('[data-tab="cut"]').click();
+  await expect(page.locator('#cutBody')).toContainText('bevel');
+  await expect(page.locator('#cutBody')).toContainText('20°');
+  await page.locator('[data-tab="parts"]').click();
+  await page.locator('#bUndo').click();
+  await expect(page.locator('#pBevelB')).toHaveValue('0');
+  // Tilt the leg 15° about X; its lower end (B) now meets the floor at an angle.
+  await hoverView(page);
+  await page.keyboard.press('r');
+  await page.keyboard.press('x');
+  await page.keyboard.type('15');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#rotX')).toHaveValue('15');
+  await page.locator('#bFitB').click();
+  const toast = page.locator('.toast');
+  await expect(toast).toContainText('End B cut to meet the floor');
+  await expect(toast).toContainText('bevel');
+  // The leg's width faces the tilt, so the cut is a miter; the cut end now sits on the floor.
+  await expect(page.locator('#pMiterB')).toHaveValue('-15');
+  await expect(page.locator('#pZ')).toHaveValue('0');
+});

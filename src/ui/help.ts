@@ -31,6 +31,10 @@ const SECTIONS: [string, [string, string][]][] = [
       ],
       ['S', 'Scale the length with the mouse (grid steps), or type a length; Enter'],
       ["Drag a handle at a part's end", 'Pull that end to meet another part; it snaps to faces'],
+      [
+        'Fit end A / B (Part panel)',
+        'Cut the end to meet the part or floor it points at: miter, bevel, length',
+      ],
       ['Enter / click · Esc / right-click', 'Confirm · cancel'],
       ['Arrows, PgUp / PgDn', 'Nudge by the grid step'],
       ['Alt+G', 'Drop onto the floor or the parts below'],

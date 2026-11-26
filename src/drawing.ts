@@ -11,8 +11,10 @@ import {
   cutsOf,
   describeCut,
   grainOf,
+  bevelOf,
+  endCutCorners,
   miterOf,
-  miterOutline,
+  sawBevel,
   partDims,
   shortLength,
   type Cut,
@@ -30,6 +32,7 @@ export interface DrawingRow {
   w: number;
   t: number;
   miter: [number, number];
+  bevel: [number, number];
   grain: Grain;
   cuts: Cut[];
   fasteners: Fastener[];
@@ -50,10 +53,11 @@ export function drawingRows(parts: readonly Part[]): DrawingRow[] {
     const len = r32(p.len);
     const w = r32(stockWidth(s, p.w));
     const miter = miterOf(p);
+    const bevel = bevelOf(p);
     const grain: Grain = s.sheet && s.grain !== false ? grainOf(p) : 'any';
     const cuts = cutsOf(p);
     const fasteners = fastenersOf(p);
-    const key = `${p.stock}|${len}|${w}|${miter.join('/')}|${grain}|${cutsKey(cuts)}|${fastenersKey(fasteners)}`;
+    const key = `${p.stock}|${len}|${w}|${miter.join('/')}|${bevel.join('/')}|${grain}|${cutsKey(cuts)}|${fastenersKey(fasteners)}`;
     let r = map.get(key);
     if (!r) {
       r = {
@@ -62,10 +66,11 @@ export function drawingRows(parts: readonly Part[]): DrawingRow[] {
         w,
         t: s.t,
         miter,
+        bevel,
         grain,
         cuts,
         fasteners,
-        short: r32(shortLength(len, w, miter)),
+        short: r32(shortLength([len, w, s.t], miter, bevel)),
         qty: 0,
         names: [],
       };
@@ -104,22 +109,17 @@ export function hull(points: readonly Pt[]): Pt[] {
   return [...lower.slice(0, -1), ...upper.slice(0, -1)];
 }
 
-/** The part's eight corners (its mitered face outline through the thickness) in world space. */
+/** The part's eight corners, end cuts included, in world space. */
 export function partCorners(p: Part): Vec3[] {
-  const [len, w, t] = partDims(p);
-  const outline = miterOutline(len, w, miterOf(p));
   const q = new Quaternion().fromArray(p.q);
-  const out: Vec3[] = [];
-  for (const [x, y] of outline)
-    for (const z of [-t / 2, t / 2]) {
-      const v = new Vector3(x, y, z).applyQuaternion(q);
-      out.push([
-        Math.round((v.x + p.pos[0]) * 1e6) / 1e6,
-        Math.round((v.y + p.pos[1]) * 1e6) / 1e6,
-        Math.round((v.z + p.pos[2]) * 1e6) / 1e6,
-      ]);
-    }
-  return out;
+  return endCutCorners(partDims(p), miterOf(p), bevelOf(p)).map((c) => {
+    const v = new Vector3().fromArray(c).applyQuaternion(q);
+    return [
+      Math.round((v.x + p.pos[0]) * 1e6) / 1e6,
+      Math.round((v.y + p.pos[1]) * 1e6) / 1e6,
+      Math.round((v.z + p.pos[2]) * 1e6) / 1e6,
+    ];
+  });
 }
 
 export type ViewName = 'front' | 'right' | 'top';
@@ -273,14 +273,18 @@ export function partSheetSvg(r: DrawingRow, pageW = 760): SheetResult {
   let svg = '';
   const notes: string[] = [];
 
-  // Face view: the miter outline, which is in centred local coordinates.
-  const outline = miterOutline(len, w, miter).map(
-    ([x, y]) => [fx(x + len / 2), fy(y + w / 2)] as Pt,
+  // Face view: the top face's outline (corners with +Z), in centred local coordinates.
+  const corners = endCutCorners([len, w, t], miter, r.bevel);
+  const face = [4, 5, 7, 6].map(
+    (i) => [fx(corners[i]![0] + len / 2), fy(corners[i]![1] + w / 2)] as Pt,
   );
-  svg += poly(outline, 'part');
-  // Edge view.
+  svg += poly(face, 'part');
+  // Edge view: the front edge (corners with −Y), where a bevel shows.
   svg += `<text x="${n(x0)}" y="${n(edgeTop - 10)}" ${TEXT} font-weight="600">Front edge</text>`;
-  svg += `<rect x="${n(fx(0))}" y="${n(ez(t))}" width="${n(len * s)}" height="${n(t * s)}" class="part"/>`;
+  const edge = [0, 1, 5, 4].map(
+    (i) => [fx(corners[i]![0] + len / 2), ez(corners[i]![2] + t / 2)] as Pt,
+  );
+  svg += poly(edge, 'part');
 
   // Joinery.
   const rect = (x: number, y: number, wd: number, ht: number, cls: string) =>
@@ -341,12 +345,27 @@ export function partSheetSvg(r: DrawingRow, pageW = 760): SheetResult {
     `${fmt(len)}${miter[0] || miter[1] ? ' long point' : ''}`,
     edgeBottom + 2,
   );
+  const b = r.bevel;
+  if (miter[0] || miter[1] || b[0] || b[1]) notes.push(`Short point ${fmt(r.short)}`);
   if (miter[0] || miter[1]) {
-    notes.push(`Short point ${fmt(r.short)} · miter A ${angle(miter[0])}, B ${angle(miter[1])}`);
+    notes.push(`Miter A ${angle(miter[0])}, B ${angle(miter[1])}`);
     if (miter[0])
       svg += `<text x="${n(fx(0) + 4)}" y="${n(faceTop + 12)}" ${TEXT}>${Math.abs(miter[0])}°</text>`;
     if (miter[1])
       svg += `<text x="${n(fx(len) - 4)}" y="${n(faceTop + 12)}" text-anchor="end" ${TEXT}>${Math.abs(miter[1])}°</text>`;
+  }
+  if (b[0] || b[1]) {
+    notes.push(`Bevel A ${bevelAngle(b[0])}, B ${bevelAngle(b[1])}`);
+    for (const end of [0, 1] as const)
+      if (b[end] && miter[end])
+        notes.push(
+          `End ${end ? 'B' : 'A'} compound: saw miter ${Math.abs(miter[end])}°, saw bevel ${sawBevel(miter[end], b[end])}°`,
+        );
+    // Bevel angles sit on the edge view, where the cut shows.
+    if (b[0])
+      svg += `<text x="${n(fx(0) + 4)}" y="${n(edgeTop + 12)}" ${TEXT}>${Math.abs(b[0])}°</text>`;
+    if (b[1])
+      svg += `<text x="${n(fx(len) - 4)}" y="${n(edgeTop + 12)}" text-anchor="end" ${TEXT}>${Math.abs(b[1])}°</text>`;
   }
   svg += dimV(fy(0), fy(w), fx(len) + 20, fmt(w), fx(len) + 2);
   svg += dimV(ez(0), ez(t), fx(len) + 20, fmt(t), fx(len) + 2);
@@ -362,6 +381,10 @@ export function partSheetSvg(r: DrawingRow, pageW = 760): SheetResult {
   };
 }
 
+const bevelAngle = (deg: number): string =>
+  deg === 0
+    ? 'square'
+    : `${Math.abs(deg)}°${deg > 0 ? ' (short point on top)' : ' (short point on bottom)'}`;
 const angle = (deg: number): string =>
   deg === 0
     ? 'square'

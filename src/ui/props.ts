@@ -16,6 +16,7 @@ import {
   grainOf,
   GRAINS,
   miterOf,
+  bevelOf,
   unionAABB,
   withMinKept,
   type AlignMode,
@@ -41,6 +42,7 @@ import type { Store } from '../store';
 import { fmt, parseLen } from '../units';
 import { esc, onChange, onClick } from './dom';
 import { keepFocus } from './fields';
+import { toast } from './toast';
 import { icon } from './icons';
 
 type SectionId = 'part' | 'transform' | 'arrange' | 'assembly' | 'fasteners' | 'array';
@@ -311,6 +313,10 @@ export class PropsPanel {
         const [ma, mb] = miterOf(p);
         part += `<div class="row"><div><label class="small">Miter A (−X end)</label><input type="number" id="pMiterA" value="${ma}" min="-75" max="75" step="0.5"></div><div><label class="small">Miter B (+X end)</label><input type="number" id="pMiterB" value="${mb}" min="-75" max="75" step="0.5"></div></div>
         <div class="muted note">Degrees from square, across the width. Positive puts the short point on the back (+Y) edge. Length is long point to long point.</div>`;
+        const [ba, bb] = bevelOf(p);
+        part += `<div class="row"><div><label class="small">Bevel A (−X end)</label><input type="number" id="pBevelA" value="${ba}" min="-75" max="75" step="0.5"></div><div><label class="small">Bevel B (+X end)</label><input type="number" id="pBevelB" value="${bb}" min="-75" max="75" step="0.5"></div></div>
+        <div class="muted note">Across the thickness. Positive puts the short point on the top (+Z) face. With a miter too, the cut list gives the saw's compound settings.</div>
+        <div class="row btns"><button id="bFitA" title="Cut end A to lie flat on the part or floor it points at, and bring its long point to touch">Fit end A</button><button id="bFitB" title="Cut end B to lie flat on the part or floor it points at, and bring its long point to touch">Fit end B</button></div>`;
       }
       if (!s.sheet) part += cutsEditorHtml(p);
       if (inGroup) {
@@ -501,6 +507,33 @@ export class PropsPanel {
       wireFastenersEditor(el, p, store, this.place);
       onChange(el, 'pMiterA', (i) => setMiter(0, i.value));
       onChange(el, 'pMiterB', (i) => setMiter(1, i.value));
+      const setBevel = (end: 0 | 1, text: string) => {
+        const v = clampMiter(parseFloat(text));
+        store.mutate(() => {
+          const b = bevelOf(p);
+          b[end] = v;
+          if (b[0] === 0 && b[1] === 0) delete p.bevel;
+          else p.bevel = b;
+        });
+      };
+      onChange(el, 'pBevelA', (i) => setBevel(0, i.value));
+      onChange(el, 'pBevelB', (i) => setBevel(1, i.value));
+      const fit = (end: 0 | 1) => {
+        const f = store.fitEnd(p.id, end);
+        const name = end ? 'B' : 'A';
+        if (!f) toast(`End ${name} points at nothing within 24".`);
+        else {
+          const change =
+            Math.abs(f.extend) >= 1 / 64
+              ? `, ${f.extend > 0 ? 'lengthened' : 'trimmed'} ${fmt(Math.abs(f.extend))} to touch`
+              : '';
+          toast(
+            `End ${name} cut to meet ${f.target}: miter ${f.miter}°, bevel ${f.bevel}°${change}.`,
+          );
+        }
+      };
+      onClick(el, 'bFitA', () => fit(0));
+      onClick(el, 'bFitB', () => fit(1));
     }
     const moveTo = (axis: 0 | 1 | 2, text: string) => {
       const v = parseLen(text);

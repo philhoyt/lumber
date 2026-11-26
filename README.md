@@ -65,6 +65,7 @@ theme.
 | Drag a ring while rotating         | Turn in 15° steps, Ctrl for 1°; the Part panel shows and sets angles      |
 | S, move the mouse or type, Enter   | Scale the cut length with the mouse (grid steps) or set it by number      |
 | Drag a handle at a part's end      | Pull that end to meet another part; the end snaps to faces                |
+| Fit end A / B (Part panel)         | Cut the end to meet what it points at: miter, bevel and length            |
 | Shift+A                            | Add stock at the pointer                                                  |
 | Shift+D                            | Duplicate and grab the copy; Ctrl+D duplicates with an offset             |
 | Array (Part panel)                 | A live array: count or fit-to-length, on center or by gap; Apply bakes it |
@@ -135,8 +136,12 @@ the cut.
 
 Boards can have a miter at each end: two angle fields in the Part section,
 degrees from square, cut across the width, positive for a short point on the
-back edge. The length stays long point to long point; the cut list prints the
-angles and the short-point length, and the 3D view draws the angled ends.
+back edge. Bevels are the same across the thickness, positive for a short point
+on the top face, and an end with both is a compound cut. The length stays long
+point to long point; the cut list prints the angles, the short-point length and
+the saw's compound settings, and the 3D view and drawings show the angled ends.
+Fit end A or B cuts that end to lie flat on the part or the floor it points at,
+an angled kicker meeting the slab say, and brings its long point to touch.
 
 The stock table is yours to edit: the gear button in the palette opens it. Change
 sizes, purchase lengths, prices and colors, add custom boards or sheets, delete

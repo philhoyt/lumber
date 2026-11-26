@@ -44,6 +44,12 @@ export interface Part {
    */
   miter?: [number, number];
   /**
+   * Bevel angles in degrees at the −X and +X ends, cut across the thickness (a kicker
+   * meeting the floor, a sloped top edge). 0 is square. Positive puts the short point on
+   * the top (+Z) face, negative on the bottom. With a miter too, the end is a compound cut.
+   */
+  bevel?: [number, number];
+  /**
    * Sheet parts: which way the part's length must run relative to the sheet's grain,
    * which runs along a plywood sheet's long side. Unset means either way is fine.
    */
@@ -183,6 +189,48 @@ export const MAX_MITER = 75;
 /** A part's miter angles, square when unset. */
 export const miterOf = (p: Part): [number, number] => p.miter ?? [0, 0];
 export const hasMiter = (p: Part): boolean => miterOf(p).some((a) => a !== 0);
+/** A part's bevel angles, square when unset. */
+export const bevelOf = (p: Part): [number, number] => p.bevel ?? [0, 0];
+export const hasBevel = (p: Part): boolean => bevelOf(p).some((a) => a !== 0);
+/** Whether either end is anything but a square cut. */
+export const hasEndCut = (p: Part): boolean => hasMiter(p) || hasBevel(p);
+/** The shortest a part may be cut, inches. */
+export const MIN_LEN = 1 / 16;
+
+/**
+ * The eight corners of a board with its end cuts, in its local frame, indexed by bits:
+ * 1 for the +X end, 2 for the +Y edge, 4 for the +Z face. Each end is a plane through
+ * the end's long point: a miter tilts it across the width, a bevel across the thickness,
+ * both together make a compound cut.
+ */
+export function endCutCorners(
+  dims: Vec3,
+  miter: [number, number],
+  bevel: [number, number],
+): Vec3[] {
+  const [len, w, t] = dims;
+  const tan = (deg: number) => Math.tan((Math.abs(deg) * Math.PI) / 180);
+  const xAt = (end: 0 | 1, y: number, z: number): number => {
+    const m = miter[end];
+    const b = bevel[end];
+    const back = tan(m) * (Math.sign(m) * y + w / 2) + tan(b) * (Math.sign(b) * z + t / 2);
+    return end ? len / 2 - back : -len / 2 + back;
+  };
+  const out: Vec3[] = [];
+  for (let i = 0; i < 8; i++) {
+    const y = i & 2 ? w / 2 : -w / 2;
+    const z = i & 4 ? t / 2 : -t / 2;
+    out.push([xAt(i & 1 ? 1 : 0, y, z), y, z]);
+  }
+  return out;
+}
+
+/** The saw's bevel setting for a compound cut: a face bevel `b` with the table at miter `m`. */
+export function sawBevel(miter: number, bevel: number): number {
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const beta = Math.atan(Math.tan(rad(Math.abs(bevel))) * Math.cos(rad(miter)));
+  return Math.round(((beta * 180) / Math.PI) * 2) / 2;
+}
 
 /** Clamp and tidy a typed angle: whole or half degrees, within the limits. */
 export function clampMiter(deg: number): number {
@@ -223,11 +271,15 @@ export function miterOutline(
  * the same edge that edge is shorter by both setbacks; on opposite edges (a
  * parallelogram) both edges lose one setback.
  */
-export function shortLength(len: number, width: number, miter: [number, number]): number {
-  const o = miterOutline(len, width, miter);
-  const bottom = o[1]![0] - o[0]![0];
-  const top = o[2]![0] - o[3]![0];
-  return Math.min(bottom, top);
+export function shortLength(
+  dims: Vec3,
+  miter: [number, number],
+  bevel: [number, number] = [0, 0],
+): number {
+  const c = endCutCorners(dims, miter, bevel);
+  let short = Infinity;
+  for (const i of [0, 2, 4, 6]) short = Math.min(short, c[i + 1]![0] - c[i]![0]);
+  return short;
 }
 
 export interface AABB {
@@ -360,12 +412,17 @@ export function partAABB(p: Part): AABB {
   _q.fromArray(p.q);
   const min: Vec3 = [Infinity, Infinity, Infinity];
   const max: Vec3 = [-Infinity, -Infinity, -Infinity];
+  // The corners as cut: a mitered or beveled end reaches less far than the plain box.
+  const cut = hasEndCut(p) && !stockById(p.stock).sheet;
+  const corners = cut ? endCutCorners(d, miterOf(p), bevelOf(p)) : null;
   for (let i = 0; i < 8; i++) {
-    _v.set(
-      ((i & 1 ? 1 : -1) * d[0]) / 2,
-      ((i & 2 ? 1 : -1) * d[1]) / 2,
-      ((i & 4 ? 1 : -1) * d[2]) / 2,
-    ).applyQuaternion(_q);
+    if (corners) _v.fromArray(corners[i]!).applyQuaternion(_q);
+    else
+      _v.set(
+        ((i & 1 ? 1 : -1) * d[0]) / 2,
+        ((i & 2 ? 1 : -1) * d[1]) / 2,
+        ((i & 4 ? 1 : -1) * d[2]) / 2,
+      ).applyQuaternion(_q);
     const c: Vec3 = [_v.x + p.pos[0], _v.y + p.pos[1], _v.z + p.pos[2]];
     for (const a of [0, 1, 2] as const) {
       min[a] = Math.min(min[a], c[a]);
@@ -547,6 +604,11 @@ export function mirrorParts(list: Part[], axis: Axis): void {
       const [m0, m1] = p.miter;
       if (local === 0) p.miter = [m1, m0];
       else if (local === 1) p.miter = [-m0 || 0, -m1 || 0];
+    }
+    if (p.bevel) {
+      const [b0, b1] = p.bevel;
+      if (local === 0) p.bevel = [b1, b0];
+      else if (local === 2) p.bevel = [-b0 || 0, -b1 || 0];
     }
     if (p.cuts?.length) {
       const dims = partDims(p);
