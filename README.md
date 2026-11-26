@@ -47,7 +47,7 @@ The keys follow Blender, and the world is Z-up like Blender: X runs left to
 right, −Y is the front, Z is up.
 
 The tool strip on the left holds the same actions as buttons, with the key in
-each tooltip, and the view presets below them. T shows or hides the stock
+each tooltip; the views are on the navigation gizmo in the view's corner. T shows or hides the stock
 palette, N the side panel with its Parts and Cut list tabs and the properties
 sections. ? opens the full key reference. The sun/moon button switches the
 theme.
