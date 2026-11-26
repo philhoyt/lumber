@@ -284,6 +284,46 @@ export class Store {
       }
     });
   }
+  /**
+   * Put parts into a group, or into none. A part joining an array group becomes part of
+   * its source cell; a copy pulled out of one becomes an ordinary part and the array
+   * fills its place again.
+   */
+  moveToGroup(ids: Iterable<number>, groupId: number | undefined): void {
+    const target = groupId === undefined ? undefined : this.groupById(groupId);
+    if (groupId !== undefined && !target) return;
+    const list = [...ids]
+      .map((id) => this.partById(id))
+      .filter((p): p is Part => !!p && p.group !== groupId);
+    if (!list.length) return;
+    this.mutate(() => {
+      for (const p of list) {
+        if (groupId === undefined) delete p.group;
+        else p.group = groupId;
+        if (target?.array) p.arrayIndex = 0;
+        else delete p.arrayIndex;
+      }
+    });
+  }
+  /** Nest a group inside another (or at the top level); never inside itself. */
+  reparentGroup(id: number, parent: number | undefined): void {
+    const g = this.groupById(id);
+    if (!g || g.parent === parent || id === parent) return;
+    if (parent !== undefined && (!this.groupById(parent) || this.isInside(parent, id))) return;
+    this.mutate(() => {
+      if (parent === undefined) delete g.parent;
+      else g.parent = parent;
+    });
+  }
+  /** Whether group `id` is `ancestor` or nested somewhere inside it. */
+  isInside(id: number, ancestor: number): boolean {
+    let g = this.groupById(id);
+    while (g) {
+      if (g.id === ancestor) return true;
+      g = g.parent === undefined ? undefined : this.groupById(g.parent);
+    }
+    return false;
+  }
   renameGroup(id: number, name: string): void {
     const g = this.groupById(id);
     const next = name.trim();

@@ -13,6 +13,10 @@ const SECTIONS: [string, [string, string][]][] = [
       ['A / Alt+A', 'Select all / none'],
       ['Right-click', 'Menu for the selection or the scene'],
       ['Right-click a Parts-list row', 'Rename, frame, hide others, group, and the rest'],
+      [
+        'Drag a Parts-list row',
+        'Onto a group to join it, onto a loose part to group, off to leave',
+      ],
     ],
   ],
   [

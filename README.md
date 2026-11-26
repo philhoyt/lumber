@@ -110,6 +110,10 @@ group, double-click picks the single part, groups nest, and duplicating a
 whole group makes a new group. The Parts list shows groups as expandable
 nodes, then loose parts grouped by
 stock: click to select, Shift+click to extend, double-click (or F2) to rename,
+drag a row onto a group to move the part into it, onto another loose part to group
+the two, or onto the list's background to take it out of its group (a group dragged
+onto another nests inside it); stock dragged from the palette onto the list is added,
+into the group it lands on,
 and the eye to hide or show. Hovering a row highlights the part.
 
 You can drag a part's body to slide it on the floor, or drag the gizmo's

@@ -91,6 +91,51 @@ describe('groups', () => {
     expect(s.parts).toHaveLength(6);
   });
 
+  it('moves parts into and out of groups', () => {
+    const { s, a, b } = twoParts();
+    const g = s.groupSelected()!;
+    const c = s.addPart('2x6');
+    s.moveToGroup([c.id], g.id);
+    expect(s.membersOf(g.id).map((p) => p.id)).toEqual([a.id, b.id, c.id]);
+    s.moveToGroup([a.id], undefined);
+    expect(s.membersOf(g.id).map((p) => p.id)).toEqual([b.id, c.id]);
+    expect(s.partById(a.id)!.group).toBeUndefined();
+    s.moveToGroup([b.id, c.id], undefined);
+    expect(s.groups).toHaveLength(0); // emptied, so pruned
+    s.undo();
+    expect(s.groups).toHaveLength(1);
+  });
+
+  it('keeps an array whole when a copy is pulled out, and copies a part moved in', () => {
+    const s = new Store();
+    s.addPart('2x4');
+    const g = s.setArray({ axis: 'x', count: 3, spacing: 16, mode: 'center' })!;
+    const copy = s.parts.find((p) => p.arrayIndex === 2)!;
+    s.moveToGroup([copy.id], undefined);
+    expect(s.parts.filter((p) => p.group === g.id)).toHaveLength(3);
+    expect(s.partById(copy.id)!.group).toBeUndefined();
+    expect(s.partById(copy.id)!.arrayIndex).toBeUndefined();
+    const extra = s.addPart('2x6');
+    s.moveToGroup([extra.id], g.id);
+    expect(s.parts.filter((p) => p.group === g.id)).toHaveLength(6);
+  });
+
+  it('nests groups by re-parenting, never inside themselves', () => {
+    const { s } = twoParts();
+    const inner = s.groupSelected()!;
+    const c = s.addPart('2x4');
+    const d = s.addPart('2x4');
+    s.select([c.id, d.id]);
+    const outer = s.groupSelected()!;
+    s.reparentGroup(inner.id, outer.id);
+    expect(s.groupById(inner.id)!.parent).toBe(outer.id);
+    expect(s.membersOf(outer.id)).toHaveLength(4);
+    s.reparentGroup(outer.id, inner.id); // a cycle: refused
+    expect(s.groupById(outer.id)!.parent).toBeUndefined();
+    s.reparentGroup(inner.id, undefined);
+    expect(s.groupById(inner.id)!.parent).toBeUndefined();
+  });
+
   it('renames groups and keeps them in the saved document', () => {
     const { s } = twoParts();
     const g = s.groupSelected()!;

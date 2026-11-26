@@ -193,6 +193,25 @@ test('Alt + hover shows the distance from the selection to another part', async 
   await expect(label).toBeHidden();
 });
 
+test('rows drag onto each other, into groups and back out', async ({ page }) => {
+  await openBench(page);
+  const row = (name: string) => page.locator('.out-row', { hasText: name }).first();
+  // A loose part dropped on another loose part groups the two.
+  await row('Leg LF').dragTo(row('Leg RF'));
+  const group = page.locator('.out-row.group');
+  await expect(group).toContainText('2 parts');
+  // Another part dropped on the group joins it.
+  await row('Leg LB').dragTo(group);
+  await expect(group).toContainText('3 parts');
+  // Dropped on a stock heading (the list background), a part leaves its group.
+  await row('Leg LB').dragTo(page.locator('.out-group', { hasText: '2x4' }));
+  await expect(group).toContainText('2 parts');
+  // Stock from the palette dropped on the group is added into it.
+  await page.locator('#boards .stock', { hasText: '2x6' }).first().dragTo(group);
+  await expect(group).toContainText('3 parts');
+  await expect(page.locator('#stat')).toContainText('13 parts');
+});
+
 test('G moves by a typed distance along the constrained axis', async ({ page }) => {
   await openBench(page);
   await selectPart(page, 'Leg LF');

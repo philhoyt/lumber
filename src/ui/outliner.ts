@@ -9,6 +9,7 @@ import { partDims, type Group, type Part } from '../model';
 import { getStock, stockById } from '../stock';
 import type { Store } from '../store';
 import type { ListTarget } from './menu';
+import { DRAG_TYPE } from './palette';
 import { fmt } from '../units';
 import { hex } from './dom';
 
@@ -17,6 +18,27 @@ export interface HoverTarget {
 }
 
 type Renaming = { kind: 'part' | 'group'; id: number } | null;
+
+/** Drag data for rows: the part ids, or the group id, being moved. */
+const PARTS_TYPE = 'application/x-lumber-parts';
+const GROUP_TYPE = 'application/x-lumber-group';
+
+/** What a drag carries, read from its types. */
+type Dragged =
+  { kind: 'parts'; ids: number[] } | { kind: 'group'; id: number } | { kind: 'stock'; id: string };
+
+function readDrag(dt: DataTransfer | null): Dragged | null {
+  if (!dt) return null;
+  if (dt.types.includes(PARTS_TYPE))
+    return { kind: 'parts', ids: JSON.parse(dt.getData(PARTS_TYPE) || '[]') as number[] };
+  if (dt.types.includes(GROUP_TYPE)) return { kind: 'group', id: Number(dt.getData(GROUP_TYPE)) };
+  if (dt.types.includes(DRAG_TYPE)) return { kind: 'stock', id: dt.getData(DRAG_TYPE) };
+  return null;
+}
+
+function canDrop(dt: DataTransfer | null): boolean {
+  return !!dt && [PARTS_TYPE, GROUP_TYPE, DRAG_TYPE].some((t) => dt.types.includes(t));
+}
 
 /** The context-menu key, or Shift+F10, on a focused row. */
 function isMenuKey(e: KeyboardEvent): boolean {
@@ -48,6 +70,22 @@ export class OutlinerPanel {
       this.render();
     });
     body.addEventListener('mouseleave', () => view.hover(null));
+    // Dropping on the list's background, or a stock heading, takes parts out of their
+    // group, and adds dragged stock as a loose part.
+    body.addEventListener('dragover', (e) => {
+      if (!canDrop(e.dataTransfer)) return;
+      e.preventDefault();
+      body.classList.add('drop-loose');
+    });
+    body.addEventListener('dragleave', (e) => {
+      if (e.target === body) body.classList.remove('drop-loose');
+    });
+    body.addEventListener('drop', (e) => {
+      body.classList.remove('drop-loose');
+      if (e.defaultPrevented) return;
+      e.preventDefault();
+      this.dropOn(readDrag(e.dataTransfer), undefined);
+    });
     store.subscribe((kind) => {
       if (kind !== 'drag') this.render();
     });
@@ -199,6 +237,7 @@ export class OutlinerPanel {
       if (e.key.startsWith('Arrow')) this.render();
     });
     el.addEventListener('mouseenter', () => this.view.hover(null));
+    this.wireDrag(el, { kind: 'group', id: g.id }, () => [GROUP_TYPE, String(g.id)]);
     body.appendChild(el);
 
     let shown = 0;
@@ -262,6 +301,11 @@ export class OutlinerPanel {
       e.stopPropagation();
     });
     el.addEventListener('mouseenter', () => view.hover(p.hidden ? null : p.id));
+    // A selected row drags the whole selection; any other row drags just itself.
+    this.wireDrag(el, { kind: 'part', id: p.id }, () => [
+      PARTS_TYPE,
+      JSON.stringify(store.selected.has(p.id) ? [...store.selected] : [p.id]),
+    ]);
     return el;
   }
 
@@ -276,6 +320,63 @@ export class OutlinerPanel {
       onClick();
     });
     return eye;
+  }
+
+  /** What a drop means: into a group (or none), or onto a part. */
+  private dropOn(d: Dragged | null, onto: ListTarget | undefined): void {
+    const { store } = this;
+    if (!d) return;
+    const intoGroup = onto?.kind === 'group' ? onto.id : undefined;
+    const ontoPart = onto?.kind === 'part' ? store.partById(onto.id) : undefined;
+    if (d.kind === 'stock') {
+      const p = store.addPart(d.id);
+      const g = intoGroup ?? ontoPart?.group;
+      if (g !== undefined) store.moveToGroup([p.id], g);
+      return;
+    }
+    if (d.kind === 'group') {
+      if (onto?.kind === 'part') return;
+      store.reparentGroup(d.id, intoGroup);
+      return;
+    }
+    const ids = d.ids.filter((id) => id !== ontoPart?.id);
+    if (!ids.length) return;
+    if (ontoPart && ontoPart.group === undefined) {
+      // Dropped on a loose part: the two (or more) become a new group.
+      store.select([...ids, ontoPart.id]);
+      store.groupSelected();
+      return;
+    }
+    store.moveToGroup(ids, ontoPart ? ontoPart.group : intoGroup);
+  }
+
+  /** Make a row a drag source and a drop target. */
+  private wireDrag(el: HTMLElement, target: ListTarget, dragData: () => [string, string]): void {
+    el.draggable = true;
+    el.addEventListener('dragstart', (e) => {
+      if (!e.dataTransfer) return;
+      const [type, data] = dragData();
+      e.dataTransfer.setData(type, data);
+      e.dataTransfer.effectAllowed = 'move';
+      el.classList.add('dragging');
+    });
+    el.addEventListener('dragend', () => el.classList.remove('dragging'));
+    el.addEventListener('dragover', (e) => {
+      if (!canDrop(e.dataTransfer)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer)
+        e.dataTransfer.dropEffect = e.dataTransfer.types.includes(DRAG_TYPE) ? 'copy' : 'move';
+      el.classList.add('drop-into');
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('drop-into'));
+    el.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      el.classList.remove('drop-into');
+      this.body.classList.remove('drop-loose');
+      this.dropOn(readDrag(e.dataTransfer), target);
+    });
   }
 
   /** Start renaming a row in place, as F2 does. */

@@ -691,6 +691,15 @@ footer .saved.warn {
   outline: 1px solid var(--sel);
   outline-offset: -1px;
 }
+.out-row.dragging {
+  opacity: 0.5;
+}
+.out-row.drop-into {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+#outBody.drop-loose {
+  background: var(--panel2);
+}
 .out-row.hidden-part {
   color: var(--muted);
   font-style: italic;
