@@ -344,13 +344,25 @@ export class PropsPanel {
         <div class="muted note">Plywood grain runs the long way of the sheet. The nesting only turns the part the way you allow.</div>`;
       }
       if (!s.sheet) {
-        const [ma, mb] = miterOf(p);
-        part += `<div class="row"><div><label class="small">Miter A (−X end)</label><input type="number" id="pMiterA" value="${ma}" min="-75" max="75" step="0.5"></div><div><label class="small">Miter B (+X end)</label><input type="number" id="pMiterB" value="${mb}" min="-75" max="75" step="0.5"></div></div>
-        <div class="muted note">Degrees from square, across the width. Positive puts the short point on the back (+Y) edge. Length is long point to long point.</div>`;
-        const [ba, bb] = bevelOf(p);
-        part += `<div class="row"><div><label class="small">Bevel A (−X end)</label><input type="number" id="pBevelA" value="${ba}" min="-75" max="75" step="0.5"></div><div><label class="small">Bevel B (+X end)</label><input type="number" id="pBevelB" value="${bb}" min="-75" max="75" step="0.5"></div></div>
-        <div class="muted note">Across the thickness. Positive puts the short point on the top (+Z) face. With a miter too, the cut list gives the saw's compound settings.</div>
-        <div class="row btns"><button id="bFitA" title="Cut end A to lie flat on the part or floor it points at, and bring its long point to touch">Fit end A</button><button id="bFitB" title="Cut end B to lie flat on the part or floor it points at, and bring its long point to touch">Fit end B</button></div>`;
+        // One row per end: miter, bevel and Fit. The sign conventions live in the tooltips.
+        const m = miterOf(p);
+        const b = bevelOf(p);
+        const angle = (id: string, label: string, title: string, value: number) =>
+          inlineField(
+            id,
+            label,
+            title,
+            `<input type="number" id="${id}" value="${value}" min="-75" max="75" step="0.5">`,
+            '°',
+          );
+        const endRow = (end: 0 | 1) => {
+          const name = end ? 'B' : 'A';
+          return `<div class="row ends"><div class="endlab" title="End ${name} is the ${end ? '+X' : '−X'} end of the part">End ${name} <span class="muted">${end ? '+X' : '−X'}</span></div>
+          ${angle(`pMiter${name}`, 'M', `Miter at end ${name}: degrees from square, across the width. Positive puts the short point on the back (+Y) edge. Length is long point to long point.`, m[end])}
+          ${angle(`pBevel${name}`, 'B', `Bevel at end ${name}: degrees across the thickness. Positive puts the short point on the top (+Z) face. With a miter too, the cut list gives the saw's compound settings.`, b[end])}
+          <div class="grow0"><button id="bFit${name}" title="Cut end ${name} to lie flat on the part or floor it points at, and bring its long point to touch">Fit</button></div></div>`;
+        };
+        part += `<label class="small" title="M is the miter, B the bevel, in degrees from square">End cuts</label>${endRow(0)}${endRow(1)}`;
       }
       if (!s.sheet) part += cutsEditorHtml(p);
       if (inGroup) {

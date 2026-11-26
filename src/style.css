@@ -836,6 +836,20 @@ footer .saved.warn {
   gap: 4px;
   flex-wrap: wrap;
 }
+/* End cuts: a row per end with its miter, bevel and Fit. */
+.row.ends {
+  gap: 6px;
+  align-items: center;
+}
+.row.ends .endlab {
+  flex: none;
+  width: 54px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.row.ends button {
+  padding: 4px 9px;
+}
 .row.btns button {
   flex: 1;
 }
