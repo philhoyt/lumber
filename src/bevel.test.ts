@@ -117,3 +117,40 @@ describe('fitEnd', () => {
     expect(fitEnd(p, 1, [far])).toBeNull();
   });
 });
+
+describe('fitEnd against a leaning part', () => {
+  it('cuts a kicker to lie flat on the back of a panel leaning 20 degrees', () => {
+    // A 4x8 sheet standing up and leaning back, like a climbing wall panel.
+    const panel: Part = {
+      id: 2,
+      stock: 'ply34',
+      len: 96,
+      w: 48,
+      pos: [0, 10, 48],
+      q: quatFromEuler([-70, 0, 0]),
+      name: 'panel',
+    };
+    const pq = new Quaternion().fromArray(panel.q);
+    const n = new Vector3(0, 0, 1).applyQuaternion(pq); // one broad face's outward normal
+    const facePoint = new Vector3().fromArray(panel.pos).addScaledVector(n, 0.375);
+    // A 2x4 kicker whose end A points at that face from an angle 10" away.
+    const d = n
+      .clone()
+      .negate()
+      .add(new Vector3(0, 0, -0.8))
+      .normalize();
+    const kq = new Quaternion().setFromUnitVectors(new Vector3(1, 0, 0), d.clone().negate());
+    const kpos = facePoint.clone().addScaledVector(d, -(24 + 10));
+    const kicker = part({ pos: [kpos.x, kpos.y, kpos.z], q: [kq.x, kq.y, kq.z, kq.w] });
+    const fit = fitEnd(kicker, 0, [panel], 60);
+    expect(fit?.target).toBe('panel');
+    expect(fit!.extend).toBeGreaterThan(5);
+    applyFit(kicker, 0, fit!);
+    // The cut end's four corners all lie on the panel's face plane.
+    const c = worldCorners(kicker, [kicker.len, 3.5, 1.5]);
+    for (const i of [0, 2, 4, 6]) {
+      const off = n.dot(new Vector3().fromArray(c[i]!).sub(facePoint));
+      expect(Math.abs(off)).toBeLessThan(0.03);
+    }
+  });
+});

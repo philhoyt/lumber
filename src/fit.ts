@@ -6,17 +6,7 @@
  * lengthen or trim so the long point lands on it.
  */
 import { Quaternion, Vector3 } from 'three';
-import {
-  bevelOf,
-  clampMiter,
-  isSquare,
-  miterOf,
-  partAABB,
-  partDims,
-  MIN_LEN,
-  type Part,
-  type Vec3,
-} from './model';
+import { bevelOf, clampMiter, miterOf, partDims, MIN_LEN, type Part, type Vec3 } from './model';
 
 export interface EndFit {
   /** What the end meets: a part's name, or "the floor". */
@@ -99,12 +89,20 @@ export function endTarget(
     });
   }
   for (const o of others) {
-    if (o.hidden || !isSquare(o.q)) continue;
-    const b = partAABB(o);
-    const hit = enterBox(centre, dir, b.min, b.max);
+    if (o.hidden) continue;
+    // Look at the other part in its own frame, where it is a plain box, so a leaning
+    // panel's face is as good a target as a square part's.
+    const oq = new Quaternion().fromArray(o.q);
+    const inv = oq.clone().invert();
+    const opos = new Vector3().fromArray(o.pos);
+    const localOrigin = centre.clone().sub(opos).applyQuaternion(inv);
+    const localDir = dir.clone().applyQuaternion(inv);
+    const [L, W, T] = partDims(o);
+    const hit = enterBox(localOrigin, localDir, [-L / 2, -W / 2, -T / 2], [L / 2, W / 2, T / 2]);
     if (!hit) continue;
     const normal = new Vector3();
     normal.setComponent(hit.axis, hit.side);
+    normal.applyQuaternion(oq);
     consider({
       name: o.name,
       t: hit.t,
