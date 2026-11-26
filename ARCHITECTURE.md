@@ -27,6 +27,14 @@ units      stock        pure data and conversions, no dependencies
      main              wires it together
 ```
 
+Panel fields share one set of behaviours in `ui/fields.ts`: arrow keys step a value,
+dragging a field's label scrubs it (the store folds the run into one undo step), and
+Escape puts back what the field held. A field reads its text through `parseLenEdit`
+in `units.ts`, so a leading operator changes the value in place and a Mixed field
+can be edited for every selected part at once. The properties panel (`ui/props.ts`)
+builds its numeric fields with `inlineField`, label inside the box, and keeps the
+selection's actions in a sticky header above the sections.
+
 The scene keeps the interaction (picking, the modal transforms, box select,
 the pointer and key handlers) and delegates the rest to `view/`:
 

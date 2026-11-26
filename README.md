@@ -142,10 +142,11 @@ width), groove (along the length), rabbet (along an end or edge) or notch
 width and depth. The 3D view subtracts them and the cut list prints them under
 the cut.
 
-Boards can have a miter at each end: two angle fields in the Part section,
-degrees from square, cut across the width, positive for a short point on the
-back edge. Bevels are the same across the thickness, positive for a short point
-on the top face, and an end with both is a compound cut. The length stays long
+Boards can have a miter and a bevel at each end: the End cuts rows in the Part
+section, one per end, with M for the miter and B for the bevel in degrees from
+square. A miter is cut across the width, positive for a short point on the back
+edge; a bevel across the thickness, positive for a short point on the top face;
+an end with both is a compound cut. The length stays long
 point to long point; the cut list prints the angles, the short-point length and
 the saw's compound settings, and the 3D view and drawings show the angled ends.
 Fit end A or B cuts that end to lie flat on the part or the floor it points at,
