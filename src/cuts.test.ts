@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { clampCut, cutBox, cutsKey, defaultCut, describeCut, type Cut, type Part } from './model';
+import {
+  clampCut,
+  cutBox,
+  cutsKey,
+  defaultCut,
+  describeCut,
+  mirrorCut,
+  type Cut,
+  type Part,
+} from './model';
+import { chamferWedge, partGeometry } from './view/partMesh';
 import { cutRows } from './pack';
 import { parseDocument } from './document';
 import { fmt } from './units';
@@ -60,8 +70,84 @@ describe('clampCut and defaults', () => {
     expect(n.depth).toBe(3.5);
   });
   it('has a default of every kind', () => {
-    for (const k of ['dado', 'groove', 'rabbet', 'notch'] as const)
+    for (const k of ['dado', 'groove', 'rabbet', 'notch', 'chamfer'] as const)
       expect(defaultCut(k).kind).toBe(k);
+  });
+});
+
+describe('chamfer', () => {
+  const front: Cut = { kind: 'chamfer', face: 'top', edge: 'front', width: 0.25, depth: 0.5 };
+  it('boxes like a rabbet on the same edge and clamps the same way', () => {
+    const b = cutBox(front, dims)!;
+    expect(b.max[1]).toBeCloseTo(-1.75 + 0.25);
+    expect(b.min[2]).toBeCloseTo(0.75 - 0.5);
+    expect(clampCut({ ...front, width: 9, depth: 9 }, dims)).toMatchObject({
+      width: 3.5,
+      depth: 1.5,
+    });
+  });
+  it('is a wedge: its sloped face runs from the width mark on the face to the depth mark on the edge', () => {
+    const geo = chamferWedge(front, dims);
+    geo.computeBoundingBox();
+    const bb = geo.boundingBox!;
+    expect(bb.min.y).toBeLessThan(-1.75); // pokes out past the front edge
+    expect(bb.max.z).toBeGreaterThan(0.75); // and above the top face
+    expect(bb.max.y).toBeCloseTo(-1.5 + 0.02 * 0.5, 6); // the chamfer line, extended past the face
+    expect(bb.min.z).toBeCloseTo(0.25 - 0.02 * 2, 6); // and past the edge
+    expect(bb.min.x).toBeLessThan(-48);
+    expect(bb.max.x).toBeGreaterThan(48);
+    expect(geo.getAttribute('position').count).toBe(24); // two triangles and three quads
+  });
+  it('takes a corner off the part without changing its bounds', () => {
+    const p: Part = {
+      id: 1,
+      stock: '2x4',
+      len: 96,
+      pos: [0, 0, 0],
+      q: [0, 0, 0, 1],
+      name: 'a',
+      cuts: [front],
+    };
+    const geo = partGeometry(p, dims);
+    geo.computeBoundingBox();
+    expect(geo.boundingBox!.max.z).toBeCloseTo(0.75, 5);
+    expect(geo.boundingBox!.min.y).toBeCloseTo(-1.75, 5);
+    expect(geo.getAttribute('position').count).toBeGreaterThan(36); // seven faces now
+    // The corner itself is gone: no vertex sits at the front-top edge.
+    const pos = geo.getAttribute('position');
+    for (let i = 0; i < pos.count; i++)
+      expect(pos.getY(i) < -1.74 && pos.getZ(i) > 0.74).toBe(false);
+  });
+  it('subtracts from a mitered board too, which has no uv to carry', () => {
+    const p: Part = {
+      id: 1,
+      stock: '2x4',
+      len: 96,
+      pos: [0, 0, 0],
+      q: [0, 0, 0, 1],
+      name: 'a',
+      miter: [0, 45],
+      cuts: [{ kind: 'dado', face: 'top', at: 12, width: 0.75, depth: 0.375 }],
+    };
+    expect(partGeometry(p, dims).getAttribute('position').count).toBeGreaterThan(36);
+  });
+  it('reads like a shop note and mirrors like a rabbet', () => {
+    expect(describeCut({ ...front, depth: 0.25 }, fmt)).toBe(
+      'chamfer 1/4" at 45° off front edge, top',
+    );
+    expect(describeCut(front, fmt)).toBe('chamfer 1/4" across × 1/2" down off front edge, top');
+    expect(mirrorCut(front, 1, dims)).toMatchObject({ edge: 'back' });
+    expect(mirrorCut(front, 2, dims)).toMatchObject({ face: 'bottom' });
+    expect(mirrorCut(front, 0, dims)).toEqual(front);
+    expect(mirrorCut({ ...front, edge: 'endA' }, 0, dims)).toMatchObject({ edge: 'endB' });
+  });
+  it('is kept from a file only with an edge, a face and sizes', () => {
+    const file = (cuts: unknown) => ({
+      version: 2,
+      parts: [{ id: 1, stock: '2x4', len: 96, pos: [0, 0, 0], q: [0, 0, 0, 1], name: 'a', cuts }],
+    });
+    expect(parseDocument(file([front]))!.parts[0]!.cuts).toEqual([front]);
+    expect(parseDocument(file([{ ...front, edge: 'side' }]))!.parts[0]!.cuts).toBeUndefined();
   });
 });
 

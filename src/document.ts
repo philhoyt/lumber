@@ -60,11 +60,12 @@ export function parseDocument(o: unknown): Document | null {
             const k = (c as Cut).kind;
             if (!CUT_KINDS.includes(k)) return false;
             const o = c as Record<string, unknown>;
-            const nums = k === 'rabbet' ? ['width', 'depth'] : ['at', 'width', 'depth'];
+            const onEdge = k === 'rabbet' || k === 'chamfer';
+            const nums = onEdge ? ['width', 'depth'] : ['at', 'width', 'depth'];
             if (!nums.every((f) => typeof o[f] === 'number' && o[f] >= 0)) return false;
             if (k === 'notch') return o.edge === 'front' || o.edge === 'back';
             if (o.face !== 'top' && o.face !== 'bottom') return false;
-            if (k === 'rabbet') return ['endA', 'endB', 'front', 'back'].includes(o.edge as string);
+            if (onEdge) return ['endA', 'endB', 'front', 'back'].includes(o.edge as string);
             return true;
           })
         : [];

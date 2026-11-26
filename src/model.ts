@@ -84,12 +84,14 @@ export function isCylinderPart(p: Part): boolean {
 }
 
 /**
- * A rectangular cut taken out of a board, in its local frame (X length, Y width, Z
- * thickness). Positions are from end A (−X) or the front edge (−Y).
+ * A cut taken out of a board, in its local frame (X length, Y width, Z thickness).
+ * Positions are from end A (−X) or the front edge (−Y).
  * - dado: across the width on a broad face, `at` from end A along the length
  * - groove: along the length on a broad face, `at` from the front edge
  * - rabbet: along an end or an edge on a broad face, `width` in from that edge
  * - notch: through the thickness, into an edge, `at` from end A, `depth` into the width
+ * - chamfer: the corner taken off where a face meets an end or an edge, `width` across
+ *   the face and `depth` down the edge; equal for 45°
  */
 export type Cut =
   | { kind: 'dado'; face: 'top' | 'bottom'; at: number; width: number; depth: number }
@@ -101,9 +103,16 @@ export type Cut =
       width: number;
       depth: number;
     }
-  | { kind: 'notch'; edge: 'front' | 'back'; at: number; width: number; depth: number };
+  | { kind: 'notch'; edge: 'front' | 'back'; at: number; width: number; depth: number }
+  | {
+      kind: 'chamfer';
+      face: 'top' | 'bottom';
+      edge: 'endA' | 'endB' | 'front' | 'back';
+      width: number;
+      depth: number;
+    };
 
-export const CUT_KINDS: Cut['kind'][] = ['dado', 'groove', 'rabbet', 'notch'];
+export const CUT_KINDS: Cut['kind'][] = ['dado', 'groove', 'rabbet', 'notch', 'chamfer'];
 export const cutsOf = (p: Part): Cut[] => p.cuts ?? [];
 
 /** A sensible starting cut of a kind, for the Add button. */
@@ -117,6 +126,8 @@ export function defaultCut(kind: Cut['kind']): Cut {
       return { kind, face: 'top', edge: 'endA', width: 0.75, depth: 0.375 };
     case 'notch':
       return { kind, edge: 'front', at: 12, width: 1.5, depth: 1.5 };
+    case 'chamfer':
+      return { kind, face: 'top', edge: 'front', width: 0.25, depth: 0.25 };
   }
 }
 
@@ -130,6 +141,7 @@ export function clampCut(c: Cut, dims: Vec3): Cut {
     case 'groove':
       return { ...c, at: n(c.at, W), width: n(c.width, W), depth: n(c.depth, T) };
     case 'rabbet':
+    case 'chamfer':
       return {
         ...c,
         width: n(c.width, c.edge === 'endA' || c.edge === 'endB' ? L : W),
@@ -143,6 +155,7 @@ export function clampCut(c: Cut, dims: Vec3): Cut {
 /**
  * The box a cut removes, in the part's local frame, or null when it removes nothing.
  * The box pokes a hair past the surface it opens on so a subtraction leaves no skin.
+ * A chamfer removes only the wedge in its box, the half on the outside of its plane.
  */
 export function cutBox(c: Cut, dims: Vec3): AABB | null {
   if (c.width <= 0 || c.depth <= 0) return null;
@@ -161,7 +174,7 @@ export function cutBox(c: Cut, dims: Vec3): AABB | null {
     y[0] = -W / 2 + c.at;
     y[1] = y[0] + c.width;
     z = faceZ(c.face, c.depth);
-  } else if (c.kind === 'rabbet') {
+  } else if (c.kind === 'rabbet' || c.kind === 'chamfer') {
     if (c.edge === 'endA') x[1] = -L / 2 + c.width;
     else if (c.edge === 'endB') x[0] = L / 2 - c.width;
     else if (c.edge === 'front') y[1] = -W / 2 + c.width;
@@ -190,6 +203,10 @@ export function describeCut(c: Cut, fmt: (n: number) => string): string {
       return `rabbet ${fmt(c.width)} × ${fmt(c.depth)} deep on ${edge(c.edge)}, ${c.face}`;
     case 'notch':
       return `notch ${fmt(c.width)} × ${fmt(c.depth)} deep in ${edge(c.edge)}, ${fmt(c.at)} from A`;
+    case 'chamfer':
+      return c.width === c.depth
+        ? `chamfer ${fmt(c.width)} at 45° off ${edge(c.edge)}, ${c.face}`
+        : `chamfer ${fmt(c.width)} across × ${fmt(c.depth)} down off ${edge(c.edge)}, ${c.face}`;
   }
 }
 
@@ -681,15 +698,16 @@ export function partSnapPoints(p: Part): Vec3[] {
 export function mirrorCut(c: Cut, local: AxisIndex, dims: Vec3): Cut {
   const [L, W] = dims;
   const flipFace = (f: 'top' | 'bottom') => (f === 'top' ? 'bottom' : 'top');
+  const onEdge = c.kind === 'rabbet' || c.kind === 'chamfer';
   if (local === 0) {
     if (c.kind === 'dado' || c.kind === 'notch') return { ...c, at: L - c.at - c.width };
-    if (c.kind === 'rabbet' && (c.edge === 'endA' || c.edge === 'endB'))
+    if (onEdge && (c.edge === 'endA' || c.edge === 'endB'))
       return { ...c, edge: c.edge === 'endA' ? 'endB' : 'endA' };
     return c;
   }
   if (local === 1) {
     if (c.kind === 'groove') return { ...c, at: W - c.at - c.width };
-    if (c.kind === 'rabbet' && (c.edge === 'front' || c.edge === 'back'))
+    if (onEdge && (c.edge === 'front' || c.edge === 'back'))
       return { ...c, edge: c.edge === 'front' ? 'back' : 'front' };
     if (c.kind === 'notch') return { ...c, edge: c.edge === 'front' ? 'back' : 'front' };
     return c;

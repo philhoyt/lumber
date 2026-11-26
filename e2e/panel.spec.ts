@@ -155,3 +155,25 @@ test('the properties panel never scrolls sideways, even at its narrowest', async
   expect(inside).toBe(true);
   await bar.dblclick();
 });
+
+test('Add cut adds a dado, and changing its kind to a chamfer reaches the cut list', async ({
+  page,
+}) => {
+  await openBench(page);
+  await selectPart(page, 'Leg LF');
+  await page.locator('#bAddCut').click();
+  await expect(page.locator('#cut-0-kind')).toHaveValue('dado');
+  await page.locator('#cut-0-kind').selectOption('chamfer');
+  await expect(page.locator('#cut-0-edge')).toHaveValue('front');
+  await page.locator('#cut-0-width').fill('1/2');
+  await page.locator('#cut-0-width').press('Enter');
+  await page.locator('[data-tab="cut"]').click();
+  await expect(page.locator('#cutBody')).toContainText(
+    'chamfer 1/2" across × 1/4" down off front edge, top',
+  );
+  await page.locator('[data-tab="parts"]').click();
+  await page.locator('#bUndo').click();
+  await page.locator('#bUndo').click();
+  await page.locator('#bUndo').click();
+  await expect(page.locator('#cut-0-kind')).toHaveCount(0);
+});

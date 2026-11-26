@@ -241,7 +241,7 @@ export function partSheetSvg(r: DrawingRow, pageW = 760): SheetResult {
       svg += rect(fx(0), hiddenFace ? ez(c.depth) : ez(t), len * s, c.depth * s, cls);
       cutDims.push(dimV(fy(0), fy(c.at), fx(len) + 34 + dimRow * 14, fmt(c.at), fx(len)));
       dimRow++;
-    } else if (c.kind === 'rabbet') {
+    } else if (c.kind === 'rabbet' || c.kind === 'chamfer') {
       if (c.edge === 'endA' || c.edge === 'endB') {
         const xa = c.edge === 'endA' ? 0 : len - c.width;
         svg += rect(fx(xa), fy(w), c.width * s, w * s, cls);

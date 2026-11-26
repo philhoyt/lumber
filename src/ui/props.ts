@@ -135,6 +135,9 @@ function cutsEditorHtml(p: { cuts?: Cut[] }): string {
     } else if (c.kind === 'rabbet') {
       where = `${select(id('edge'), EDGES_ALL, c.edge)}${select(id('face'), FACES, c.face)}`;
       fields = `${lenField(id('width'), c.width, 'Width, in from the edge')}${lenField(id('depth'), c.depth, 'Depth')}`;
+    } else if (c.kind === 'chamfer') {
+      where = `${select(id('edge'), EDGES_ALL, c.edge)}${select(id('face'), FACES, c.face)}`;
+      fields = `${lenField(id('width'), c.width, 'Across the face, in from the edge')}${lenField(id('depth'), c.depth, 'Down the edge, from the face; the same as the width for 45°')}`;
     } else {
       where = select(id('edge'), EDGES_SIDE, c.edge);
       fields = `${lenField(id('at'), c.at, 'From end A')}${lenField(id('width'), c.width, 'Width along the length')}${lenField(id('depth'), c.depth, 'Depth into the width')}`;
@@ -146,7 +149,7 @@ function cutsEditorHtml(p: { cuts?: Cut[] }): string {
     )}${where}${fields}<button class="icon ghost danger" data-delcut="${i}" title="Remove this cut">×</button></div>`;
   });
   html += `<div class="row btns"><button id="bAddCut" title="Add a dado; change its kind in the row">Add cut</button></div>
-  <div class="muted note">Dado: across the width, position from end A. Groove: along the length, position from the front edge. Rabbet: along an end or edge. Notch: through the thickness into an edge.</div>`;
+  <div class="muted note">Dado: across the width, position from end A. Groove: along the length, position from the front edge. Rabbet: along an end or edge. Notch: through the thickness into an edge. Chamfer: the corner off an edge, equal sizes for 45°.</div>`;
   return html;
 }
 

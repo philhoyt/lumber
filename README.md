@@ -160,10 +160,11 @@ show up translucent, but are never cut or bought: the cut list, buy list, nestin
 drawings and the overall size ignore them, and the status bar counts them separately.
 
 Boards can carry joinery: Add cut in the Part section adds a dado (across the
-width), groove (along the length), rabbet (along an end or edge) or notch
-(through the thickness into an edge), each with its face or edge, position,
-width and depth. The 3D view subtracts them and the cut list prints them under
-the cut.
+width), groove (along the length), rabbet (along an end or edge), notch
+(through the thickness into an edge) or chamfer (the corner taken off where a
+face meets an end or edge, with a width across the face and a depth down the
+edge, equal for 45°), each with its face or edge, position, width and depth.
+The 3D view subtracts them and the cut list prints them under the cut.
 
 Boards can have a miter and a bevel at each end: the End cuts rows in the Part
 section, one per end, with M for the miter and B for the bevel in degrees from
