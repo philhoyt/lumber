@@ -5,6 +5,7 @@
 import { Printer, X } from 'lucide';
 import { drawingRows, modelViewsSvg, partSheetSvg } from '../drawing';
 import { hardwareRows, kindInfo } from '../fastener';
+import { sizeText } from '../model';
 import type { Store } from '../store';
 import { fmt } from '../units';
 import { esc } from './dom';
@@ -70,9 +71,7 @@ export class DrawingsOverlay {
     html += `<div class="sheet"><h2>Views</h2>${views.svg}</div>`;
     rows.forEach((r, i) => {
       const { svg, notes } = partSheetSvg(r);
-      const size = r.stock.sheet
-        ? `${fmt(r.t)} × ${fmt(r.w)} × ${fmt(r.len)}`
-        : `${esc(r.stock.name)} · ${fmt(r.len)} long`;
+      const size = `${esc(r.stock.name)} · ${sizeText(r.stock, r.len, r.w, r.t, fmt)}${r.stock.sheet ? '' : ' long'}`;
       html += `<div class="sheet"><h2>${i + 1}. ${esc(r.names.join(', '))}</h2><div class="muted">${size} · make ${r.qty}${r.stock.sheet ? ` from ${esc(r.stock.name)}` : ''}</div>${svg}${
         notes.length
           ? `<ul class="notes">${notes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>`

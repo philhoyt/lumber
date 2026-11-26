@@ -5,7 +5,7 @@
  * view (and the view's selection highlights the rows).
  */
 import { createElement, ChevronDown, ChevronRight, Eye, EyeOff, Boxes } from 'lucide';
-import { partDims, type Group, type Part } from '../model';
+import { partSizeText, type Group, type Part } from '../model';
 import { getStock, stockById } from '../stock';
 import type { Store } from '../store';
 import type { ListTarget } from './menu';
@@ -274,13 +274,8 @@ export class OutlinerPanel {
 
     const size = document.createElement('span');
     size.className = 'size';
-    const d = partDims(p);
-    const s = stockById(p.stock);
-    size.textContent = depth
-      ? `${s.name} · ${s.sheet ? `${fmt(d[1])} × ` : ''}${fmt(d[0])}`
-      : s.sheet
-        ? `${fmt(d[1])} × ${fmt(d[0])}`
-        : fmt(d[0]);
+    const text = partSizeText(p, fmt);
+    size.textContent = depth ? `${stockById(p.stock).name} · ${text}` : text;
 
     const eye = this.eyeButton(!!p.hidden, () => store.setHidden([p.id], !p.hidden));
     el.append(name, size, eye);

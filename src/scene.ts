@@ -30,6 +30,7 @@ import {
   miterOf,
   partAABB,
   partDims,
+  partSizeText,
   rotatePartsBy,
   partSnapPoints,
   isSquare,
@@ -727,11 +728,7 @@ export class LumberScene {
       const miter =
         (hasMiter(p) ? ` · miter ${Math.abs(m[0])}°/${Math.abs(m[1])}°` : '') +
         (hasBevel(p) ? ` · bevel ${Math.abs(b[0])}°/${Math.abs(b[1])}°` : '');
-      const size =
-        s.shape === 'cylinder'
-          ? `⌀${fmt(p.len)} × ${fmt(p.t ?? s.t)}`
-          : `${s.sheet ? fmt(p.w ?? s.sheet[0]) + ' × ' : ''}${fmt(p.len)}`;
-      this.labelEl.textContent = `${p.name} · ${s.name} · ${size}${miter}`;
+      this.labelEl.textContent = `${p.name} · ${s.name} · ${partSizeText(p, fmt)}${miter}`;
     } else this.labelEl.style.display = 'none';
 
     const t = this.tf;

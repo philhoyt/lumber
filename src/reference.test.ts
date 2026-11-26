@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { drawingRows, modelViewsSvg } from './drawing';
-import { createPart, isCylinderPart, isReferencePart, partAABB, partDims } from './model';
+import {
+  createPart,
+  isCylinderPart,
+  isReferencePart,
+  partAABB,
+  partDims,
+  partSizeText,
+} from './model';
+import { fmt } from './units';
 import { cutRows, partsByStock } from './pack';
 import { parseDocument, Store } from './store';
 import {
@@ -131,5 +139,19 @@ describe('reference cylinders', () => {
     const box = createPart(2, 'ref', [0, 0, 0]);
     const bgeo = partGeometry(box, partDims(box));
     expect(partEdges(box, bgeo).getAttribute('position').count).toBe(24);
+  });
+});
+
+describe('partSizeText', () => {
+  it('says a size the way people do for each kind of part', () => {
+    const s = new Store();
+    expect(partSizeText(s.addPart('2x4'), fmt)).toBe('96"');
+    expect(partSizeText(s.addPart('ply34'), fmt)).toBe('48" × 96"');
+    const box = s.addPart('ref');
+    s.mutate(() => (box.t = 30));
+    expect(partSizeText(box, fmt)).toBe('24" × 12" × 30"');
+    const can = s.addPart('refcyl');
+    s.mutate(() => (can.len = 8));
+    expect(partSizeText(can, fmt)).toBe('⌀8" × 12"');
   });
 });

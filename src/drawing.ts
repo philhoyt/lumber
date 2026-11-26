@@ -5,86 +5,25 @@
  * nothing is traced from the 3D view. Pure functions returning SVG text.
  */
 import { Quaternion, Vector3 } from 'three';
-import { describeFastener, fastenersKey, fastenersOf, type Fastener } from './fastener';
+import { describeFastener } from './fastener';
 import {
-  cutsKey,
-  cutsOf,
   describeCut,
-  grainOf,
   bevelOf,
   endCutCorners,
   miterOf,
   sawBevel,
   partDims,
-  shortLength,
-  type Cut,
-  type Grain,
   type Part,
   type Vec3,
   isReferencePart,
 } from './model';
-import { getStock, stockById, stockWidth, type Stock } from './stock';
+import { cutRows, type CutRow } from './pack';
 import { fmt, r32 } from './units';
 
-/** A unique part for a drawing: like a cut-list row, but markers split rows too. */
-export interface DrawingRow {
-  stock: Stock;
-  len: number;
-  w: number;
-  t: number;
-  miter: [number, number];
-  bevel: [number, number];
-  grain: Grain;
-  cuts: Cut[];
-  fasteners: Fastener[];
-  short: number;
-  qty: number;
-  names: string[];
-}
+/** A unique part for a drawing: a cut-list row, but markers split rows too. */
+export type DrawingRow = CutRow;
 
-const stockOrder = (s: Stock): number => {
-  const i = getStock().indexOf(s);
-  return i < 0 ? 1e9 : i;
-};
-
-export function drawingRows(parts: readonly Part[]): DrawingRow[] {
-  const map = new Map<string, DrawingRow>();
-  for (const p of parts) {
-    if (isReferencePart(p)) continue;
-    const s = stockById(p.stock);
-    const len = r32(p.len);
-    const w = r32(stockWidth(s, p.w));
-    const miter = miterOf(p);
-    const bevel = bevelOf(p);
-    const grain: Grain = s.sheet && s.grain !== false ? grainOf(p) : 'any';
-    const cuts = cutsOf(p);
-    const fasteners = fastenersOf(p);
-    const key = `${p.stock}|${len}|${w}|${miter.join('/')}|${bevel.join('/')}|${grain}|${cutsKey(cuts)}|${fastenersKey(fasteners)}`;
-    let r = map.get(key);
-    if (!r) {
-      r = {
-        stock: s,
-        len,
-        w,
-        t: s.t,
-        miter,
-        bevel,
-        grain,
-        cuts,
-        fasteners,
-        short: r32(shortLength([len, w, s.t], miter, bevel)),
-        qty: 0,
-        names: [],
-      };
-      map.set(key, r);
-    }
-    r.qty++;
-    r.names.push(p.name);
-  }
-  return [...map.values()].sort(
-    (a, b) => stockOrder(a.stock) - stockOrder(b.stock) || b.len - a.len || b.w - a.w,
-  );
-}
+export const drawingRows = (parts: readonly Part[]): DrawingRow[] => cutRows(parts, true);
 
 // ---- geometry helpers ----
 export type Pt = [number, number];

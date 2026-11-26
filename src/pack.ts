@@ -4,6 +4,7 @@
  * best. Both are simple on purpose: good enough to buy the right amount, and easy to
  * check by hand.
  */
+import { fastenersKey, fastenersOf, type Fastener } from './fastener';
 import {
   cutsKey,
   cutsOf,
@@ -250,21 +251,32 @@ export interface CutRow {
   bevel: [number, number];
   /** Sheet parts: how the length runs relative to the grain. */
   grain: Grain;
+  /** Thickness of the stock. */
+  t: number;
   /** Joinery on the part. */
   cuts: Cut[];
+  /**
+   * Markers on the first part of the row. Rows group by them only when asked (the
+   * drawings do); the cut list does not care where the screws go.
+   */
+  fasteners: Fastener[];
   /** Short-point length when mitered, else the length. */
   short: number;
   qty: number;
   names: string[];
 }
 
-const order = (s: Stock): number => {
+/** Where a stock sits in the library, so rows list in the yard's order. */
+const stockOrder = (s: Stock): number => {
   const i = getStock().indexOf(s);
   return i < 0 ? 1e9 : i;
 };
 
-/** Identical cuts grouped, ordered by stock then size, largest first. */
-export function cutRows(parts: readonly Part[]): CutRow[] {
+/**
+ * Identical cuts grouped, ordered by stock then size, largest first. Reference parts
+ * are left out. With `byFasteners`, parts whose markers differ get rows of their own.
+ */
+export function cutRows(parts: readonly Part[], byFasteners = false): CutRow[] {
   const map = new Map<string, CutRow>();
   for (const p of parts) {
     if (isReferencePart(p)) continue;
@@ -275,17 +287,22 @@ export function cutRows(parts: readonly Part[]): CutRow[] {
     const bevel = bevelOf(p);
     const grain: Grain = s.sheet && s.grain !== false ? grainOf(p) : 'any';
     const cuts = cutsOf(p);
-    const key = `${p.stock}|${len}|${w}|${miter.join('/')}|${bevel.join('/')}|${grain}|${cutsKey(cuts)}`;
+    const fasteners = fastenersOf(p);
+    const key =
+      `${p.stock}|${len}|${w}|${miter.join('/')}|${bevel.join('/')}|${grain}|${cutsKey(cuts)}` +
+      (byFasteners ? `|${fastenersKey(fasteners)}` : '');
     let r = map.get(key);
     if (!r) {
       r = {
         stock: s,
         len,
         w,
+        t: s.t,
         miter,
         bevel,
         grain,
         cuts,
+        fasteners,
         short: r32(shortLength([len, w, s.t], miter, bevel)),
         qty: 0,
         names: [],
@@ -296,7 +313,7 @@ export function cutRows(parts: readonly Part[]): CutRow[] {
     r.names.push(p.name);
   }
   return [...map.values()].sort(
-    (a, b) => order(a.stock) - order(b.stock) || b.len - a.len || b.w - a.w,
+    (a, b) => stockOrder(a.stock) - stockOrder(b.stock) || b.len - a.len || b.w - a.w,
   );
 }
 

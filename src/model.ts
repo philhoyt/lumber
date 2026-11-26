@@ -9,7 +9,7 @@
  */
 import { Euler, Matrix4, Quaternion, Vector3 } from 'three';
 import { mirrorFastener, type Fastener } from './fastener';
-import { stockById, stockWidth } from './stock';
+import { stockById, stockWidth, type Stock } from './stock';
 
 export type Vec3 = [number, number, number];
 export type Quat = [number, number, number, number];
@@ -415,6 +415,29 @@ export function makeQ(seq: Axis[]): Quat {
 
 /** Lying flat: length along X, width along Y, thickness up. */
 export const DEFAULT_Q: Quat = [0, 0, 0, 1];
+
+/**
+ * A size the way people say it: a board by its length, a sheet part width × length, a
+ * reference box L × W × H, a cylinder ⌀D × H. `fmt` is the length formatter.
+ */
+export function sizeText(
+  s: Stock,
+  len: number,
+  w: number,
+  t: number,
+  fmt: (v: number) => string,
+): string {
+  if (s.shape === 'cylinder') return `⌀${fmt(len)} × ${fmt(t)}`;
+  if (s.reference) return `${fmt(len)} × ${fmt(w)} × ${fmt(t)}`;
+  if (s.sheet) return `${fmt(w)} × ${fmt(len)}`;
+  return fmt(len);
+}
+
+/** `sizeText` for a part. */
+export function partSizeText(p: Part, fmt: (v: number) => string): string {
+  const [len, w, t] = partDims(p);
+  return sizeText(stockById(p.stock), len, w, t, fmt);
+}
 
 /** Size of the part in its local frame: [length, width, thickness]. */
 export function partDims(p: Part): Vec3 {

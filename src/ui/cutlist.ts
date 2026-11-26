@@ -1,6 +1,6 @@
 /** The cut list and buy list panel, with cutting diagrams and a cost estimate. */
 import { cutRows, packBoards, packBoardsAuto, packSheets, partsByStock } from '../pack';
-import { isReferencePart } from '../model';
+import { isReferencePart, sizeText } from '../model';
 import { hardwareRows, kindInfo } from '../fastener';
 import { describeCut, grainOf } from '../model';
 import { sawBevel } from '../model';
@@ -56,7 +56,7 @@ export class CutlistPanel {
             ? ' <span class="muted" title="Length runs across the grain">⊥ grain</span>'
             : '';
       const cut = r.stock.sheet
-        ? `${fmt(r.w)} × ${fmt(r.len)}${grainMark}`
+        ? `${sizeText(r.stock, r.len, r.w, r.t, fmt)}${grainMark}`
         : mitered || beveled
           ? `${fmt(r.len)} <span class="muted">long · ${fmt(r.short)} short · ${ends}</span>`
           : fmt(r.len);
