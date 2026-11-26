@@ -239,8 +239,20 @@ export class Store {
     }
     return this.parts.filter((p) => p.group !== undefined && ids.has(p.group));
   }
-  /** What a click on a part should select: its whole assembly, or just the part when loose. */
+  /**
+   * What a click on a part should select: its whole assembly, or just the part when it
+   * is loose. Once the selection is inside that assembly (some of its parts but not all,
+   * as after a double-click), clicks pick single parts, so Shift+click extends part by
+   * part instead of grabbing the whole group again.
+   */
   selectionForClick(partId: number): number[] {
+    const members = this.assemblyOf(partId);
+    const chosen = members.filter((id) => this.selected.has(id)).length;
+    const inside = chosen > 0 && chosen < members.length;
+    return inside ? [partId] : members;
+  }
+  /** The ids of a part's whole assembly (its outermost group), or just the part when loose. */
+  assemblyOf(partId: number): number[] {
     const root = this.rootGroupOf(partId);
     return root ? this.membersOf(root.id).map((p) => p.id) : [partId];
   }

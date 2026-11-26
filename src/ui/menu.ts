@@ -280,7 +280,7 @@ export function buildListMenu(
     own.push({
       label: 'Select its group',
       icon: Boxes,
-      action: () => store.select(store.selectionForClick(part.id)),
+      action: () => store.select(store.assemblyOf(part.id)),
     });
   // The selection's actions, without the scene-wide tail (add stock, views...).
   const ctx: MenuContext = { x: 0, y: 0, partId: part?.id ?? null, ground: null };

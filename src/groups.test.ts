@@ -22,6 +22,24 @@ describe('groups', () => {
     expect(s.selectedGroup()).toBe(g);
   });
 
+  it('picks single parts once the selection is inside the group', () => {
+    const { s, a, b } = twoParts();
+    const c = s.addPart('2x4');
+    s.select([a.id, b.id, c.id]);
+    s.groupSelected();
+    // A double-click narrowed the selection to one part: the next clicks stay inside.
+    s.select([a.id]);
+    expect(s.selectionForClick(b.id)).toEqual([b.id]);
+    s.toggleSelectMany(s.selectionForClick(b.id));
+    expect([...s.selected].sort()).toEqual([a.id, b.id]);
+    // With the whole group selected, or nothing of it, a click takes the whole group.
+    s.toggleSelectMany(s.selectionForClick(c.id));
+    expect(s.selected.size).toBe(3);
+    expect(s.selectionForClick(b.id)).toHaveLength(3);
+    s.select([]);
+    expect(s.selectionForClick(b.id)).toHaveLength(3);
+  });
+
   it('needs at least two parts', () => {
     const s = new Store();
     s.addPart('2x4');
@@ -40,7 +58,7 @@ describe('groups', () => {
     const inner = s.groupSelected()!;
     expect(inner.parent).toBe(s.groups.find((g) => g.id !== inner.id)!.id);
     expect(s.rootGroupOf(a.id)!.id).not.toBe(inner.id);
-    expect(s.selectionForClick(a.id)).toHaveLength(3);
+    expect(s.assemblyOf(a.id)).toHaveLength(3);
     expect(outer.id).not.toBe(inner.id);
   });
 
