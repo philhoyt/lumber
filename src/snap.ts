@@ -14,6 +14,8 @@ export interface SnapOptions {
   snapParts: boolean;
   /** How close a face must be to snap, inches. */
   tol?: number;
+  /** Snap a bottom face to the floor (default true; off when snapping in a part's frame). */
+  floor?: boolean;
 }
 
 /** What one axis snapped to. */
@@ -74,7 +76,7 @@ export function snapWithHits(
             consider(theirs - me, { kind: 'face', other: i, side, mine, at: theirs });
           }
       });
-      if (a === UP) consider(-myMin, { kind: 'floor', mine: 'min', at: 0 });
+      if (a === UP && opts.floor !== false) consider(-myMin, { kind: 'floor', mine: 'min', at: 0 });
     }
     if (best) {
       delta[a] += bestDelta;

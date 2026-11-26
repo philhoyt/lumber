@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { boxInFrame, extentAlong, isCoframed, localAxisDir, unionInFrame } from './frame';
+import {
+  boxInFrame,
+  coframedBoxes,
+  extentAlong,
+  isCoframed,
+  localAxisDir,
+  unionInFrame,
+} from './frame';
 import { createPart, makeQ, quatFromEuler, type Part } from './model';
 
 const part = (q: Part['q'], pos: [number, number, number] = [0, 0, 0], len = 96): Part => {
@@ -47,5 +54,19 @@ describe('boxInFrame and extentAlong', () => {
     const u = unionInFrame([part(q, [0, 0, 0], 10), part(q, [20, 0, 0], 10)], q);
     expect(u.min[0]).toBe(-5);
     expect(u.max[0]).toBe(25);
+  });
+});
+
+describe('coframedBoxes', () => {
+  it('keeps only the parts whose axes line up with the frame', () => {
+    const tilt = quatFromEuler([-40, 0, 0]);
+    const joist = part(tilt, [0, 0, 0], 60);
+    const rail = part(tilt, [0, 10, 0], 60);
+    rail.name = 'Rail';
+    const flat = part(makeQ([]), [0, 30, 0], 60);
+    flat.name = 'Flat';
+    const r = coframedBoxes([rail, flat], joist.q);
+    expect(r.names).toEqual(['Rail']);
+    expect(r.boxes[0]!.max[0] - r.boxes[0]!.min[0]).toBeCloseTo(60);
   });
 });

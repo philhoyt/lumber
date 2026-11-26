@@ -61,7 +61,7 @@ import {
   sameArray,
 } from './arrayDrag';
 import type { ArrayParams, Quat } from './model';
-import { extentAlong, localAxisDir } from './frame';
+import { coframedBoxes, extentAlong, localAxisDir, unionInFrame } from './frame';
 import { CameraRig, Z_UP, type Projection, type ViewName } from './view/camera';
 import { DimLabels } from './view/dimLabels';
 import { GapReadout } from './view/gapReadout';
@@ -93,6 +93,9 @@ interface Transform {
   local: boolean;
   /** Distance moved along a local axis so far, for the readout and a typed length. */
   along: number;
+  /** For a local move: the other parts sharing the frame, as boxes in it, and the
+   *  selection's own box there before the move. Built on first use. */
+  frameSnap: { boxes: AABB[]; names: string[]; mine: AABB } | null;
   origin: THREE.Vector3;
   ids: Set<number>;
   startPos: Vec3[];
@@ -760,12 +763,14 @@ export class LumberScene {
     const byRelation = new Map<string, string[]>();
     for (const h of t.snaps) {
       if (h.kind === 'grid') continue;
+      const boxes = t.local && t.frameSnap ? t.frameSnap.boxes : t.others;
+      const names = t.local && t.frameSnap ? t.frameSnap.names : t.otherNames;
       const pairs =
         h.kind === 'floor'
           ? [['on the floor', '']]
-          : coplanarFaces(h, t.others).map((f) => [
+          : coplanarFaces(h, boxes).map((f) => [
               h.mine === f.side ? 'flush with' : 'against',
-              t.otherNames[f.other] ?? 'a part',
+              names[f.other] ?? 'a part',
             ]);
       for (const [rel, name] of pairs as [string, string][]) {
         const list = byRelation.get(rel) ?? [];
@@ -1016,6 +1021,7 @@ export class LumberScene {
       frame: list[0]!.q,
       local: false,
       along: 0,
+      frameSnap: null,
       origin: new THREE.Vector3().fromArray(aabbCenter(aabb)),
       ids,
       startPos: list.map((p) => [...p.pos] as Vec3),
@@ -1301,8 +1307,14 @@ export class LumberScene {
       return;
     }
     if (t.local) {
-      this.applyDelta(raw);
-      t.snaps = [];
+      // Along the part's own axis: snap to the faces of parts that share its frame.
+      if (t.constraint.kind === 'axis') {
+        t.along = this.snapAlong(t, t.constraint.axis, t.along);
+        this.applyDelta(t.constraint.dir.clone().multiplyScalar(t.along).toArray());
+      } else {
+        this.applyDelta(raw);
+        t.snaps = [];
+      }
       this.snapFx.hide();
       return;
     }
@@ -1315,6 +1327,28 @@ export class LumberScene {
     this.snapFx.show(t.snaps, moved, t.others);
   }
 
+  /**
+   * Snap a move of `along` on local `axis` to the faces of co-framed parts, in the frame
+   * of the first selected part. Sets `t.snaps` for the readout; returns the snapped move.
+   */
+  private snapAlong(t: Transform, axis: AxisIndex, along: number): number {
+    if (!t.frameSnap) {
+      const list = this.store.selectedParts();
+      const start = list.map((p, i) => ({ ...p, pos: t.startPos[i]! }));
+      const others = this.store.parts.filter((p) => !t.ids.has(p.id) && !p.hidden);
+      t.frameSnap = { ...coframedBoxes(others, t.frame), mine: unionInFrame(start, t.frame) };
+    }
+    const d: Vec3 = [0, 0, 0];
+    d[axis] = along;
+    const { boxes } = t.frameSnap;
+    t.snaps = snapWithHits(t.frameSnap.mine, d, [axis], boxes, {
+      ...this.store.settings,
+      grid: 0,
+      floor: false,
+    }).hits;
+    return d[axis];
+  }
+
   /** The copies follow the pointer along the axis it moves most on, or the locked one. */
   private updateArray(t: Transform, raw: Vec3, axes: readonly AxisIndex[]): void {
     const ad = t.array;
@@ -1322,8 +1356,8 @@ export class LumberScene {
     if (t.local && t.constraint?.kind === 'axis') {
       // Along the cell's own axis: no face snapping, the distance is the drag along it.
       const axis = t.constraint.axis;
-      t.delta = raw;
-      t.snaps = [];
+      t.along = this.snapAlong(t, axis, t.along);
+      t.delta = t.constraint.dir.clone().multiplyScalar(t.along).toArray();
       this.snapFx.hide();
       ad.axis = axis;
       ad.distance = t.along;

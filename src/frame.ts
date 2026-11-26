@@ -102,3 +102,18 @@ export function extentAlong(parts: readonly Part[], dir: Vector3): number {
 export function fromFrame(q: Quat, v: Vec3): Vec3 {
   return new Vector3().fromArray(v).applyQuaternion(_q.fromArray(q)).toArray();
 }
+
+/** The other parts that share a frame, as boxes in it, with their names: what a local move snaps to. */
+export function coframedBoxes(
+  others: readonly Part[],
+  frame: Quat,
+): { boxes: AABB[]; names: string[] } {
+  const boxes: AABB[] = [];
+  const names: string[] = [];
+  for (const o of others)
+    if (isCoframed(frame, o.q)) {
+      boxes.push(boxInFrame(o, frame));
+      names.push(o.name);
+    }
+  return { boxes, names };
+}
