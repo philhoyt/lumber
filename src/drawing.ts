@@ -9,6 +9,7 @@ import { describeFastener } from './fastener';
 import {
   describeCut,
   bevelOf,
+  boundsOfPoints,
   endCutCorners,
   miterOf,
   sawBevel,
@@ -129,13 +130,7 @@ export function modelViewsSvg(parts: readonly Part[], pageW = 760): ViewsResult 
   const visible = parts.filter((p) => !p.hidden && !isReferencePart(p));
   if (!visible.length) return { svg: '', size: [0, 0, 0] };
   const corners = visible.flatMap(partCorners);
-  const min: Vec3 = [Infinity, Infinity, Infinity];
-  const max: Vec3 = [-Infinity, -Infinity, -Infinity];
-  for (const c of corners)
-    for (const a of [0, 1, 2] as const) {
-      min[a] = Math.min(min[a], c[a]);
-      max[a] = Math.max(max[a], c[a]);
-    }
+  const { min, max } = boundsOfPoints(corners);
   const W = max[0] - min[0];
   const D = max[1] - min[1];
   const H = max[2] - min[2];

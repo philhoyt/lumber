@@ -1,4 +1,6 @@
 /** Header buttons, settings controls, panel toggles and the Blender-style key map. */
+import { MIN_LEN } from '../model';
+import { groundOnGrid } from '../snap';
 import {
   Download,
   FilePlus,
@@ -217,9 +219,7 @@ export function wireDrop(viewport: HTMLElement, scene: LumberScene, store: Store
     const id = e.dataTransfer?.getData(DRAG_TYPE);
     if (!id) return;
     const g = scene.groundPoint(e.clientX, e.clientY) ?? [0, 0, 0];
-    const grid = store.settings.grid;
-    const snap = (v: number) => (grid ? Math.round(v / grid) * grid : v);
-    addStock(store, id, [snap(g[0]), snap(g[1]), 0]);
+    addStock(store, id, groundOnGrid(g, store.settings.grid));
   });
 }
 
@@ -276,7 +276,7 @@ export function wireKeyboard(
       e.preventDefault();
       return;
     }
-    const step = store.settings.grid || 0.0625;
+    const step = store.settings.grid || MIN_LEN;
     const digit = e.code.startsWith('Numpad') ? e.code.slice(6) : e.code.replace('Digit', '');
 
     if (e.key === 'Escape') {

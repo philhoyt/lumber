@@ -60,6 +60,9 @@ function enterBox(
   return { t: tEnter, axis, side };
 }
 
+/** How far an end looks for something to meet, in inches. */
+export const FIT_REACH = 24;
+
 /**
  * The surface the given end (0 for A, 1 for B) points at, within `reach` inches: the
  * nearest square part's face or the floor, allowing the end to be a little inside already.
@@ -68,7 +71,7 @@ export function endTarget(
   p: Part,
   end: 0 | 1,
   others: readonly Part[],
-  reach = 24,
+  reach = FIT_REACH,
 ): Surface | null {
   const q = new Quaternion().fromArray(p.q);
   const dir = new Vector3(end ? 1 : -1, 0, 0).applyQuaternion(q);
@@ -114,7 +117,12 @@ export function endTarget(
 }
 
 /** The angles and length change that lay the end flat on what it points at, or null. */
-export function fitEnd(p: Part, end: 0 | 1, others: readonly Part[], reach = 24): EndFit | null {
+export function fitEnd(
+  p: Part,
+  end: 0 | 1,
+  others: readonly Part[],
+  reach = FIT_REACH,
+): EndFit | null {
   const s = endTarget(p, end, others, reach);
   if (!s) return null;
   const q = new Quaternion().fromArray(p.q);

@@ -2,6 +2,7 @@
  * The right-click menu: every action on the selection, or on empty space, with Lucide
  * icons and the key beside each item. One level of submenus for stock, align and views.
  */
+import { groundOnGrid } from '../snap';
 import {
   AlignHorizontalDistributeCenter,
   AlignHorizontalJustifyStart,
@@ -120,10 +121,7 @@ function stockItem(s: Stock, ground: Vec3 | null, store: Store): MenuItem {
   return {
     label: s.name,
     action: () => {
-      const g = ground ?? [0, 0, 0];
-      const grid = store.settings.grid;
-      const snap = (v: number) => (grid ? Math.round(v / grid) * grid : v);
-      addStock(store, s.id, [snap(g[0]), snap(g[1]), 0] as Vec3);
+      addStock(store, s.id, groundOnGrid(ground ?? [0, 0, 0], store.settings.grid));
     },
   };
 }

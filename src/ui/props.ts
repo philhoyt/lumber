@@ -3,6 +3,7 @@
  * duplicate, group, hide, delete), then collapsible sections. Part (name, stock, size),
  * Transform (position, rotation), Align (several parts), Assembly, Fasteners and Array.
  */
+import { FIT_REACH } from '../fit';
 import {
   ArrowDownToLine,
   Boxes,
@@ -35,6 +36,8 @@ import {
   type Part,
   eulerDeg,
   isSquare,
+  ARRAY_SPACING,
+  MIN_LEN,
 } from '../model';
 import {
   FACES as FASTENER_FACES,
@@ -331,13 +334,13 @@ export class PropsPanel {
                 'pLen',
                 'D',
                 'Diameter of the reference cylinder (S scales it in the view)',
-                `<input type="text" class="len" data-min="0.0625" id="pLen" value="${fmt(p.len)}">`,
+                `<input type="text" class="len" data-min="${MIN_LEN}" id="pLen" value="${fmt(p.len)}">`,
               )
             : inlineField(
                 'pLen',
                 'L',
                 'Length, long point to long point (S scales it in the view)',
-                `<input type="text" class="len" data-min="0.0625" id="pLen" value="${fmt(p.len)}">`,
+                `<input type="text" class="len" data-min="${MIN_LEN}" id="pLen" value="${fmt(p.len)}">`,
               )
         }
         ${
@@ -348,7 +351,7 @@ export class PropsPanel {
                   'pW',
                   'W',
                   'Width cut from the sheet',
-                  `<input type="text" class="len" data-min="0.0625" id="pW" value="${fmt(p.w ?? s.sheet[0])}">`,
+                  `<input type="text" class="len" data-min="${MIN_LEN}" id="pW" value="${fmt(p.w ?? s.sheet[0])}">`,
                 )
               : `<div><div class="static muted" title="Thickness × width of the stock">${fmt(s.t)} × ${fmt(s.w ?? 0)} section</div></div>`
         }${
@@ -357,7 +360,7 @@ export class PropsPanel {
                 'pH',
                 'H',
                 `Height of the reference ${s.shape === 'cylinder' ? 'cylinder' : 'box'}`,
-                `<input type="text" class="len" data-min="0.0625" id="pH" value="${fmt(p.t ?? s.t)}">`,
+                `<input type="text" class="len" data-min="${MIN_LEN}" id="pH" value="${fmt(p.t ?? s.t)}">`,
               )
             : ''
         }</div>`;
@@ -416,7 +419,7 @@ export class PropsPanel {
           id,
           label,
           `${name} of all of them, or +1/2, -1/2, *2 to change each`,
-          `<input type="text" class="len" data-min="0.0625" id="${id}" value="${one}" placeholder="${one ? '' : 'Mixed'}">`,
+          `<input type="text" class="len" data-min="${MIN_LEN}" id="${id}" value="${one}" placeholder="${one ? '' : 'Mixed'}">`,
         );
       };
       const allSheets = list.every((p) => stockById(p.stock).sheet);
@@ -522,7 +525,7 @@ export class PropsPanel {
     } else {
       array = `<div class="row"><div><label class="small">Along</label>${axisSel('x')}</div>
         <div><label class="small">Count</label><input type="number" id="arrN" value="4" min="1" step="1"></div>
-        <div><label class="small">${modeSel('center')}</label><input type="text" class="len" data-min="0" id="arrS" value="16"></div><div class="grow0"><button id="bArr" class="primary" title="Make a live array you can keep adjusting; Shift+R in the view drags one out instead">Array</button></div></div>
+        <div><label class="small">${modeSel('center')}</label><input type="text" class="len" data-min="0" id="arrS" value="${ARRAY_SPACING}"></div><div class="grow0"><button id="bArr" class="primary" title="Make a live array you can keep adjusting; Shift+R in the view drags one out instead">Array</button></div></div>
         ${localChk(false)}
         <div class="muted note">Or press Shift+R and drag in the view: copies fill toward the pointer at this spacing; tap the axis key twice for the part's own axis.</div>`;
     }
@@ -586,7 +589,7 @@ export class PropsPanel {
       const along = el.querySelector<HTMLSelectElement>('#arrAxis')!.value;
       const axis = along.replace('-', '') as Axis;
       const mode = el.querySelector<HTMLSelectElement>('#arrMode')!.value as ArrayParams['mode'];
-      const spacing = parseLen(el.querySelector<HTMLInputElement>('#arrS')!.value) ?? 16;
+      const spacing = parseLen(el.querySelector<HTMLInputElement>('#arrS')!.value) ?? ARRAY_SPACING;
       const how = el.querySelector<HTMLSelectElement>('#arrHow')?.value ?? 'count';
       const params: ArrayParams = { axis, mode, spacing };
       if (along.startsWith('-')) params.reverse = true;
@@ -692,7 +695,7 @@ export class PropsPanel {
       const fit = (end: 0 | 1) => {
         const f = store.fitEnd(p.id, end);
         const name = end ? 'B' : 'A';
-        if (!f) toast(`End ${name} points at nothing within 24".`);
+        if (!f) toast(`End ${name} points at nothing within ${fmt(FIT_REACH)}.`);
         else {
           const change =
             Math.abs(f.extend) >= 1 / 64

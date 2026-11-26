@@ -90,6 +90,17 @@ export function snapWithHits(
   return { delta, hits };
 }
 
+/** `v` rounded to the grid, or as it is when there is no grid. */
+export const snapToGrid = (v: number, grid: number): number =>
+  grid ? Math.round(v / grid) * grid : v;
+
+/** A ground point on the grid: where new stock lands from a click or a drop. */
+export const groundOnGrid = (g: Vec3, grid: number): Vec3 => [
+  snapToGrid(g[0], grid),
+  snapToGrid(g[1], grid),
+  0,
+];
+
 /** A face of another box lying on the plane a hit snapped to. */
 export interface CoplanarFace {
   other: number;

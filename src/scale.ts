@@ -21,7 +21,7 @@ export function scaleFactor(
 
 /** A length rounded to the grid (a sixteenth when the grid is off), never below the minimum. */
 export function snapLength(len: number, grid: number): number {
-  const step = grid > 0 ? grid : 1 / 16;
+  const step = grid > 0 ? grid : MIN_LEN;
   return Math.max(MIN_LEN, Math.round(len / step) * step);
 }
 

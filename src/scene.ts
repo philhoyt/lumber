@@ -31,6 +31,9 @@ import {
   partAABB,
   partDims,
   partSizeText,
+  translateAABB,
+  unionBoxes,
+  ARRAY_SPACING,
   rotatePartsBy,
   partSnapPoints,
   isSquare,
@@ -53,7 +56,7 @@ import { fastenersOf } from './fastener';
 import { buildMarkers } from './markers';
 import { nearestSnap } from './measure';
 import { pullEnd, scaleFactor, snapEnd, snapLength } from './scale';
-import { coplanarFaces, snapWithHits, type SnapHit } from './snap';
+import { coplanarFaces, groundOnGrid, snapWithHits, type SnapHit } from './snap';
 import { stockById, type Stock } from './stock';
 import type { Store } from './store';
 import { fmt, parseLen } from './units';
@@ -962,17 +965,7 @@ export class LumberScene {
     return this.lookOnly ? offsetAABB(p, this.offsetOf(p.id)) : partAABB(p);
   }
   private displayBounds(parts: readonly Part[]): AABB {
-    if (!this.lookOnly) return unionAABB(parts);
-    const min: Vec3 = [Infinity, Infinity, Infinity];
-    const max: Vec3 = [-Infinity, -Infinity, -Infinity];
-    for (const p of parts) {
-      const b = this.displayAABB(p);
-      for (const a of [0, 1, 2] as const) {
-        min[a] = Math.min(min[a], b.min[a]);
-        max[a] = Math.max(max[a], b.max[a]);
-      }
-    }
-    return { min, max };
+    return this.lookOnly ? unionBoxes(parts.map((p) => this.displayAABB(p))) : unionAABB(parts);
   }
 
   // ---- picking ----
@@ -998,9 +991,7 @@ export class LumberScene {
     }
     const g = this.groundPoint(clientX, clientY);
     if (!g) return null;
-    const grid = this.store.settings.grid;
-    const snap = (v: number) => (grid ? Math.round(v / grid) * grid : v);
-    return [snap(g[0]), snap(g[1]), 0];
+    return groundOnGrid(g, this.store.settings.grid);
   }
   /**
    * A right click that did not pan and did not cancel a transform: select what is under
@@ -1172,7 +1163,7 @@ export class LumberScene {
     const params: ArrayParams = {
       axis: axis ?? 'x',
       mode: mode ?? 'center',
-      spacing: spacing ?? 16,
+      spacing: spacing ?? ARRAY_SPACING,
     };
     if (reverse) params.reverse = true;
     const size = t.aabb.max.map((v, i) => v - t.aabb.min[i]!) as Vec3;
@@ -1384,11 +1375,7 @@ export class LumberScene {
     }
     t.snaps = snapWithHits(t.aabb, raw, axes, t.others, this.store.settings).hits;
     this.applyDelta(raw);
-    const moved: AABB = {
-      min: [t.aabb.min[0] + t.delta[0], t.aabb.min[1] + t.delta[1], t.aabb.min[2] + t.delta[2]],
-      max: [t.aabb.max[0] + t.delta[0], t.aabb.max[1] + t.delta[1], t.aabb.max[2] + t.delta[2]],
-    };
-    this.snapFx.show(t.snaps, moved, t.others);
+    this.snapFx.show(t.snaps, translateAABB(t.aabb, t.delta), t.others);
   }
 
   /**
@@ -1445,11 +1432,7 @@ export class LumberScene {
       ad.applied = params;
       this.applyArray(params);
     }
-    const moved: AABB = {
-      min: [t.aabb.min[0] + d[0], t.aabb.min[1] + d[1], t.aabb.min[2] + d[2]],
-      max: [t.aabb.max[0] + d[0], t.aabb.max[1] + d[1], t.aabb.max[2] + d[2]],
-    };
-    this.snapFx.show(t.snaps, moved, t.others);
+    this.snapFx.show(t.snaps, translateAABB(t.aabb, d), t.others);
   }
 
   /** A live array edit during the drag, marked as ours so the notify does not end it. */

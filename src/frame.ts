@@ -18,6 +18,7 @@ import {
   type Part,
   type Quat,
   type Vec3,
+  unionBoxes,
 } from './model';
 import { stockById } from './stock';
 
@@ -75,16 +76,7 @@ export function boxInFrame(p: Part, q: Quat): AABB {
 
 /** The union of parts' boxes in frame `q`. */
 export function unionInFrame(parts: readonly Part[], q: Quat): AABB {
-  const min: Vec3 = [Infinity, Infinity, Infinity];
-  const max: Vec3 = [-Infinity, -Infinity, -Infinity];
-  for (const p of parts) {
-    const b = boxInFrame(p, q);
-    for (const a of [0, 1, 2] as const) {
-      min[a] = Math.min(min[a], b.min[a]);
-      max[a] = Math.max(max[a], b.max[a]);
-    }
-  }
-  return { min, max };
+  return unionBoxes(parts.map((p) => boxInFrame(p, q)));
 }
 
 /** How far parts extend along a world direction: the spread of their corners on it. */

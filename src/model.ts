@@ -306,6 +306,9 @@ export interface AABB {
  * is repeated along an axis. Copies are real parts, regenerated whenever the source or
  * these parameters change.
  */
+/** On-centre spacing an array starts with: studs and joists at 16". */
+export const ARRAY_SPACING = 16;
+
 export interface ArrayParams {
   axis: Axis;
   /** Either a fixed number of copies, or as many as fit in `fit` inches. */
@@ -331,7 +334,7 @@ export interface Group {
 
 /** The centre-to-centre step and the number of pieces an array produces. */
 export function arrayLayout(a: ArrayParams, cellExtent: number): { step: number; count: number } {
-  const step = Math.max(1 / 16, a.mode === 'gap' ? a.spacing + cellExtent : a.spacing);
+  const step = Math.max(MIN_LEN, a.mode === 'gap' ? a.spacing + cellExtent : a.spacing);
   let count = a.count ?? 2;
   if (a.fit !== undefined) count = Math.floor((a.fit - cellExtent) / step + 1e-9) + 1;
   return { step, count: Math.max(1, Math.min(500, Math.floor(count))) };
@@ -482,16 +485,32 @@ export function partAABB(p: Part): AABB {
 }
 
 export function unionAABB(list: readonly Part[]): AABB {
+  return unionBoxes(list.map(partAABB));
+}
+
+/** The box around a set of boxes (an empty set gives an inside-out box). */
+export function unionBoxes(boxes: readonly AABB[]): AABB {
   const min: Vec3 = [Infinity, Infinity, Infinity];
   const max: Vec3 = [-Infinity, -Infinity, -Infinity];
-  for (const p of list) {
-    const b = partAABB(p);
+  for (const b of boxes)
     for (const a of [0, 1, 2] as const) {
       min[a] = Math.min(min[a], b.min[a]);
       max[a] = Math.max(max[a], b.max[a]);
     }
-  }
   return { min, max };
+}
+
+/** The box around a set of points. */
+export function boundsOfPoints(points: readonly Vec3[]): AABB {
+  return unionBoxes(points.map((c) => ({ min: c, max: c })));
+}
+
+/** The box moved by `d`. */
+export function translateAABB(b: AABB, d: Vec3): AABB {
+  return {
+    min: [b.min[0] + d[0], b.min[1] + d[1], b.min[2] + d[2]],
+    max: [b.max[0] + d[0], b.max[1] + d[1], b.max[2] + d[2]],
+  };
 }
 
 export const aabbSize = (b: AABB): Vec3 => [

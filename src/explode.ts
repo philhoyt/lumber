@@ -6,7 +6,15 @@
  * Assemblies hold together a little: a group moves as a unit away from the model's
  * centre, and its parts spread out from the group's centre at half the rate.
  */
-import { aabbCenter, partAABB, unionAABB, type Part, type Vec3 } from './model';
+import {
+  aabbCenter,
+  partAABB,
+  translateAABB,
+  unionAABB,
+  type AABB,
+  type Part,
+  type Vec3,
+} from './model';
 
 /** The slider runs 0..1; at 1 a part moves this many times its distance from the centre. */
 export const EXPLODE_MAX = 1.5;
@@ -58,10 +66,6 @@ export function explodeOffsets(
 }
 
 /** A part's bounds as drawn, shifted by its explode offset. */
-export function offsetAABB(p: Part, o: Vec3): { min: Vec3; max: Vec3 } {
-  const b = partAABB(p);
-  return {
-    min: [b.min[0] + o[0], b.min[1] + o[1], b.min[2] + o[2]],
-    max: [b.max[0] + o[0], b.max[1] + o[1], b.max[2] + o[2]],
-  };
+export function offsetAABB(p: Part, o: Vec3): AABB {
+  return translateAABB(partAABB(p), o);
 }

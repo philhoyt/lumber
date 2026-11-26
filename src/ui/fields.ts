@@ -4,6 +4,7 @@
  * the same way. The change applies at once, as if typed. Escape in any field puts back
  * what it held when it took focus and leaves it.
  */
+import { MIN_LEN } from '../model';
 import type { Store } from '../store';
 import { fmt, parseLen } from '../units';
 
@@ -12,9 +13,9 @@ export function arrowStep(
   e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean },
   grid: number,
 ): number {
-  if (e.ctrlKey || e.metaKey) return 1 / 16;
+  if (e.ctrlKey || e.metaKey) return MIN_LEN;
   if (e.shiftKey) return 1;
-  return grid || 1 / 16;
+  return grid || MIN_LEN;
 }
 
 /**
