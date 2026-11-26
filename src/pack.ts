@@ -1,7 +1,8 @@
 /**
  * The cut list and the buy list. Boards pack by first-fit decreasing into purchase
- * lengths; sheets pack by shelves (rows of parts across the sheet). Both are simple on
- * purpose: good enough to buy the right amount, and easy to check by hand.
+ * lengths; sheets pack by guillotine cuts, each part into the free rectangle it fits
+ * best. Both are simple on purpose: good enough to buy the right amount, and easy to
+ * check by hand.
  */
 import {
   cutsKey,

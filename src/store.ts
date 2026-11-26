@@ -29,7 +29,6 @@ import {
   migrateFromYUp,
   mirrorParts,
   rotateParts,
-  rotatePartsBy,
   quatFromEuler,
   squareUp,
   translateParts,
@@ -73,7 +72,6 @@ export interface Document {
   prices?: Record<string, number>;
 }
 
-export type ArraySpacing = 'center' | 'gap';
 export type ChangeKind = 'model' | 'selection' | 'settings' | 'drag';
 export type Listener = (kind: ChangeKind) => void;
 
@@ -619,37 +617,10 @@ export class Store {
     });
     this.select(ids);
   }
-  /**
-   * Stamp copies along an axis. `spacing` is centre to centre, or, with mode 'gap',
-   * the clear space between copies (the selection's own extent on that axis is added).
-   */
-  arraySelected(axis: Axis, count: number, spacing: number, mode: ArraySpacing = 'center'): void {
-    const list = this.selectedParts();
-    if (!list.length || count < 2) return;
-    const a = AXIS_INDEX[axis];
-    const step = mode === 'gap' ? spacing + aabbSize(unionAABB(list))[a] : spacing;
-    const offsets: Vec3[] = [];
-    for (let i = 1; i < count; i++) {
-      const offset: Vec3 = [0, 0, 0];
-      offset[a] = step * i;
-      offsets.push(offset);
-    }
-    let ids: number[] = [];
-    this.mutate(() => {
-      ids = this.cloneParts(list, offsets);
-    });
-    this.select(ids);
-  }
   rotateSelected(axis: Axis, turns = 1): void {
     const list = this.selectedParts();
     if (!list.length) return;
     this.mutate(() => rotateParts(list, axis, turns));
-  }
-  /** Turn the selection by any angle, in degrees, about a world axis through its centre. */
-  rotateSelectedBy(axis: Axis, deg: number): void {
-    const list = this.selectedParts();
-    if (!list.length || !deg) return;
-    this.mutate(() => rotatePartsBy(list, axis, deg));
   }
   /** Set each selected part's orientation in place, as XYZ angles in degrees. */
   setRotation(ids: Iterable<number>, deg: Vec3): void {

@@ -2,9 +2,10 @@
  * The model: a list of parts, each a piece of stock cut to size and placed in the
  * world. The world is Z-up, like Blender: X runs left-right, Y runs front-back (−Y is
  * the front), Z is up. A part's local frame has its length along X, its width along Y
- * and its thickness along Z, so a part with no rotation lies flat on the floor.
- * Rotations are always multiples of 90° about world axes, so an axis-aligned bounding
- * box describes a part exactly.
+ * and its thickness along Z, so a part with no rotation lies flat on the floor. Parts
+ * may be turned to any angle; an axis-aligned bounding box describes a square-turned
+ * part exactly and bounds a tilted one, and the tools that need the true shape (snapping
+ * in a tilted frame, fitting an end) work in the part's own frame.
  */
 import { Euler, Matrix4, Quaternion, Vector3 } from 'three';
 import { mirrorFastener, type Fastener } from './fastener';

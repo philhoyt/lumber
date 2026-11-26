@@ -22,7 +22,7 @@ describe('Store', () => {
     expect(s.parts.map((p) => p.id)).toEqual([1, 2]);
     expect(s.parts[1]!.pos[0]).toBe(16);
     s.select([1]);
-    s.arraySelected('y', 3, 16);
+    s.setArray({ axis: 'y', count: 3, spacing: 16, mode: 'center' });
     expect(s.parts).toHaveLength(4);
     expect(s.parts[3]!.pos[1]).toBe(32);
   });
@@ -30,11 +30,11 @@ describe('Store', () => {
   it('arrays by gap: slats 1 1/2" apart are 5" on center for a flat 2x4', () => {
     const s = new Store();
     s.addPart('2x4'); // flat: 3 1/2" across Y
-    s.arraySelected('y', 3, 1.5, 'gap');
+    s.setArray({ axis: 'y', count: 3, spacing: 1.5, mode: 'gap' });
     expect(s.parts.map((p) => p.pos[1])).toEqual([0, 5, 10]);
     const sheet = new Store();
     sheet.addPart('ply34'); // 48" across Y
-    sheet.arraySelected('y', 2, 2, 'gap');
+    sheet.setArray({ axis: 'y', count: 2, spacing: 2, mode: 'gap' });
     expect(sheet.parts[1]!.pos[1]).toBe(50);
   });
 

@@ -658,7 +658,7 @@ export class PropsPanel {
       });
     if (list.length === 1) {
       const p = list[0]!;
-      onChange(el, 'pName', (i) => store.mutate(() => (p.name = i.value)));
+      onChange(el, 'pName', (i) => store.renamePart(p.id, i.value));
       const setMiter = (end: 0 | 1, text: string) => {
         const v = clampMiter(parseFloat(text));
         store.mutate(() => {

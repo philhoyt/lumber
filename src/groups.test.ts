@@ -101,12 +101,14 @@ describe('groups', () => {
     expect(b.group).toBe(g.id);
   });
 
-  it('arrays a group into separate groups', () => {
+  it('arrays a group: the array lives inside the group and holds every copy', () => {
     const { s } = twoParts();
-    s.groupSelected();
-    s.arraySelected('y', 3, 16);
-    expect(s.groups).toHaveLength(3);
+    const g = s.groupSelected()!;
+    const arr = s.setArray({ axis: 'y', count: 3, spacing: 16, mode: 'center' })!;
     expect(s.parts).toHaveLength(6);
+    expect(s.groups).toHaveLength(2);
+    expect(arr.parent).toBe(g.id);
+    expect(s.parts.every((p) => p.group === arr.id)).toBe(true);
   });
 
   it('moves parts into and out of groups', () => {

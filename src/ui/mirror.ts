@@ -17,8 +17,6 @@ export function beginMirror(store: Store): void {
   toast('Mirror: press X, Y or Z for the axis, Esc to cancel', 8000);
 }
 
-export const mirrorPending = (): boolean => pending;
-
 /** Handle a key while waiting; true when the key was consumed. */
 export function mirrorKey(e: KeyboardEvent, store: Store): boolean {
   if (!pending) return false;

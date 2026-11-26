@@ -125,9 +125,6 @@ export const DEFAULT_STOCK: readonly Stock[] = [
   ...REFERENCE_STOCKS,
 ];
 
-/** @deprecated The defaults; the live library is `getStock()`. */
-export const STOCK = DEFAULT_STOCK;
-
 export const cloneStock = (list: readonly Stock[]): Stock[] =>
   list.map((s) => ({
     ...s,
@@ -190,8 +187,6 @@ function missingStock(id: string): Stock {
 export function stockById(id: string): Stock {
   return current.find((x) => x.id === id) ?? missingStock(id);
 }
-
-export const isSheet = (s: Stock): boolean => s.sheet !== undefined;
 
 /** Width of a board's cross-section, or of a sheet part cut to `w`. */
 export function stockWidth(s: Stock, w: number | undefined): number {

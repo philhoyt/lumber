@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { AABB, Vec3 } from './model';
-import { coplanarFaces, snapDelta, snapQuads, snapWithHits } from './snap';
+import { coplanarFaces, snapQuads, snapWithHits } from './snap';
+
+/** The adjusted movement alone. */
+const snapDelta = (...args: Parameters<typeof snapWithHits>): Vec3 => snapWithHits(...args).delta;
 
 const box = (min: Vec3, max: Vec3): AABB => ({ min, max });
 const moving = box([0, 0, 0], [10, 2, 4]);

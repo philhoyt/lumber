@@ -90,17 +90,6 @@ export function snapWithHits(
   return { delta, hits };
 }
 
-/** As `snapWithHits`, returning only the adjusted movement. */
-export function snapDelta(
-  aabb: AABB,
-  delta: Vec3,
-  axes: readonly AxisIndex[],
-  others: readonly AABB[],
-  opts: SnapOptions,
-): Vec3 {
-  return snapWithHits(aabb, delta, axes, others, opts).delta;
-}
-
 /** A face of another box lying on the plane a hit snapped to. */
 export interface CoplanarFace {
   other: number;

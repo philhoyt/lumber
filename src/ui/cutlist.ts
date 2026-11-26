@@ -207,7 +207,6 @@ export class CutlistPanel {
   }
 }
 
-/** "45°/45°" with the short-point edge marked. */
 /** "20°▴ / square": each end's angle with where the short point is (▴ back or top, ▾ front or bottom). */
 export function angleText(m: [number, number], up = 'back', down = 'front'): string {
   const one = (a: number) =>
