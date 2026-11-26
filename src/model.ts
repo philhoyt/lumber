@@ -6,7 +6,7 @@
  * Rotations are always multiples of 90° about world axes, so an axis-aligned bounding
  * box describes a part exactly.
  */
-import { Quaternion, Vector3 } from 'three';
+import { Euler, Matrix4, Quaternion, Vector3 } from 'three';
 import { mirrorFastener, type Fastener } from './fastener';
 import { stockById, stockWidth } from './stock';
 
@@ -276,7 +276,64 @@ export const AXIS_NAMES: Axis[] = ['x', 'y', 'z'];
 
 /** A quarter turn about a world axis. */
 export function rot90(axis: Axis, turns = 1): Quaternion {
-  return new Quaternion().setFromAxisAngle(AX[axis], (turns * Math.PI) / 2);
+  return rotDeg(axis, turns * 90);
+}
+
+/** A turn of any angle, in degrees, about a world axis. */
+export function rotDeg(axis: Axis, deg: number): Quaternion {
+  return new Quaternion().setFromAxisAngle(AX[axis], (deg * Math.PI) / 180);
+}
+
+/** A quaternion as stored: unit length, float noise and -0 stripped. */
+export function cleanQ(q: Quaternion): Quat {
+  q.normalize();
+  return q.toArray().map((x) => Math.round(x * 1e10) / 1e10 || 0) as Quat;
+}
+
+/** Orientation as XYZ Euler angles in degrees, each to a hundredth. */
+export function eulerDeg(q: Quat): Vec3 {
+  const e = new Euler().setFromQuaternion(new Quaternion().fromArray(q), 'XYZ');
+  return [e.x, e.y, e.z].map((r) => Math.round(((r * 180) / Math.PI) * 100) / 100 || 0) as Vec3;
+}
+
+/** The orientation with these XYZ Euler angles, in degrees. */
+export function quatFromEuler(deg: Vec3): Quat {
+  const r = (d: number) => (d * Math.PI) / 180;
+  return cleanQ(new Quaternion().setFromEuler(new Euler(r(deg[0]), r(deg[1]), r(deg[2]), 'XYZ')));
+}
+
+/** Whether every local axis lies along a world axis: a quarter-turn orientation. */
+export function isSquare(q: Quat, eps = 1e-6): boolean {
+  _q.fromArray(q);
+  for (const a of [0, 1, 2] as const) {
+    _v.set(a === 0 ? 1 : 0, a === 1 ? 1 : 0, a === 2 ? 1 : 0).applyQuaternion(_q);
+    if (Math.max(Math.abs(_v.x), Math.abs(_v.y), Math.abs(_v.z)) < 1 - eps) return false;
+  }
+  return true;
+}
+
+/** The nearest quarter-turn orientation: each local axis snapped to the world axis it leans along. */
+export function squareUp(q: Quat): Quat {
+  const m = new Matrix4().makeRotationFromQuaternion(new Quaternion().fromArray(q));
+  const snap = (v: Vector3, avoid: number): Vector3 => {
+    let best = 0;
+    let bestAbs = -1;
+    for (const a of [0, 1, 2] as const) {
+      const c = Math.abs(v.getComponent(a));
+      if (a !== avoid && c > bestAbs) {
+        bestAbs = c;
+        best = a;
+      }
+    }
+    const out = new Vector3();
+    out.setComponent(best, v.getComponent(best) < 0 ? -1 : 1);
+    return out;
+  };
+  const x = snap(new Vector3().setFromMatrixColumn(m, 0), -1);
+  const xAxis = [0, 1, 2].find((a) => x.getComponent(a) !== 0) ?? 0;
+  const y = snap(new Vector3().setFromMatrixColumn(m, 1), xAxis);
+  const z = new Vector3().crossVectors(x, y);
+  return cleanQ(new Quaternion().setFromRotationMatrix(new Matrix4().makeBasis(x, y, z)));
 }
 
 /** Compose quarter turns in order, each about a world axis. */
@@ -376,14 +433,23 @@ export function withMinKept(p: Part, change: (p: Part) => void): void {
 
 /** Rotate parts together a quarter turn about their shared centre, keeping them at the same floor height. */
 export function rotateParts(list: Part[], axis: Axis, turns = 1): void {
-  if (!list.length) return;
+  rotatePartsBy(list, axis, turns * 90);
+}
+
+/**
+ * Turn parts about their common centre by any angle in degrees, then set them back on
+ * the floor line they stood on. An angled part keeps an exact box in its own frame; its
+ * world bounds enclose the tilted box.
+ */
+export function rotatePartsBy(list: Part[], axis: Axis, deg: number): void {
+  if (!list.length || !deg) return;
   const u = unionAABB(list);
   const c = new Vector3().fromArray(aabbCenter(u));
-  const R = rot90(axis, turns);
+  const R = rotDeg(axis, deg);
   for (const p of list) {
     const v = new Vector3().fromArray(p.pos).sub(c).applyQuaternion(R).add(c);
     p.pos = v.toArray();
-    p.q = R.clone().multiply(new Quaternion().fromArray(p.q)).toArray();
+    p.q = cleanQ(R.clone().multiply(new Quaternion().fromArray(p.q)));
   }
   const u2 = unionAABB(list);
   const dz = u.min[UP] - u2.min[UP];
@@ -391,16 +457,46 @@ export function rotateParts(list: Part[], axis: Axis, turns = 1): void {
 }
 
 /**
- * Which local axis of a part (0 length, 1 width, 2 thickness) runs along a world axis.
- * Orientations are quarter turns, so exactly one does.
+ * Which local axis of a part (0 length, 1 width, 2 thickness) runs along a world axis:
+ * exactly one for a quarter-turn orientation, the one leaning closest for an angled part.
  */
 export function localAxisAlong(q: Quat, axis: AxisIndex): AxisIndex {
   _q.fromArray(q);
+  let best: AxisIndex = 0;
+  let bestAbs = -1;
   for (const a of [0, 1, 2] as const) {
     _v.set(a === 0 ? 1 : 0, a === 1 ? 1 : 0, a === 2 ? 1 : 0).applyQuaternion(_q);
-    if (Math.abs(_v.getComponent(axis)) > 0.5) return a;
+    const c = Math.abs(_v.getComponent(axis));
+    if (c > bestAbs) {
+      bestAbs = c;
+      best = a;
+    }
   }
-  return 0;
+  return best;
+}
+
+/**
+ * Snap targets on a part for measuring: its corners, edge midpoints and face centres,
+ * in world space, however it is turned.
+ */
+export function partSnapPoints(p: Part): Vec3[] {
+  const d = partDims(p);
+  _q.fromArray(p.q);
+  const out: Vec3[] = [];
+  for (let i = 0; i < 3; i++)
+    for (let j = 0; j < 3; j++)
+      for (let k = 0; k < 3; k++) {
+        if (i === 1 && j === 1 && k === 1) continue; // the centre is not a snap target
+        _v.set(((i - 1) * d[0]) / 2, ((j - 1) * d[1]) / 2, ((k - 1) * d[2]) / 2).applyQuaternion(
+          _q,
+        );
+        out.push([
+          Math.round((_v.x + p.pos[0]) * 1e6) / 1e6 || 0,
+          Math.round((_v.y + p.pos[1]) * 1e6) / 1e6 || 0,
+          Math.round((_v.z + p.pos[2]) * 1e6) / 1e6 || 0,
+        ]);
+      }
+  return out;
 }
 
 /** A cut flipped end for end (local X), front for back (Y) or top for bottom (Z). */
@@ -437,6 +533,16 @@ export function mirrorParts(list: Part[], axis: Axis): void {
   for (const p of list) {
     p.pos[a] = 2 * c - p.pos[a] || 0;
     const local = localAxisAlong(p.q, a);
+    if (!isSquare(p.q)) {
+      // A tilted part leans the other way in the mirror: reflect its frame. M R L is a
+      // proper rotation again when L flips the local axis nearest the mirror's normal.
+      const flip = (k: number) =>
+        new Matrix4().makeScale(k === 0 ? -1 : 1, k === 1 ? -1 : 1, k === 2 ? -1 : 1);
+      const R = new Matrix4().makeRotationFromQuaternion(new Quaternion().fromArray(p.q));
+      p.q = cleanQ(
+        new Quaternion().setFromRotationMatrix(flip(a).multiply(R).multiply(flip(local))),
+      );
+    }
     if (p.miter) {
       const [m0, m1] = p.miter;
       if (local === 0) p.miter = [m1, m0];

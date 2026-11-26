@@ -61,7 +61,8 @@ theme.
 | X / Y / Z during a grab            | Move along that axis only; Shift+X / Y / Z: in the plane without it       |
 | Type a length during a grab, Enter | Move that far (`16`, `3/4`, `2'6`)                                        |
 | Enter / click, Esc / right-click   | Confirm or cancel a transform                                             |
-| R then X / Y / Z                   | Quarter turn about that axis; Shift reverses                              |
+| R then X / Y / Z                   | Quarter turn; Shift reverses; type an angle after the axis (R X 15 Enter) |
+| Drag a ring while rotating         | Turn in 15° steps, Ctrl for 1°; the Part panel shows and sets angles      |
 | S then a length, Enter             | Set the cut length                                                        |
 | Shift+A                            | Add stock at the pointer                                                  |
 | Shift+D                            | Duplicate and grab the copy; Ctrl+D duplicates with an offset             |

@@ -13,7 +13,8 @@
  *   to one axis, Shift+X / Y / Z to the plane without that axis; type a distance;
  *   Enter or left-click confirms, Escape or right-click cancels
  * - R then X / Y / Z turns the selection a quarter turn about that axis (Shift for the
- *   other way); S then a length sets the cut length
+ *   other way); type an angle after the axis for any other turn (R X 15 Enter), or drag
+ *   a ring in 15° steps (Ctrl for 1°); S then a length sets the cut length
  * - the gizmo and a part's body can also be dragged directly with the mouse
  */
 import * as THREE from 'three';
@@ -25,7 +26,8 @@ import {
   miterOf,
   partAABB,
   partDims,
-  rotateParts,
+  rotatePartsBy,
+  partSnapPoints,
   unionAABB,
   withMinKept,
   AXIS_NAMES,
@@ -39,7 +41,7 @@ import { assemblyOffsets, lastStep, stepCount, stepTitle } from './assembly';
 import { explodeOffsets, offsetAABB } from './explode';
 import { fastenersOf } from './fastener';
 import { buildMarkers } from './markers';
-import { nearestSnap, snapPoints } from './measure';
+import { nearestSnap } from './measure';
 import { coplanarFaces, snapWithHits, type SnapHit } from './snap';
 import { stockById, type Stock } from './stock';
 import type { Store } from './store';
@@ -81,8 +83,10 @@ interface Transform {
   typed: string;
   /** A ring being dragged in rotate mode. */
   ring: RingDrag | null;
-  /** Quarter turns applied so far in rotate mode, per axis, for the readout. */
-  turns: Vec3;
+  /** Degrees turned so far in rotate mode, per axis, for the readout. */
+  angles: Vec3;
+  /** The axis the last X / Y / Z key or ring chose, which a typed angle applies to. */
+  rotAxis: AxisIndex | null;
 }
 
 interface RingDrag {
@@ -90,7 +94,7 @@ interface RingDrag {
   /** Angle at the start of the drag and the last unwrapped angle, radians. */
   start: number;
   last: number;
-  /** Quarter turns applied by this drag so far. */
+  /** Degrees applied by this drag so far. */
   applied: number;
   moved: boolean;
 }
@@ -130,8 +134,11 @@ const EMISSIVE: Record<MeshState, number> = {
   current: 0x3a2e10,
 };
 const LABELS = ['X', 'Y', 'Z'] as const;
-/** Quarter turns as a signed count in -1..2, so three turns read as -90°. */
-const signedTurns = (n: number): number => ((((n + 1) % 4) + 4) % 4) - 1;
+/** An angle as a signed turn in (-180, 180], so 270° reads as -90°. */
+const signedDeg = (d: number): number => {
+  const m = ((d % 360) + 360) % 360;
+  return m > 180 ? m - 360 : m;
+};
 
 export class LumberScene {
   private renderer: THREE.WebGLRenderer;
@@ -161,6 +168,8 @@ export class LumberScene {
   private lastPointer: [number, number] | null = null;
   private downPos: [number, number] | null = null;
   private hoverId: number | null = null;
+  /** Ctrl held while the pointer moves: a ring drag turns by the degree instead of 15°. */
+  private fine = false;
   private grids: THREE.GridHelper[] = [];
   private rightDown: [number, number] | null = null;
   private suppressMenu = false;
@@ -533,11 +542,12 @@ export class LumberScene {
 
   private transformText(t: Transform): string {
     if (t.kind === 'rotate') {
+      if (t.typed) return `Rotate ${LABELS[t.rotAxis ?? UP]} ${t.typed}▏°`;
       const done = ([0, 1, 2] as AxisIndex[])
-        .filter((a) => t.turns[a])
-        .map((a) => `${LABELS[a]} ${signedTurns(t.turns[a]) * 90}°`)
+        .filter((a) => signedDeg(t.angles[a]))
+        .map((a) => `${LABELS[a]} ${signedDeg(t.angles[a])}°`)
         .join('  ');
-      return done || 'Rotate: drag a ring, or X / Y / Z (Shift reverses) · Enter';
+      return done || 'Rotate: X / Y / Z a quarter turn, type an angle, or drag a ring · Enter';
     }
     if (t.kind === 'size') return `Length: ${t.typed}▏`;
     const c = t.constraint;
@@ -740,7 +750,7 @@ export class LumberScene {
       const at: Vec3 = [hit.point.x, hit.point.y, hit.point.z];
       if (!p) return at;
       const tol = this.rig.viewHeightAt(hit.point) * 0.025;
-      return nearestSnap(snapPoints(partAABB(p)), at, tol) ?? at;
+      return nearestSnap(partSnapPoints(p), at, tol) ?? at;
     }
     const g = this.groundPoint(clientX, clientY);
     if (!g) return null;
@@ -817,18 +827,20 @@ export class LumberScene {
       delta: [0, 0, 0],
       typed: '',
       ring: null,
-      turns: [0, 0, 0],
+      angles: [0, 0, 0],
+      rotAxis: null,
     };
     if (modal) this.container.style.cursor = kind === 'rotate' ? '' : 'move';
     return this.tf;
   }
 
-  /** Turn the selection quarter turns about an axis during rotate mode, keeping the readout. */
-  private turn(axis: AxisIndex, turns: number): void {
+  /** Turn the selection by degrees about an axis during rotate mode, keeping the readout. */
+  private turn(axis: AxisIndex, deg: number): void {
     const t = this.tf;
-    if (t?.kind !== 'rotate' || !turns) return;
-    rotateParts(this.store.selectedParts(), AXIS_NAMES[axis]!, turns);
-    t.turns[axis] = (((t.turns[axis] + turns) % 4) + 4) % 4;
+    if (t?.kind !== 'rotate' || !deg) return;
+    rotatePartsBy(this.store.selectedParts(), AXIS_NAMES[axis]!, deg);
+    t.angles[axis] = (((t.angles[axis] + deg) % 360) + 360) % 360;
+    t.rotAxis = axis;
     t.moved = true;
     this.syncAll();
     this.store.notify('drag');
@@ -853,7 +865,9 @@ export class LumberScene {
     if (d > Math.PI) d -= 2 * Math.PI;
     if (d < -Math.PI) d += 2 * Math.PI;
     r.last += d;
-    const want = Math.round((r.last - r.start) / (Math.PI / 2));
+    // Snap the drag to 15° steps, or single degrees with Ctrl held.
+    const step = this.fine ? 1 : 15;
+    const want = Math.round(((r.last - r.start) * 180) / Math.PI / step) * step;
     if (want !== r.applied) {
       this.turn(r.axis, want - r.applied);
       r.applied = want;
@@ -865,7 +879,7 @@ export class LumberScene {
     const r = t?.ring;
     if (!t || !r) return;
     // A click on a ring, with no drag to speak of, is one quarter turn.
-    if (!r.moved && r.applied === 0) this.turn(r.axis, 1);
+    if (!r.moved && r.applied === 0) this.turn(r.axis, 90);
     t.ring = null;
   }
 
@@ -981,6 +995,13 @@ export class LumberScene {
         t.moved = true;
         this.applyDelta(d);
       }
+    }
+    if (commit && t.kind === 'rotate' && t.typed) {
+      // The typed angle is the whole turn about that axis for this rotate, whatever the
+      // keys or rings did first: R X 15 Enter ends at 15°.
+      const deg = parseFloat(t.typed);
+      const axis = t.rotAxis ?? UP;
+      if (Number.isFinite(deg)) this.turn(axis, deg - t.angles[axis]);
     }
     if (commit && t.kind === 'size') {
       const v = parseLen(t.typed);
@@ -1106,6 +1127,7 @@ export class LumberScene {
 
   private onPointerMove(e: PointerEvent): void {
     this.lastPointer = [e.clientX, e.clientY];
+    this.fine = e.ctrlKey || e.metaKey;
     const t = this.tf;
     if (t) {
       if (t.kind === 'rotate') {
@@ -1209,8 +1231,14 @@ export class LumberScene {
       this.setConstraint(key === t.constraintKey ? '' : key);
       this.updateGrab();
     } else if (t.kind === 'rotate' && (lower === 'x' || lower === 'y' || lower === 'z')) {
-      this.turn(AXIS_NAMES.indexOf(lower) as AxisIndex, e.shiftKey ? -1 : 1);
-    } else if (t.kind !== 'rotate' && k === 'Backspace') t.typed = t.typed.slice(0, -1);
+      // An angle typed before the axis turns by it; otherwise a quarter turn.
+      const axis = AXIS_NAMES.indexOf(lower) as AxisIndex;
+      const typed = parseFloat(t.typed);
+      const deg = t.typed && Number.isFinite(typed) ? typed : 90;
+      t.typed = '';
+      this.turn(axis, e.shiftKey ? -deg : deg);
+    } else if (k === 'Backspace') t.typed = t.typed.slice(0, -1);
+    else if (t.kind === 'rotate' && k.length === 1 && /[\d.-]/.test(k)) t.typed += k;
     else if (t.kind !== 'rotate' && k.length === 1 && /[\d./'" +*()-]/.test(k)) t.typed += k;
     else return;
     e.preventDefault();

@@ -23,6 +23,8 @@ import {
   type Axis,
   type AxisIndex,
   type Part,
+  eulerDeg,
+  isSquare,
 } from '../model';
 import {
   FACES as FASTENER_FACES,
@@ -42,6 +44,19 @@ import { keepFocus } from './fields';
 import { icon } from './icons';
 
 type SectionId = 'part' | 'transform' | 'arrange' | 'assembly' | 'fasteners' | 'array';
+
+/** Angle fields for the selection (blank when the parts differ) and a way back to square. */
+function anglesHtml(list: readonly Part[]): string {
+  const first = list[0] ? eulerDeg(list[0].q) : [0, 0, 0];
+  const same = list.every((p) => eulerDeg(p.q).every((d, i) => d === first[i]));
+  const square = list.every((p) => isSquare(p.q));
+  const field = (id: string, label: string, i: number) =>
+    `<div><label class="small">${label}</label><input type="number" step="any" id="${id}" value="${same ? first[i] : ''}" placeholder="${same ? '' : 'mixed'}" title="Degrees about the world ${label} axis"></div>`;
+  return `<label class="small">Angles (degrees about X, Y, Z)</label>
+      <div class="row">${field('rotX', 'X', 0)}${field('rotY', 'Y', 1)}${field('rotZ', 'Z', 2)}</div>
+      <div class="row btns"><button id="bSquare" title="Snap to the nearest quarter turns"${square ? ' disabled' : ''}>Square up</button></div>
+      <div class="muted">Any angle is allowed: R, the axis, then the angle (R X 15 Enter), or drag a ring in 15° steps, Ctrl for 1°.</div>`;
+}
 
 /** The Assembly section: one step number for the selection, blank when unset or mixed. */
 function assemblyHtml(list: readonly Part[]): string {
@@ -313,6 +328,7 @@ export class PropsPanel {
       <div class="muted footprint">Footprint ${fmt(size[0])} × ${fmt(size[1])}, height ${fmt(size[2])}</div>
       <label class="small">Rotate 90° (R, then axis)</label>
       <div class="row btns"><button id="bRotX" title="R X">About X</button><button id="bRotY" title="R Y">About Y</button><button id="bRotZ" title="R Z">About Z</button></div>
+      ${anglesHtml(list)}
       <label class="small">Mirror (Ctrl+M, then axis)</label>
       <div class="row btns"><button id="bMirX" title="Ctrl+M X: flip left-right">Left-right</button><button id="bMirY" title="Ctrl+M Y: flip front-back">Front-back</button><button id="bMirZ" title="Ctrl+M Z: flip top-bottom">Top-bottom</button></div>`;
 
@@ -505,6 +521,21 @@ export class PropsPanel {
       ),
     );
     onClick(el, 'bRotX', () => store.rotateSelected('x'));
+    const setAngles = () => {
+      const read = (id: string) =>
+        parseFloat(el.querySelector<HTMLInputElement>(`#${id}`)?.value ?? '');
+      const deg = [read('rotX'), read('rotY'), read('rotZ')].map((v) =>
+        Number.isFinite(v) ? v : 0,
+      );
+      store.setRotation(
+        list.map((p) => p.id),
+        deg as [number, number, number],
+      );
+    };
+    onChange(el, 'rotX', setAngles);
+    onChange(el, 'rotY', setAngles);
+    onChange(el, 'rotZ', setAngles);
+    onClick(el, 'bSquare', () => store.squareUpSelected());
     onClick(el, 'bRotY', () => store.rotateSelected('y'));
     onClick(el, 'bRotZ', () => store.rotateSelected('z'));
     onClick(el, 'bMirX', () => store.mirrorSelected('x'));

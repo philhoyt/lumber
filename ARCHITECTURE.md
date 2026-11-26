@@ -60,9 +60,13 @@ Rules of the layering:
   `model.ts` is the one place that knows which axis index is up.
 - A part's local frame is length along X, width along Y, thickness along Z, so
   the identity orientation lies flat on the floor.
-- Rotations are quaternions composed from quarter turns about world axes
-  (`makeQ(['x', 'z'])`), so a part's axis-aligned bounding box is exact and is
-  used for snapping, resizing (keep the min corner) and the overall size.
+- Rotations are quaternions. Quarter turns about world axes (`makeQ(['x', 'z'])`,
+  R then an axis) are the default and keep a part's axis-aligned bounding box
+  exact. Any angle is allowed too (`rotatePartsBy`: R X 15, a ring drag, the
+  angle fields), for braces, kickers and tilted panels; an angled part's box is
+  then the bounds of its tilted box, and snapping, aligning, dropping and the
+  overall size work on that. `squareUp` snaps back to the nearest quarter
+  turns. Measuring snaps to the part's real corners either way.
 
 ## Transforms
 

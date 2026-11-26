@@ -21,7 +21,14 @@ const SECTIONS: [string, [string, string][]][] = [
       ['X / Y / Z while grabbing', 'Move along one axis'],
       ['Shift+X / Y / Z', 'Move in the plane without that axis'],
       ['Type a length, Enter', "Move exactly that far (16, 3/4, 2'6, 48 - 3/4)"],
-      ['R then X / Y / Z', 'Quarter turn; Shift reverses; or drag a ring'],
+      [
+        'R then X / Y / Z',
+        'Quarter turn; Shift reverses; type an angle after the axis (R X 15 Enter)',
+      ],
+      [
+        'Drag a ring while rotating',
+        '15° steps; Ctrl for 1°; the Part panel shows and sets angles',
+      ],
       ['S then a length', 'Set the cut length'],
       ['Enter / click · Esc / right-click', 'Confirm · cancel'],
       ['Arrows, PgUp / PgDn', 'Nudge by the grid step'],

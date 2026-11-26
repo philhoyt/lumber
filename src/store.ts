@@ -16,6 +16,9 @@ import {
   migrateFromYUp,
   mirrorParts,
   rotateParts,
+  rotatePartsBy,
+  quatFromEuler,
+  squareUp,
   translateParts,
   unionAABB,
   AXIS_INDEX,
@@ -512,6 +515,29 @@ export class Store {
     const list = this.selectedParts();
     if (!list.length) return;
     this.mutate(() => rotateParts(list, axis, turns));
+  }
+  /** Turn the selection by any angle, in degrees, about a world axis through its centre. */
+  rotateSelectedBy(axis: Axis, deg: number): void {
+    const list = this.selectedParts();
+    if (!list.length || !deg) return;
+    this.mutate(() => rotatePartsBy(list, axis, deg));
+  }
+  /** Set each selected part's orientation in place, as XYZ angles in degrees. */
+  setRotation(ids: Iterable<number>, deg: Vec3): void {
+    const list = [...ids].map((id) => this.partById(id)).filter((p) => p !== undefined);
+    if (!list.length) return;
+    const q = quatFromEuler(deg);
+    this.mutate(() => {
+      for (const p of list) p.q = [...q];
+    });
+  }
+  /** Snap each selected part to the nearest quarter-turn orientation, in place. */
+  squareUpSelected(): void {
+    const list = this.selectedParts();
+    if (!list.length) return;
+    this.mutate(() => {
+      for (const p of list) p.q = squareUp(p.q);
+    });
   }
   // ---- fasteners ----
   addFastener(partId: number, f: Fastener): void {

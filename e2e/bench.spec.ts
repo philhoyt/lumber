@@ -256,3 +256,25 @@ test('E explodes the view, which is look-only, and collapses again', async ({ pa
   await page.keyboard.press('e');
   await expect(bar).toBeHidden();
 });
+
+test('R with a typed angle tilts a part, and Square up brings it back', async ({ page }) => {
+  await openBench(page);
+  await selectPart(page, 'Leg LF');
+  await expect(page.locator('#rotX')).toHaveValue('0');
+  await expect(page.locator('#bSquare')).toBeDisabled();
+  await hoverView(page);
+  await page.keyboard.press('r');
+  await page.keyboard.press('x');
+  await expect(page.locator('.drag-label')).toContainText('X 90°');
+  await page.keyboard.type('15');
+  await expect(page.locator('.drag-label')).toContainText('Rotate X 15');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#rotX')).toHaveValue('15');
+  await expect(page.locator('#pZ')).toHaveValue('0'); // still standing on the floor
+  await expect(page.locator('#bSquare')).toBeEnabled();
+  await page.locator('#bSquare').click();
+  await expect(page.locator('#rotX')).toHaveValue('0');
+  await expect(page.locator('#bSquare')).toBeDisabled();
+  await page.locator('#bUndo').click();
+  await expect(page.locator('#rotX')).toHaveValue('15');
+});
