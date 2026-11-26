@@ -42,6 +42,7 @@ import {
   type AxisIndex,
   type Group,
   type Part,
+  type Quat,
   type Cut,
   type Vec3,
   CUT_KINDS,
@@ -527,14 +528,23 @@ export class Store {
   }
 
   // ---- part operations ----
-  addPart(stockId: string, at: Vec3 = [0, 0, 0]): Part {
+  addPart(stockId: string, at: Vec3 = [0, 0, 0], q?: Quat): Part {
     let p!: Part;
     this.mutate(() => {
       p = createPart(this.nextId++, stockId, at);
+      if (q) p.q = [...q] as Quat;
       this.parts.push(p);
     });
     this.select([p.id]);
     return p;
+  }
+  /**
+   * Add stock turned like the selection: a new piece arrives at the tilt of the part you
+   * are working next to instead of flat. Loose when nothing is selected.
+   */
+  addPartLikeSelection(stockId: string, at: Vec3 = [0, 0, 0]): Part {
+    const ref = this.selectedParts()[0];
+    return this.addPart(stockId, at, ref?.q);
   }
   deleteSelected(): void {
     if (!this.selected.size) return;

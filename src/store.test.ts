@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aabbSize, makeQ, partAABB } from './model';
+import { aabbSize, makeQ, partAABB, quatFromEuler } from './model';
 import { parseDocument, Store } from './store';
 
 describe('Store', () => {
@@ -246,5 +246,21 @@ describe('addBlockBetween', () => {
     expect(s.addBlockBetween(a.id, a.id)).toBeNull();
     s.undo();
     expect(s.parts).toHaveLength(2);
+  });
+});
+
+describe('addPartLikeSelection', () => {
+  it('turns new stock like the selected part, and leaves it flat when nothing is selected', () => {
+    const s = new Store();
+    const tilted = s.addPart('2x6');
+    const q = quatFromEuler([-40, 0, 0]);
+    s.mutate(() => (tilted.q = q));
+    s.select([tilted.id]);
+    const next = s.addPartLikeSelection('2x4', [10, 0, 0]);
+    expect(next.q).toEqual(q);
+    expect(next.pos[0]).toBe(10);
+    s.select([]);
+    const flat = s.addPartLikeSelection('2x4');
+    expect(flat.q).toEqual([0, 0, 0, 1]);
   });
 });

@@ -218,7 +218,7 @@ export function wireDrop(viewport: HTMLElement, scene: LumberScene, store: Store
     const g = scene.groundPoint(e.clientX, e.clientY) ?? [0, 0, 0];
     const grid = store.settings.grid;
     const snap = (v: number) => (grid ? Math.round(v / grid) * grid : v);
-    store.addPart(id, [snap(g[0]), snap(g[1]), 0]);
+    store.addPartLikeSelection(id, [snap(g[0]), snap(g[1]), 0]);
   });
 }
 

@@ -97,7 +97,7 @@ export function stockItems(ground: Vec3 | null, store: Store): MenuItem[] {
       const g = ground ?? [0, 0, 0];
       const grid = store.settings.grid;
       const snap = (v: number) => (grid ? Math.round(v / grid) * grid : v);
-      store.addPart(s.id, [snap(g[0]), snap(g[1]), 0] as Vec3);
+      store.addPartLikeSelection(s.id, [snap(g[0]), snap(g[1]), 0] as Vec3);
     },
   }));
 }

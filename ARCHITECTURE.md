@@ -85,6 +85,15 @@ constraint mid-drag re-anchors so the parts do not jump. Typed digits are kept
 on the transform and applied on Enter. Confirm commits the pre-transform
 snapshot to the store; cancel restores it.
 
+## Local frames
+
+`frame.ts` is the geometry of a part's own axes: the world direction of a local axis,
+a part's box expressed in another part's frame, extents along a direction, whether two
+parts share a frame (their axes line up, quarter turns aside), and the fit of a block
+between two parallel parts. The scene uses it for moves and array drags along a local
+axis (an axis key tapped twice, or the gizmo on a tilted part), snapping those moves
+to co-framed parts in that frame, and the store for local arrays and `addBlockBetween`.
+
 ## Groups and arrays
 
 Shift+R arrays by dragging: `arrayDrag.ts` turns a drag distance along an axis into

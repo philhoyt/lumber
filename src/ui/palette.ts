@@ -57,7 +57,7 @@ export function renderPalette(
         e.dataTransfer?.setData(DRAG_TYPE, s.id);
         if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
       });
-      el.addEventListener('click', () => store.addPart(s.id, [0, 0, 0]));
+      el.addEventListener('click', () => store.addPartLikeSelection(s.id, [0, 0, 0]));
       (s.sheet ? sheetsEl : boardsEl).appendChild(el);
       items.push({ el, text: `${s.name} ${dim}`.toLowerCase() });
     }
