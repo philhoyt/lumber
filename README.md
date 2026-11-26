@@ -2,22 +2,23 @@
 
 Build it from the stock you buy. A 3D planner for projects made of construction
 lumber and sheet goods: drag a 2x4 or a sheet of plywood into the scene, cut it
-to length, snap it against the other parts, and read the cut list, board and
-sheet layouts, and a cost estimate off the side panel as you go.
+to length and snap it against the other parts. The side panel keeps the cut
+list, the sheet layouts and the cost current as you work.
 
 Every part is a piece of stock, so there is no geometry kernel. The model is a
-list of boxes. See [ARCHITECTURE.md](ARCHITECTURE.md) for how it is put together.
+list of boxes. [ARCHITECTURE.md](ARCHITECTURE.md) explains how the pieces fit.
 
 ## Run it
 
-Live at <https://philhoyt.github.io/lumber/>; every push to `main` that passes the
-checks is published there by GitHub Actions. To run it yourself, Node 20 or later:
+The app runs at <https://philhoyt.github.io/lumber/>. GitHub Actions publishes
+each push to `main` that passes the checks. To run it yourself, with Node 20 or
+later:
 
     npm install
     npm run dev          # http://localhost:5173
 
-`npm run build` writes a static site to `dist/` that runs from any file host,
-with three.js bundled in so it works offline.
+`npm run build` writes a static site to `dist/` that runs from any file host.
+It bundles three.js, so it works offline.
 
 ## Develop
 
@@ -27,8 +28,8 @@ with three.js bundled in so it works offline.
     npm run test:coverage
     npm run format       # apply Prettier
 
-Enable the pre-commit hook once per clone; it runs everything in `check` except
-the end-to-end tests before every commit:
+Enable the pre-commit hook once per clone. It runs everything in `check` except
+the end-to-end tests before each commit:
 
     git config core.hooksPath .githooks
 
@@ -37,8 +38,8 @@ the end-to-end tests before every commit:
 The drawings button in the header opens printable shop drawings: front, right and top
 views of the whole model with its overall dimensions, then a sheet per unique part with
 its face and edge views, length, width, thickness, miter angles, joinery and fastener
-marks, and a hardware list. They are drawn from the model's exact sizes, so what is on
-the page is what to cut. Print sends just the drawings to the printer.
+marks, and a hardware list. The drawings use the model's exact sizes, so what is on the
+page is what you cut. Print sends the drawings alone to the printer.
 
 ## Controls
 
@@ -48,17 +49,17 @@ right, −Y is the front, Z is up.
 The tool strip on the left holds the same actions as buttons, with the key in
 each tooltip, and the view presets below them. T shows or hides the stock
 palette, N the side panel with its Parts and Cut list tabs and the properties
-sections. ? opens the full key reference; the sun/moon button switches the
+sections. ? opens the full key reference. The sun/moon button switches the
 theme.
 
 | Keys                               | What                                                                      |
 | ---------------------------------- | ------------------------------------------------------------------------- |
-| Right-click                        | Menu with every action for the part, selection or scene                   |
+| Right-click                        | Menu with the actions for the part, selection or scene                    |
 | Click, Shift+click, drag on empty  | Select, extend the selection, box select                                  |
 | A, Alt+A                           | Select all, select none                                                   |
 | G                                  | Grab: the selection follows the mouse on the floor plane                  |
 | X / Y / Z during a grab            | Move along that axis only; Shift+X / Y / Z: in the plane without it       |
-| Type a length during a grab, Enter | Move exactly that far (`16`, `3/4`, `2'6`)                                |
+| Type a length during a grab, Enter | Move that far (`16`, `3/4`, `2'6`)                                        |
 | Enter / click, Esc / right-click   | Confirm or cancel a transform                                             |
 | R then X / Y / Z                   | Quarter turn about that axis; Shift reverses                              |
 | S then a length, Enter             | Set the cut length                                                        |
@@ -66,7 +67,7 @@ theme.
 | Shift+D                            | Duplicate and grab the copy; Ctrl+D duplicates with an offset             |
 | Array (Part panel)                 | A live array: count or fit-to-length, on center or by gap; Apply bakes it |
 | Ctrl+G, Ctrl+Shift+G               | Group the selection into an assembly, ungroup                             |
-| Double-click a part                | Select just that part inside its group                                    |
+| Double-click a part                | Select that one part inside its group                                     |
 | Alt+G                              | Drop onto the floor or the parts beneath                                  |
 | Ctrl+M then X / Y / Z              | Mirror across that axis through the selection's centre                    |
 | F                                  | Fastener markers: click a face to place one, a marker to remove it        |
@@ -74,7 +75,7 @@ theme.
 | X or Delete                        | Delete                                                                    |
 | Ctrl+Z, Ctrl+Shift+Z               | Undo, redo                                                                |
 | Ctrl+S, Ctrl+O                     | Save, open                                                                |
-| Middle-drag, Shift+middle, wheel   | Orbit, pan, zoom (right-drag also pans)                                   |
+| Middle-drag, Shift+middle, wheel   | Orbit, pan, zoom (right-drag pans too)                                    |
 | Alt+drag                           | Orbit without a middle button; Shift+Alt pans, Ctrl+Alt zooms             |
 | Trackpad switch (header)           | Two-finger drag orbits, pinch zooms, Shift+two-finger pans                |
 | Corner gizmo                       | Click an axis to look along it, again for the other side; drag orbits     |
@@ -86,7 +87,7 @@ theme.
 | Numpad 2 / 4 / 6 / 8, with Ctrl    | Orbit in 15° steps, pan                                                   |
 | Numpad + / -                       | Zoom in, out                                                              |
 | Numpad . , Home                    | Frame the selection, fit the model                                        |
-| D                                  | Dimension labels on every part and the selection's W × D × H              |
+| D                                  | Dimension labels on each part and the selection's W × D × H               |
 | M                                  | Measure: click two points (snaps to corners, edges, faces); Esc           |
 | N, T, Tab                          | Toggle the side panel, the palette, both                                  |
 | Up / Down in a length field        | Step by the grid; Shift 1", Ctrl 1/16"                                    |
@@ -100,27 +101,27 @@ nodes, then loose parts grouped by
 stock: click to select, Shift+click to extend, double-click (or F2) to rename,
 and the eye to hide or show. Hovering a row highlights the part.
 
-You can also drag a part's body to slide it on the floor, or drag the gizmo's
+You can drag a part's body to slide it on the floor, or drag the gizmo's
 arrows and squares. Drag stock in from the left, or click it to add at the
 center. With several parts selected, the Align buttons make them flush or
-centred on any axis. Every length field takes fractions, feet and inches, millimetres,
+centred on any axis. Length fields take fractions, feet and inches, millimetres
 and arithmetic: `48 - 3/4`, `(96 - 2 * 1.5) / 3`, `2 ft + 3 1/2`. A slash with no spaces
 is a fraction (`3/4`, `1-1/2`); with spaces around it, it divides (`48 / 3`).
 
 The buy list shows board feet: each board stock lists the board feet in its parts
 and in what you buy, using the nominal size (2x4 is 2 × 4; the stock table has
 a Nominal column for anything the name does not say), and the total sums lumber
-in board feet and sheet goods in square feet. A stock can be priced per board
+in board feet and sheet goods in square feet. You can price a stock per board
 foot instead of per piece, for hardwood. The purchase length defaults to Auto,
 which buys the least total length.
 
-Sheet nesting is guillotine: every cut runs edge to edge across the piece it
+Sheet nesting is guillotine: each cut runs edge to edge across the piece it
 splits, as on a table saw, and each sheet diagram numbers the cuts in order.
-Three part orders are tried and the one that uses the fewest sheets is kept.
+The nester tries three part orders and keeps the one that uses the fewest sheets.
 
-Sheet parts can be told which way their length runs relative to the grain
-(Either way, Along the length, Across the length). The sheet nesting only
-turns a part the way you allow, the cut list marks the direction, and the
+You can tell a sheet part which way its length runs relative to the grain
+(Either way, Along the length, Across the length). The nester turns a part
+the ways you allow and no other, the cut list marks the direction, and the
 diagrams draw grain lines the long way of the sheet. MDF and OSB have no grain,
 which the stock table's Grain tick controls.
 
@@ -137,17 +138,17 @@ angles and the short-point length, and the 3D view draws the angled ends.
 
 The stock table is yours to edit: the gear button in the palette opens it. Change
 sizes, purchase lengths, prices and colors, add custom boards or sheets, delete
-unused ones, or reset to the defaults. Metric sizes can be typed as `38mm`. The
-table is saved with the model.
+unused ones, or reset to the defaults. Type metric sizes as `38mm`. The model
+file carries the table.
 
-Projects live in the browser: every change saves to the current project a
-moment later (the status bar says Saved). The project name in the header
-renames on click; Ctrl+O opens the Projects dialog to open, create, duplicate,
+Projects live in the browser: each change saves to the current project a
+moment later, and the status bar says Saved. Click the project name in the
+header to rename it. Ctrl+O opens the Projects dialog to open, create, duplicate,
 rename, delete or import a JSON file; Ctrl+S exports the current project as
-JSON. The link button in the header copies a share link: the whole project compressed
-into the address, nothing uploaded anywhere. Whoever opens it gets a copy as a
-new project. In Chrome or Edge the Projects dialog can also link a folder on disk:
-every project is then written there as its own .json file whenever it saves,
-renames move the file, and JSON files already in the folder can be imported
-as projects. Files from the earlier Y-up version are converted on open. The cut list exports to CSV and
-prints.
+JSON. The link button in the header copies a share link: the whole project
+compressed into the address, and nothing leaves your browser. Whoever opens it
+gets a copy as a new project. In Chrome or Edge the Projects dialog can link a
+folder on disk: the app then writes each project there as its own .json file
+whenever it saves, moves the file when you rename, and imports JSON files it
+finds in the folder as projects. Opening a file from the earlier Y-up version
+converts it. The cut list exports to CSV and prints.
