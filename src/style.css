@@ -853,6 +853,45 @@ label.small {
   display: block;
   margin-bottom: 2px;
 }
+/* A field with its label inside the box: the label scrubs it, the unit sits after. */
+.field {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel2);
+}
+.field > label {
+  flex: none;
+  padding: 0 2px 0 7px;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+  cursor: ew-resize;
+  user-select: none;
+}
+.field > input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  padding-left: 4px;
+}
+.field > input:focus-visible {
+  outline: none;
+}
+.field > .unit {
+  flex: none;
+  padding-right: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.field:focus-within {
+  border-color: var(--sel);
+  box-shadow: 0 0 0 1px var(--sel);
+}
 /* A label that drives a field scrubs it: drag left or right to slide the value. */
 label.small:has(+ input[type='text']),
 label.small:has(+ input[type='number']) {

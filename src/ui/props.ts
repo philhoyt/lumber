@@ -56,14 +56,34 @@ import { icon, iconButton } from './icons';
 
 type SectionId = 'part' | 'transform' | 'arrange' | 'assembly' | 'fasteners' | 'array';
 
+/**
+ * A field with its label inside the box, Figma-style: `X 12"`. The label names the
+ * field for screen readers (its title says more) and is the handle that scrubs it.
+ */
+export function inlineField(
+  id: string,
+  label: string,
+  title: string,
+  input: string,
+  unit = '',
+): string {
+  return `<div class="field"><label for="${id}" title="${esc(title)}">${label}</label>${input}${unit ? `<span class="unit">${unit}</span>` : ''}</div>`;
+}
+
 /** Angle fields for the selection (blank when the parts differ) and a way back to square. */
 function anglesHtml(list: readonly Part[]): string {
   const first = list[0] ? eulerDeg(list[0].q) : [0, 0, 0];
   const same = list.every((p) => eulerDeg(p.q).every((d, i) => d === first[i]));
   const square = list.every((p) => isSquare(p.q));
   const field = (id: string, label: string, i: number) =>
-    `<div><label class="small">${label}</label><input type="number" step="any" id="${id}" value="${same ? first[i] : ''}" placeholder="${same ? '' : 'mixed'}" title="Degrees about the world ${label} axis"></div>`;
-  return `<label class="small">Angles (degrees about X, Y, Z)</label>
+    inlineField(
+      id,
+      label,
+      `Degrees about the world ${label} axis`,
+      `<input type="number" step="any" id="${id}" value="${same ? first[i] : ''}" placeholder="${same ? '' : 'Mixed'}">`,
+      '°',
+    );
+  return `<label class="small">Angles about X, Y, Z</label>
       <div class="row">${field('rotX', 'X', 0)}${field('rotY', 'Y', 1)}${field('rotZ', 'Z', 2)}</div>
       <div class="row btns"><button id="bSquare" title="Snap to the nearest quarter turns"${square ? ' disabled' : ''}>Square up</button></div>
       <div class="muted">Any angle is allowed: R, the axis, then the angle (R X 15 Enter), or drag a ring in 15° steps, Ctrl for 1°.</div>`;
@@ -303,11 +323,16 @@ export class PropsPanel {
         .join('');
       part = `<div class="row"><div><label class="small">Name</label><input type="text" id="pName" value="${esc(p.name)}"></div>
         <div><label class="small">Stock</label><select id="pStock">${options}</select></div></div>
-        <div class="row"><div><label class="small">Length (S)</label><input type="text" class="len" data-min="0.0625" id="pLen" value="${fmt(p.len)}"></div>
+        <div class="row">${inlineField('pLen', 'L', 'Length, long point to long point (S scales it in the view)', `<input type="text" class="len" data-min="0.0625" id="pLen" value="${fmt(p.len)}">`)}
         ${
           s.sheet
-            ? `<div><label class="small">Width</label><input type="text" class="len" data-min="0.0625" id="pW" value="${fmt(p.w ?? s.sheet[0])}"></div>`
-            : `<div><label class="small">Section</label><div class="static">${fmt(s.t)} × ${fmt(s.w ?? 0)}</div></div>`
+            ? inlineField(
+                'pW',
+                'W',
+                'Width cut from the sheet',
+                `<input type="text" class="len" data-min="0.0625" id="pW" value="${fmt(p.w ?? s.sheet[0])}">`,
+              )
+            : `<div><div class="static muted" title="Thickness × width of the stock">${fmt(s.t)} × ${fmt(s.w ?? 0)} section</div></div>`
         }</div>`;
       if (s.sheet && s.grain !== false) {
         const labels: Record<string, string> = {
@@ -344,19 +369,31 @@ export class PropsPanel {
               `<option value="${x.id}"${stocks.size === 1 && stocks.has(x.id) ? ' selected' : ''}>${esc(x.name)}</option>`,
           )
           .join('');
-      const field = (id: string, label: string, values: Set<number>): string => {
+      const field = (id: string, label: string, name: string, values: Set<number>): string => {
         const one = values.size === 1 ? fmt([...values][0]!) : '';
-        return `<div><label class="small" for="${id}">${label}</label><input type="text" class="len" data-min="0.0625" id="${id}" value="${one}" placeholder="${one ? '' : 'Mixed'}" title="A length for all of them, or +1/2, -1/2, *2 to change each"></div>`;
+        return inlineField(
+          id,
+          label,
+          `${name} of all of them, or +1/2, -1/2, *2 to change each`,
+          `<input type="text" class="len" data-min="0.0625" id="${id}" value="${one}" placeholder="${one ? '' : 'Mixed'}">`,
+        );
       };
       const allSheets = list.every((p) => stockById(p.stock).sheet);
       part = `<div class="muted">${group ? 'An assembly: it moves, rotates and copies as one.' : 'Several parts. Group them with Ctrl+G to keep them together.'}</div>
         <div class="row"><div><label class="small" for="pStock">Stock</label><select id="pStock">${options}</select></div>
-        ${field('pLen', 'Length', new Set(list.map((p) => p.len)))}
-        ${allSheets ? field('pW', 'Width', new Set(list.map((p) => p.w ?? stockById(p.stock).sheet![0]))) : ''}</div>`;
+        ${field('pLen', 'L', 'Length', new Set(list.map((p) => p.len)))}
+        ${allSheets ? field('pW', 'W', 'Width', new Set(list.map((p) => p.w ?? stockById(p.stock).sheet![0]))) : ''}</div>`;
     }
 
     // ---- Transform ----
-    const transform = `<div class="row"><div><label class="small">X (left)</label><input type="text" class="len" id="pX" value="${fmt(u.min[0])}"></div><div><label class="small">Y (front)</label><input type="text" class="len" id="pY" value="${fmt(u.min[1])}"></div><div><label class="small">Z (bottom)</label><input type="text" class="len" id="pZ" value="${fmt(u.min[2])}"></div></div>
+    const pos = (id: string, label: string, edge: string, axis: 0 | 1 | 2) =>
+      inlineField(
+        id,
+        label,
+        `${label}: the selection's ${edge} edge; +2 moves it`,
+        `<input type="text" class="len" id="${id}" value="${fmt(u.min[axis])}">`,
+      );
+    const transform = `<div class="row">${pos('pX', 'X', 'left', 0)}${pos('pY', 'Y', 'front', 1)}${pos('pZ', 'Z', 'bottom', 2)}</div>
       <div class="muted footprint">Footprint ${fmt(size[0])} × ${fmt(size[1])}, height ${fmt(size[2])}</div>
       <label class="small">Rotate 90° (R, then axis)</label>
       <div class="row btns"><button id="bRotX" title="R X">About X</button><button id="bRotY" title="R Y">About Y</button><button id="bRotZ" title="R Z">About Z</button></div>
