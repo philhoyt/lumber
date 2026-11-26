@@ -58,6 +58,7 @@ const SECTIONS: [string, [string, string][]][] = [
       ['Esc in a field', 'Put back the value it had and leave the field'],
       ["Drag the view's edges", 'Resize the palette and side panel; double-click resets'],
       ['Arithmetic in a length field', '48 - 3/4, (96 - 2 * 1.5) / 3, 2 ft + 3 1/2'],
+      ['+1/2, -1/2, *2 in a field', 'Change what is there; with several parts selected, each one'],
     ],
   ],
   [

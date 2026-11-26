@@ -30,6 +30,34 @@ export function parseLen(str: string | null | undefined): number | null {
   }
 }
 
+/** What typing into a length field means: a new value, or a change to what is there. */
+export type LenEdit =
+  | { relative: false; value: number }
+  | { relative: true; apply: (current: number) => number | null };
+
+/**
+ * Read a field's text the way Figma does: a leading `+`, `*` or `/` changes what the
+ * field holds (`+1/2`, `*2`, `/3`), and so does a leading `-` when the field cannot be
+ * negative (a length, not a position). A leading "Mixed" is skipped, so a field showing
+ * several parts' values can be edited in place. Anything else is a plain length.
+ */
+export function parseLenEdit(
+  str: string | null | undefined,
+  minusIsRelative: boolean,
+): LenEdit | null {
+  if (str == null) return null;
+  const s = str.trim().replace(/^mixed\s*/i, '');
+  const op = s[0];
+  const relative = op === '+' || op === '*' || op === '/' || (op === '-' && minusIsRelative);
+  if (!relative) {
+    const value = parseLen(s);
+    return value === null ? null : { relative: false, value };
+  }
+  const rest = s.slice(1);
+  if (parseLen(rest) === null) return null;
+  return { relative: true, apply: (current) => parseLen(`(${current}) ${op} (${rest})`) };
+}
+
 /** Sticky patterns for the pieces of a length, matched at the parser's position. */
 const FEET = /(\d+(?:\.\d+)?|\.\d+)\s*(?:'|ft\b)/y;
 const MIXED = /(\d+)(?:-|\s+)(\d+)\/(\d+)/y;

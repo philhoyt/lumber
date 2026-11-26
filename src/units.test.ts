@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fmt, fmtFt, fmtSheet, parseLen, r32 } from './units';
+import { fmt, fmtFt, fmtSheet, parseLen, parseLenEdit, r32 } from './units';
 
 describe('parseLen', () => {
   it.each([
@@ -95,5 +95,36 @@ describe('r32', () => {
   it('rounds to a 32nd', () => {
     expect(r32(33.26)).toBe(33.25);
     expect(r32(33.27)).toBe(33.28125);
+  });
+});
+
+describe('parseLenEdit', () => {
+  const at = (text: string, current: number, minusRel = true): number | null => {
+    const e = parseLenEdit(text, minusRel);
+    if (!e) return null;
+    return e.relative ? e.apply(current) : e.value;
+  };
+  it('reads a plain length as a new value', () => {
+    expect(at('48 3/4', 10)).toBe(48.75);
+    expect(parseLenEdit('48', true)).toEqual({ relative: false, value: 48 });
+  });
+  it('applies a leading operator to what the field holds', () => {
+    expect(at('+1/2', 45)).toBe(45.5);
+    expect(at('*2', 45)).toBe(90);
+    expect(at('/3', 45)).toBe(15);
+    expect(at('+ 1 ft', 45)).toBe(57);
+  });
+  it('treats a leading minus as relative only where the field cannot go negative', () => {
+    expect(at('-1/2', 45, true)).toBe(44.5);
+    expect(at('-3', 45, false)).toBe(-3);
+  });
+  it('skips a leading Mixed', () => {
+    expect(at('Mixed+1/2', 33.25)).toBe(33.75);
+    expect(at('mixed', 33.25)).toBeNull();
+  });
+  it('rejects junk', () => {
+    expect(parseLenEdit('+abc', true)).toBeNull();
+    expect(parseLenEdit('', true)).toBeNull();
+    expect(parseLenEdit(null, true)).toBeNull();
   });
 });

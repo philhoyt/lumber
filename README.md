@@ -98,6 +98,7 @@ theme.
 | Drag a field's label               | Scrub the value with the same steps; Alt-drag the field itself            |
 | Esc in a field                     | Put back the value it had and leave the field                             |
 | Arithmetic in a length field       | 48 - 3/4, (96 - 2 * 1.5) / 3, 2 ft + 3 1/2; a spaced slash divides        |
+| +1/2, -1/2, *2, /3 in a field      | Change what is there; with several parts selected, each one               |
 | Arrows, PgUp / PgDn                | Nudge by the grid step                                                    |
 
 Groups are assemblies: clicking any part in the view selects the whole
@@ -112,7 +113,10 @@ arrows and squares. Drag stock in from the left, or click it to add at the
 center. With several parts selected, the Align buttons make them flush or
 centred on any axis. Length fields take fractions, feet and inches, millimetres
 and arithmetic: `48 - 3/4`, `(96 - 2 * 1.5) / 3`, `2 ft + 3 1/2`. A slash with no spaces
-is a fraction (`3/4`, `1-1/2`); with spaces around it, it divides (`48 / 3`).
+is a fraction (`3/4`, `1-1/2`); with spaces around it, it divides (`48 / 3`). Start
+with an operator to change what is there: `+1/2` adds half an inch, `*2` doubles. With
+several parts selected the Part section shows their stock and size, says Mixed where
+they differ, and applies what you type to each of them, so `-3/4` shortens every stud.
 
 The buy list shows board feet: each board stock lists the board feet in its parts
 and in what you buy, using the nominal size (2x4 is 2 × 4; the stock table has

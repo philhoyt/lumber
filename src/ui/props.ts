@@ -39,7 +39,7 @@ import {
 } from '../fastener';
 import { getStock, stockById } from '../stock';
 import type { Store } from '../store';
-import { fmt, parseLen } from '../units';
+import { fmt, parseLen, parseLenEdit } from '../units';
 import { esc, onChange, onClick } from './dom';
 import { keepFocus } from './fields';
 import { toast } from './toast';
@@ -326,7 +326,24 @@ export class PropsPanel {
     } else {
       partTitle = group ? esc(group.name) : 'Selection';
       partCount = `${list.length} parts`;
-      part = `<div class="muted">${group ? 'An assembly: it moves, rotates and copies as one.' : 'Several parts. Group them with Ctrl+G to keep them together.'}</div>`;
+      const stocks = new Set(list.map((p) => p.stock));
+      const options =
+        (stocks.size > 1 ? '<option value="" selected disabled>Mixed</option>' : '') +
+        getStock()
+          .map(
+            (x) =>
+              `<option value="${x.id}"${stocks.size === 1 && stocks.has(x.id) ? ' selected' : ''}>${esc(x.name)}</option>`,
+          )
+          .join('');
+      const field = (id: string, label: string, values: Set<number>): string => {
+        const one = values.size === 1 ? fmt([...values][0]!) : '';
+        return `<div><label class="small" for="${id}">${label}</label><input type="text" class="len" data-min="0.0625" id="${id}" value="${one}" placeholder="${one ? '' : 'Mixed'}" title="A length for all of them, or +1/2, -1/2, *2 to change each"></div>`;
+      };
+      const allSheets = list.every((p) => stockById(p.stock).sheet);
+      part = `<div class="muted">${group ? 'An assembly: it moves, rotates and copies as one.' : 'Several parts. Group them with Ctrl+G to keep them together.'}</div>
+        <div class="row"><div><label class="small" for="pStock">Stock</label><select id="pStock">${options}</select></div>
+        ${field('pLen', 'Length', new Set(list.map((p) => p.len)))}
+        ${allSheets ? field('pW', 'Width', new Set(list.map((p) => p.w ?? stockById(p.stock).sheet![0]))) : ''}</div>`;
     }
 
     // ---- Transform ----
@@ -461,11 +478,11 @@ export class PropsPanel {
       onClick(el, 'bRemoveArr', () => store.removeArray(group.id));
     } else onClick(el, 'bArr', () => store.setArray(readArray()));
 
-    if (list.length === 1) {
-      const p = list[0]!;
-      onChange(el, 'pName', (i) => store.mutate(() => (p.name = i.value)));
-      onChange(el, 'pStock', (i) =>
-        store.mutate(() =>
+    // Stock and size apply to every selected part; a relative edit changes each one.
+    onChange(el, 'pStock', (i) => {
+      if (!i.value) return;
+      store.mutate(() =>
+        list.forEach((p) =>
           withMinKept(p, () => {
             const was = stockById(p.stock);
             const ns = stockById(i.value);
@@ -478,16 +495,33 @@ export class PropsPanel {
           }),
         ),
       );
-      onChange(el, 'pLen', (i) => {
-        const v = parseLen(i.value);
-        if (v !== null && v > 0) store.mutate(() => withMinKept(p, () => (p.len = v)));
-        else this.render();
+    });
+    const sizeEdit = (id: string, key: 'len' | 'w') =>
+      onChange(el, id, (i) => {
+        const edit = parseLenEdit(i.value, true);
+        if (!edit) {
+          this.render();
+          return;
+        }
+        store.mutate(() =>
+          list.forEach((p) => {
+            const sheet = stockById(p.stock).sheet;
+            if (key === 'w' && !sheet) return;
+            const current = key === 'len' ? p.len : (p.w ?? sheet![0]);
+            const v = edit.relative ? edit.apply(current) : edit.value;
+            if (v === null || v <= 0) return;
+            withMinKept(p, () => {
+              if (key === 'len') p.len = v;
+              else p.w = v;
+            });
+          }),
+        );
       });
-      onChange(el, 'pW', (i) => {
-        const v = parseLen(i.value);
-        if (v !== null && v > 0) store.mutate(() => withMinKept(p, () => (p.w = v)));
-        else this.render();
-      });
+    sizeEdit('pLen', 'len');
+    sizeEdit('pW', 'w');
+    if (list.length === 1) {
+      const p = list[0]!;
+      onChange(el, 'pName', (i) => store.mutate(() => (p.name = i.value)));
       const setMiter = (end: 0 | 1, text: string) => {
         const v = clampMiter(parseFloat(text));
         store.mutate(() => {
@@ -536,7 +570,8 @@ export class PropsPanel {
       onClick(el, 'bFitB', () => fit(1));
     }
     const moveTo = (axis: 0 | 1 | 2, text: string) => {
-      const v = parseLen(text);
+      const edit = parseLenEdit(text, false);
+      const v = edit ? (edit.relative ? edit.apply(u.min[axis]) : edit.value) : null;
       if (v === null) {
         this.render();
         return;

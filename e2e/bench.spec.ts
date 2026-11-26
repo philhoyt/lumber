@@ -80,6 +80,35 @@ test('dragging a field label scrubs its value as one undo step, and Escape rever
   await expect(page.locator('.out-row', { hasText: 'Apron back' })).toContainText('45"');
 });
 
+test('several parts show Mixed and a relative edit changes each of them', async ({ page }) => {
+  await openBench(page);
+  await selectPart(page, 'Apron back');
+  await page.locator('.out-row', { hasText: 'Leg LF' }).click({ modifiers: ['Shift'] });
+  await expect(page.locator('#stat')).toContainText('2 selected');
+  const len = page.locator('#pLen');
+  await expect(len).toHaveValue('');
+  await expect(len).toHaveAttribute('placeholder', 'Mixed');
+  await expect(page.locator('#pStock')).toHaveValue('2x4');
+  await len.fill('+1/2');
+  await len.press('Enter');
+  await expect(page.locator('.out-row', { hasText: 'Apron back' })).toContainText('45 1/2"');
+  await expect(page.locator('.out-row', { hasText: 'Leg LF' })).toContainText('33 3/4"');
+  await page.locator('#pLen').fill('40');
+  await page.locator('#pLen').press('Enter');
+  await expect(page.locator('#pLen')).toHaveValue('40');
+  await expect(page.locator('.out-row', { hasText: 'Leg LF' })).toContainText('40"');
+  // A relative move shifts the selection's corner.
+  const x = page.locator('#pX');
+  const was = await x.inputValue();
+  await x.fill('+2');
+  await x.press('Enter');
+  await expect(page.locator('#pX')).not.toHaveValue(was);
+  await page.locator('#bUndo').click();
+  await page.locator('#bUndo').click();
+  await page.locator('#bUndo').click();
+  await expect(page.locator('.out-row', { hasText: 'Leg LF' })).toContainText('33 1/4"');
+});
+
 test('G moves by a typed distance along the constrained axis', async ({ page }) => {
   await openBench(page);
   await selectPart(page, 'Leg LF');
