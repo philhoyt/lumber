@@ -51,6 +51,13 @@ export interface Part {
    */
   bevel?: [number, number];
   /**
+   * Edge bevels in degrees along the −Y (front) and +Y (back) edges, ripped through the
+   * thickness the whole length (a French cleat's 45° back). 0 is square. Positive puts
+   * the short point on the top (+Z) face, negative on the bottom. The width stays the
+   * long-point width.
+   */
+  edgeBevel?: [number, number];
+  /**
    * Sheet parts: which way the part's length must run relative to the sheet's grain,
    * which runs along a plywood sheet's long side. Unset means either way is fine.
    */
@@ -206,24 +213,43 @@ export const hasMiter = (p: Part): boolean => miterOf(p).some((a) => a !== 0);
 /** A part's bevel angles, square when unset. */
 export const bevelOf = (p: Part): [number, number] => p.bevel ?? [0, 0];
 export const hasBevel = (p: Part): boolean => bevelOf(p).some((a) => a !== 0);
+/** A part's edge bevels, front then back, square when unset. */
+export const edgeBevelOf = (p: Part): [number, number] => p.edgeBevel ?? [0, 0];
+export const hasEdgeBevel = (p: Part): boolean => edgeBevelOf(p).some((a) => a !== 0);
 /** Whether either end is anything but a square cut. */
 export const hasEndCut = (p: Part): boolean => hasMiter(p) || hasBevel(p);
 /** The shortest a part may be cut, inches. */
 export const MIN_LEN = 1 / 16;
 
+/** The eight corners of a plain box, indexed by bits: 1 for +X, 2 for +Y, 4 for +Z. */
+export function boxCorners(dims: Vec3): Vec3[] {
+  const [len, w, t] = dims;
+  const out: Vec3[] = [];
+  for (let i = 0; i < 8; i++)
+    out.push([i & 1 ? len / 2 : -len / 2, i & 2 ? w / 2 : -w / 2, i & 4 ? t / 2 : -t / 2]);
+  return out;
+}
+
 /**
- * The eight corners of a board with its end cuts, in its local frame, indexed by bits:
- * 1 for the +X end, 2 for the +Y edge, 4 for the +Z face. Each end is a plane through
- * the end's long point: a miter tilts it across the width, a bevel across the thickness,
- * both together make a compound cut.
+ * The eight corners of a board with its angled cuts, in its local frame, indexed like
+ * `boxCorners`. Each end is a plane through the end's long point: a miter tilts it across
+ * the width, a bevel across the thickness, both together make a compound cut. An edge
+ * bevel tilts a long edge's face through the thickness, and a mitered end's corner
+ * follows that face inward along the end plane.
  */
-export function endCutCorners(
+export function cutCorners(
   dims: Vec3,
   miter: [number, number],
   bevel: [number, number],
+  edge: [number, number] = [0, 0],
 ): Vec3[] {
   const [len, w, t] = dims;
   const tan = (deg: number) => Math.tan((Math.abs(deg) * Math.PI) / 180);
+  const yAt = (side: 0 | 1, z: number): number => {
+    const e = edge[side];
+    const back = tan(e) * (Math.sign(e) * z + t / 2);
+    return side ? w / 2 - back : -w / 2 + back;
+  };
   const xAt = (end: 0 | 1, y: number, z: number): number => {
     const m = miter[end];
     const b = bevel[end];
@@ -232,11 +258,22 @@ export function endCutCorners(
   };
   const out: Vec3[] = [];
   for (let i = 0; i < 8; i++) {
-    const y = i & 2 ? w / 2 : -w / 2;
     const z = i & 4 ? t / 2 : -t / 2;
+    const y = yAt(i & 2 ? 1 : 0, z);
     out.push([xAt(i & 1 ? 1 : 0, y, z), y, z]);
   }
   return out;
+}
+
+/**
+ * A part's corners in its local frame as cut, or null for a plain box. Sheet parts keep
+ * square ends (their end cuts are ignored) but take edge bevels like a board.
+ */
+export function localCorners(p: Part, d: Vec3 = partDims(p)): Vec3[] | null {
+  const ends = hasEndCut(p) && !stockById(p.stock).sheet;
+  if (!ends && !hasEdgeBevel(p)) return null;
+  const square: [number, number] = [0, 0];
+  return cutCorners(d, ends ? miterOf(p) : square, ends ? bevelOf(p) : square, edgeBevelOf(p));
 }
 
 /** The saw's bevel setting for a compound cut: a face bevel `b` with the table at miter `m`. */
@@ -289,10 +326,19 @@ export function shortLength(
   dims: Vec3,
   miter: [number, number],
   bevel: [number, number] = [0, 0],
+  edge: [number, number] = [0, 0],
 ): number {
-  const c = endCutCorners(dims, miter, bevel);
+  const c = cutCorners(dims, miter, bevel, edge);
   let short = Infinity;
   for (const i of [0, 2, 4, 6]) short = Math.min(short, c[i + 1]![0] - c[i]![0]);
+  return short;
+}
+
+/** The short-point width: the narrower of the two broad faces once the edges are beveled. */
+export function shortWidth(dims: Vec3, edge: [number, number]): number {
+  const c = cutCorners(dims, [0, 0], [0, 0], edge);
+  let short = Infinity;
+  for (const i of [0, 1, 4, 5]) short = Math.min(short, c[i | 2]![1] - c[i]![1]);
   return short;
 }
 
@@ -459,17 +505,9 @@ export function partAABB(p: Part): AABB {
   _q.fromArray(p.q);
   const min: Vec3 = [Infinity, Infinity, Infinity];
   const max: Vec3 = [-Infinity, -Infinity, -Infinity];
-  // The corners as cut: a mitered or beveled end reaches less far than the plain box.
-  const cut = hasEndCut(p) && !stockById(p.stock).sheet;
-  const corners = cut ? endCutCorners(d, miterOf(p), bevelOf(p)) : null;
-  for (let i = 0; i < 8; i++) {
-    if (corners) _v.fromArray(corners[i]!).applyQuaternion(_q);
-    else
-      _v.set(
-        ((i & 1 ? 1 : -1) * d[0]) / 2,
-        ((i & 2 ? 1 : -1) * d[1]) / 2,
-        ((i & 4 ? 1 : -1) * d[2]) / 2,
-      ).applyQuaternion(_q);
+  // The corners as cut: a beveled end or edge reaches less far than the plain box.
+  for (const corner of localCorners(p, d) ?? boxCorners(d)) {
+    _v.fromArray(corner).applyQuaternion(_q);
     const c: Vec3 = [_v.x + p.pos[0], _v.y + p.pos[1], _v.z + p.pos[2]];
     for (const a of [0, 1, 2] as const) {
       min[a] = Math.min(min[a], c[a]);
@@ -664,7 +702,7 @@ export function mirrorCut(c: Cut, local: AxisIndex, dims: Vec3): Cut {
  * Mirror parts across a plane through the centre of their shared bounds, perpendicular
  * to `axis`. Each part keeps its orientation (a mirrored box is the same box) and its
  * shape flips along whichever local axis runs along the mirror normal: miters swap ends
- * or sides and cuts move to the opposite end, edge or face.
+ * or sides, edge bevels swap edges or faces, and cuts move to the opposite end, edge or face.
  */
 export function mirrorParts(list: Part[], axis: Axis): void {
   if (!list.length) return;
@@ -692,6 +730,11 @@ export function mirrorParts(list: Part[], axis: Axis): void {
       const [b0, b1] = p.bevel;
       if (local === 0) p.bevel = [b1, b0];
       else if (local === 2) p.bevel = [-b0 || 0, -b1 || 0];
+    }
+    if (p.edgeBevel) {
+      const [e0, e1] = p.edgeBevel;
+      if (local === 1) p.edgeBevel = [e1, e0];
+      else if (local === 2) p.edgeBevel = [-e0 || 0, -e1 || 0];
     }
     if (p.cuts?.length) {
       const dims = partDims(p);

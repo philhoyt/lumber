@@ -100,12 +100,13 @@ export function parseDocument(o: unknown): Document | null {
     }
     if (x.grain !== undefined && !GRAINS.includes(x.grain)) delete x.grain;
     if (x.grain === 'any') delete x.grain;
-    const clear = (part: Partial<Part>, key: 'miter' | 'bevel') => {
+    const clear = (part: Partial<Part>, key: 'miter' | 'bevel' | 'edgeBevel') => {
       if (key === 'miter') delete part.miter;
-      else delete part.bevel;
+      else if (key === 'bevel') delete part.bevel;
+      else delete part.edgeBevel;
     };
     // Miters and bevels must be a pair of angles within range; anything else reads as square.
-    for (const key of ['miter', 'bevel'] as const) {
+    for (const key of ['miter', 'bevel', 'edgeBevel'] as const) {
       if (x[key] === undefined) continue;
       const m = x[key] as unknown;
       if (

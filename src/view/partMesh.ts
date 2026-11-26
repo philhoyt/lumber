@@ -1,6 +1,6 @@
 /**
- * The geometry of one part: a box, or for a mitered board its outline extruded through
- * the thickness, with each cut's box taken out of the solid.
+ * The geometry of one part: a box, or for a board with angled ends or edges the solid
+ * between its cut planes, with each cut's box taken out of the solid.
  */
 import * as THREE from 'three';
 import { Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg';
@@ -10,9 +10,9 @@ import {
   cutBox,
   cutsKey,
   cutsOf,
-  endCutCorners,
-  hasEndCut,
+  edgeBevelOf,
   isCylinderPart,
+  localCorners,
   miterOf,
   type Part,
   type Vec3,
@@ -21,9 +21,9 @@ import { stockById } from '../stock';
 
 /** Everything the mesh depends on; when it changes, the mesh is rebuilt. */
 export const meshSignature = (p: Part, d: Vec3): string =>
-  `${d.join(',')},${p.stock},${miterOf(p).join('/')},${bevelOf(p).join('/')},${cutsKey(cutsOf(p))},${fastenersKey(fastenersOf(p))}`;
+  `${d.join(',')},${p.stock},${miterOf(p).join('/')},${bevelOf(p).join('/')},${edgeBevelOf(p).join('/')},${cutsKey(cutsOf(p))},${fastenersKey(fastenersOf(p))}`;
 
-/** A six-sided solid from the eight end-cut corners, with flat faces wound outward. */
+/** A six-sided solid from the eight cut corners, with flat faces wound outward. */
 function hexahedron(c: Vec3[]): THREE.BufferGeometry {
   // Each face as four corner indices going around it; the centre decides the winding.
   const faces: [number, number, number, number][] = [
@@ -87,16 +87,14 @@ function subtractCuts(base: THREE.BufferGeometry, p: Part, d: Vec3): THREE.Buffe
 }
 
 /**
- * A box, or for a board with mitered or beveled ends the solid between its end planes. A
+ * A box, or for a board with angled ends or edges the solid between its cut planes. A
  * reference cylinder is round: its diameter across X and Y, standing on end along Z.
  */
 export function partGeometry(p: Part, d: Vec3): THREE.BufferGeometry {
   if (isCylinderPart(p))
     return new THREE.CylinderGeometry(d[0] / 2, d[0] / 2, d[2], 48).rotateX(Math.PI / 2);
-  const geo =
-    !hasEndCut(p) || stockById(p.stock).sheet
-      ? new THREE.BoxGeometry(d[0], d[1], d[2])
-      : hexahedron(endCutCorners(d, miterOf(p), bevelOf(p)));
+  const corners = localCorners(p, d);
+  const geo = corners ? hexahedron(corners) : new THREE.BoxGeometry(d[0], d[1], d[2]);
   return cutsOf(p).length && !stockById(p.stock).sheet ? subtractCuts(geo, p, d) : geo;
 }
 

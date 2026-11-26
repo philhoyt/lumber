@@ -37,6 +37,10 @@ export class CutlistPanel {
     for (const r of cutRows(parts)) {
       const mitered = r.miter[0] !== 0 || r.miter[1] !== 0;
       const beveled = r.bevel[0] !== 0 || r.bevel[1] !== 0;
+      const edged = r.edge[0] !== 0 || r.edge[1] !== 0;
+      const edgeNote = edged
+        ? `edge bevel ${edgeText(r.edge)} · ${fmt(r.shortW)} wide at the short point`
+        : '';
       const ends = [
         mitered ? `miter ${angleText(r.miter)}` : '',
         beveled ? `bevel ${angleText(r.bevel, 'top', 'bottom')}` : '',
@@ -46,6 +50,7 @@ export class CutlistPanel {
             (e) =>
               `saw ${e ? 'B' : 'A'}: ${Math.abs(r.miter[e])}° / ${sawBevel(r.miter[e], r.bevel[e])}°`,
           ),
+        edgeNote,
       ]
         .filter(Boolean)
         .join(' · ');
@@ -56,10 +61,12 @@ export class CutlistPanel {
             ? ' <span class="muted" title="Length runs across the grain">⊥ grain</span>'
             : '';
       const cut = r.stock.sheet
-        ? `${sizeText(r.stock, r.len, r.w, r.t, fmt)}${grainMark}`
+        ? `${sizeText(r.stock, r.len, r.w, r.t, fmt)}${grainMark}${edged ? ` <span class="muted">${edgeNote}</span>` : ''}`
         : mitered || beveled
           ? `${fmt(r.len)} <span class="muted">long · ${fmt(r.short)} short · ${ends}</span>`
-          : fmt(r.len);
+          : edged
+            ? `${fmt(r.len)} <span class="muted">${edgeNote}</span>`
+            : fmt(r.len);
       const joinery = r.cuts.length
         ? `<div class="muted joinery">${r.cuts.map((c) => esc(describeCut(c, fmt))).join('<br>')}</div>`
         : '';
@@ -207,6 +214,19 @@ export class CutlistPanel {
   }
 }
 
+/** Edge bevels named by edge, "back 45°▴", the short-point face in the tooltip. */
+export function edgeText(e: [number, number]): string {
+  return (['front', 'back'] as const)
+    .map((name, i) => {
+      const a = e[i];
+      return a
+        ? `<span title="Short point on the ${a > 0 ? 'top' : 'bottom'} face">${name} ${Math.abs(a)}°${a > 0 ? '▴' : '▾'}</span>`
+        : '';
+    })
+    .filter(Boolean)
+    .join(' & ');
+}
+
 /** "20°▴ / square": each end's angle with where the short point is (▴ back or top, ▾ front or bottom). */
 export function angleText(m: [number, number], up = 'back', down = 'front'): string {
   const one = (a: number) =>
@@ -230,6 +250,9 @@ export function cutListCsv(store: Store): string {
       'Miter B',
       'Bevel A',
       'Bevel B',
+      'Edge bevel front',
+      'Edge bevel back',
+      'Short width',
       'Grain',
       'Cuts',
       'Qty',
@@ -248,6 +271,9 @@ export function cutListCsv(store: Store): string {
       r.miter[1],
       r.bevel[0],
       r.bevel[1],
+      r.edge[0],
+      r.edge[1],
+      r.shortW,
       r.grain,
       r.cuts.map((c) => describeCut(c, fmt)).join('; '),
       r.qty,

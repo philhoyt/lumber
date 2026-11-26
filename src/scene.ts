@@ -25,7 +25,9 @@ import { EndHandles, Gizmo, RotateGizmo } from './gizmo';
 import {
   aabbCenter,
   bevelOf,
+  edgeBevelOf,
   hasBevel,
+  hasEdgeBevel,
   hasMiter,
   miterOf,
   partAABB,
@@ -586,9 +588,11 @@ export class LumberScene {
       const s = stockById(p.stock);
       const m = miterOf(p);
       const b = bevelOf(p);
+      const e = edgeBevelOf(p);
       const miter =
         (hasMiter(p) ? ` · miter ${Math.abs(m[0])}°/${Math.abs(m[1])}°` : '') +
-        (hasBevel(p) ? ` · bevel ${Math.abs(b[0])}°/${Math.abs(b[1])}°` : '');
+        (hasBevel(p) ? ` · bevel ${Math.abs(b[0])}°/${Math.abs(b[1])}°` : '') +
+        (hasEdgeBevel(p) ? ` · edge ${Math.abs(e[0])}°/${Math.abs(e[1])}°` : '');
       this.labelEl.textContent = `${p.name} · ${s.name} · ${partSizeText(p, fmt)}${miter}`;
     } else this.labelEl.style.display = 'none';
 

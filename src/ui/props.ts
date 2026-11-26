@@ -27,6 +27,7 @@ import {
   GRAINS,
   miterOf,
   bevelOf,
+  edgeBevelOf,
   unionAABB,
   withMinKept,
   type AlignMode,
@@ -375,18 +376,18 @@ export class PropsPanel {
         part += `<div class="row"><div><label class="small">Grain</label><select id="pGrain">${GRAINS.map((g) => `<option value="${g}"${g === grainOf(p) ? ' selected' : ''}>${labels[g]}</option>`).join('')}</select></div></div>
         <div class="muted note">Plywood grain runs the long way of the sheet. The nesting only turns the part the way you allow.</div>`;
       }
+      const angle = (id: string, label: string, title: string, value: number) =>
+        inlineField(
+          id,
+          label,
+          title,
+          `<input type="number" id="${id}" value="${value}" min="-75" max="75" step="0.5">`,
+          '°',
+        );
       if (!s.sheet && !s.reference) {
         // One row per end: miter, bevel and Fit. The sign conventions live in the tooltips.
         const m = miterOf(p);
         const b = bevelOf(p);
-        const angle = (id: string, label: string, title: string, value: number) =>
-          inlineField(
-            id,
-            label,
-            title,
-            `<input type="number" id="${id}" value="${value}" min="-75" max="75" step="0.5">`,
-            '°',
-          );
         const endRow = (end: 0 | 1) => {
           const name = end ? 'B' : 'A';
           return `<div class="row ends"><div class="endlab" title="End ${name} is the ${end ? '+X' : '−X'} end of the part">End ${name} <span class="muted">${end ? '+X' : '−X'}</span></div>
@@ -395,6 +396,16 @@ export class PropsPanel {
           <div class="grow0"><button id="bFit${name}" title="Cut end ${name} to lie flat on the part or floor it points at, and bring its long point to touch">Fit</button></div></div>`;
         };
         part += `<label class="small" title="M is the miter, B the bevel, in degrees from square">End cuts</label>${endRow(0)}${endRow(1)}`;
+      }
+      if (!s.reference) {
+        // One row for the long edges: a bevel ripped through the thickness, as on a French cleat.
+        const e = edgeBevelOf(p);
+        const edgeTitle = (name: string, axis: string) =>
+          `Bevel along the ${name} (${axis}) edge: degrees from square, ripped through the thickness the whole length. Positive puts the short point on the top (+Z) face. 45° on the back edge makes a French cleat.`;
+        part += `<label class="small" title="Fr is the front edge, Bk the back, in degrees from square">Edge bevels</label>
+        <div class="row ends"><div class="endlab" title="The front edge is the −Y edge of the part, the back the +Y edge">Edges</div>
+        ${angle('pEdgeFront', 'Fr', edgeTitle('front', '−Y'), e[0])}
+        ${angle('pEdgeBack', 'Bk', edgeTitle('back', '+Y'), e[1])}</div>`;
       }
       if (!s.sheet && !s.reference) part += cutsEditorHtml(p);
       if (inGroup) {
@@ -692,6 +703,17 @@ export class PropsPanel {
       };
       onChange(el, 'pBevelA', (i) => setBevel(0, i.value));
       onChange(el, 'pBevelB', (i) => setBevel(1, i.value));
+      const setEdge = (side: 0 | 1, text: string) => {
+        const v = clampMiter(parseFloat(text));
+        store.mutate(() => {
+          const e = edgeBevelOf(p);
+          e[side] = v;
+          if (e[0] === 0 && e[1] === 0) delete p.edgeBevel;
+          else p.edgeBevel = e;
+        });
+      };
+      onChange(el, 'pEdgeFront', (i) => setEdge(0, i.value));
+      onChange(el, 'pEdgeBack', (i) => setEdge(1, i.value));
       const fit = (end: 0 | 1) => {
         const f = store.fitEnd(p.id, end);
         const name = end ? 'B' : 'A';

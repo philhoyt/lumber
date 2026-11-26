@@ -1,17 +1,17 @@
 /**
  * Shop drawings as SVG: three orthographic views of the whole model with its overall
  * dimensions, and a sheet per unique part with its face and edge views, cut sizes, miter
- * angles, joinery and fastener marks. Everything is drawn from the model's exact boxes;
+ * and bevel angles, joinery and fastener marks. Everything is drawn from the model's exact boxes;
  * nothing is traced from the 3D view. Pure functions returning SVG text.
  */
 import { Quaternion, Vector3 } from 'three';
 import { describeFastener } from './fastener';
 import {
   describeCut,
-  bevelOf,
   boundsOfPoints,
-  endCutCorners,
-  miterOf,
+  boxCorners,
+  cutCorners,
+  localCorners,
   sawBevel,
   partDims,
   type Part,
@@ -51,10 +51,11 @@ export function hull(points: readonly Pt[]): Pt[] {
   return [...lower.slice(0, -1), ...upper.slice(0, -1)];
 }
 
-/** The part's eight corners, end cuts included, in world space. */
+/** The part's eight corners, angled cuts included, in world space. */
 export function partCorners(p: Part): Vec3[] {
   const q = new Quaternion().fromArray(p.q);
-  return endCutCorners(partDims(p), miterOf(p), bevelOf(p)).map((c) => {
+  const d = partDims(p);
+  return (localCorners(p, d) ?? boxCorners(d)).map((c) => {
     const v = new Vector3().fromArray(c).applyQuaternion(q);
     return [
       Math.round((v.x + p.pos[0]) * 1e6) / 1e6,
@@ -210,7 +211,7 @@ export function partSheetSvg(r: DrawingRow, pageW = 760): SheetResult {
   const notes: string[] = [];
 
   // Face view: the top face's outline (corners with +Z), in centred local coordinates.
-  const corners = endCutCorners([len, w, t], miter, r.bevel);
+  const corners = cutCorners([len, w, t], miter, r.bevel, r.edge);
   const face = [4, 5, 7, 6].map(
     (i) => [fx(corners[i]![0] + len / 2), fy(corners[i]![1] + w / 2)] as Pt,
   );
@@ -303,7 +304,24 @@ export function partSheetSvg(r: DrawingRow, pageW = 760): SheetResult {
     if (b[1])
       svg += `<text x="${n(fx(len) - 4)}" y="${n(edgeTop + 12)}" text-anchor="end" ${TEXT}>${Math.abs(b[1])}°</text>`;
   }
-  svg += dimV(fy(0), fy(w), fx(len) + 20, fmt(w), fx(len) + 2);
+  const e = r.edge;
+  if (e[0] || e[1]) {
+    notes.push(
+      `Edge bevel front ${bevelAngle(e[0])}, back ${bevelAngle(e[1])}; ${fmt(r.shortW)} wide at the short point`,
+    );
+    // Edge angles sit on the face view beside the edge they belong to.
+    if (e[0])
+      svg += `<text x="${n(fx(len / 2))}" y="${n(faceBottom - 4)}" text-anchor="middle" ${TEXT}>${Math.abs(e[0])}°</text>`;
+    if (e[1])
+      svg += `<text x="${n(fx(len / 2))}" y="${n(faceTop + 12)}" text-anchor="middle" ${TEXT}>${Math.abs(e[1])}°</text>`;
+  }
+  svg += dimV(
+    fy(0),
+    fy(w),
+    fx(len) + 20,
+    `${fmt(w)}${e[0] || e[1] ? ' long point' : ''}`,
+    fx(len) + 2,
+  );
   svg += dimV(ez(0), ez(t), fx(len) + 20, fmt(t), fx(len) + 2);
   if (r.grain !== 'any')
     notes.push(

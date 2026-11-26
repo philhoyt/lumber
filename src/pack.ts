@@ -10,8 +10,10 @@ import {
   cutsOf,
   grainOf,
   bevelOf,
+  edgeBevelOf,
   miterOf,
   shortLength,
+  shortWidth,
   type Cut,
   type Grain,
   type Part,
@@ -249,6 +251,8 @@ export interface CutRow {
   miter: [number, number];
   /** Bevel angles at each end, across the thickness, 0/0 for square. */
   bevel: [number, number];
+  /** Bevel angles along the front and back edges, through the thickness, 0/0 for square. */
+  edge: [number, number];
   /** Sheet parts: how the length runs relative to the grain. */
   grain: Grain;
   /** Thickness of the stock. */
@@ -262,6 +266,8 @@ export interface CutRow {
   fasteners: Fastener[];
   /** Short-point length when mitered, else the length. */
   short: number;
+  /** Short-point width when an edge is beveled, else the width. */
+  shortW: number;
   qty: number;
   names: string[];
 }
@@ -285,11 +291,12 @@ export function cutRows(parts: readonly Part[], byFasteners = false): CutRow[] {
     const w = r32(stockWidth(s, p.w));
     const miter = miterOf(p);
     const bevel = bevelOf(p);
+    const edge = edgeBevelOf(p);
     const grain: Grain = s.sheet && s.grain !== false ? grainOf(p) : 'any';
     const cuts = cutsOf(p);
     const fasteners = fastenersOf(p);
     const key =
-      `${p.stock}|${len}|${w}|${miter.join('/')}|${bevel.join('/')}|${grain}|${cutsKey(cuts)}` +
+      `${p.stock}|${len}|${w}|${miter.join('/')}|${bevel.join('/')}|${edge.join('/')}|${grain}|${cutsKey(cuts)}` +
       (byFasteners ? `|${fastenersKey(fasteners)}` : '');
     let r = map.get(key);
     if (!r) {
@@ -300,10 +307,12 @@ export function cutRows(parts: readonly Part[], byFasteners = false): CutRow[] {
         t: s.t,
         miter,
         bevel,
+        edge,
         grain,
         cuts,
         fasteners,
-        short: r32(shortLength([len, w, s.t], miter, bevel)),
+        short: r32(shortLength([len, w, s.t], miter, bevel, edge)),
+        shortW: r32(shortWidth([len, w, s.t], edge)),
         qty: 0,
         names: [],
       };

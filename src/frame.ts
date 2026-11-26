@@ -6,12 +6,10 @@
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import { boxGap } from './gap';
 import {
-  bevelOf,
+  boxCorners,
   cleanQ,
-  endCutCorners,
-  hasEndCut,
   isSquare,
-  miterOf,
+  localCorners,
   partDims,
   type AABB,
   type AxisIndex,
@@ -20,7 +18,6 @@ import {
   type Vec3,
   unionBoxes,
 } from './model';
-import { stockById } from './stock';
 
 const _q = new Quaternion();
 const _inv = new Quaternion();
@@ -39,24 +36,13 @@ export function isCoframed(a: Quat, b: Quat, eps = 1e-6): boolean {
   return isSquare(rel.toArray(), eps);
 }
 
-/** A part's corners in world space: the cut corners for a mitered or beveled board. */
+/** A part's corners in world space: the cut corners for a board with angled ends or edges. */
 function worldCorners(p: Part): Vector3[] {
   const d = partDims(p);
-  const cut = hasEndCut(p) && !stockById(p.stock).sheet;
-  const corners = cut ? endCutCorners(d, miterOf(p), bevelOf(p)) : null;
   const q = new Quaternion().fromArray(p.q);
-  const out: Vector3[] = [];
-  for (let i = 0; i < 8; i++) {
-    const v = corners
-      ? new Vector3().fromArray(corners[i]!)
-      : new Vector3(
-          ((i & 1 ? 1 : -1) * d[0]) / 2,
-          ((i & 2 ? 1 : -1) * d[1]) / 2,
-          ((i & 4 ? 1 : -1) * d[2]) / 2,
-        );
-    out.push(v.applyQuaternion(q).add(_v.fromArray(p.pos)));
-  }
-  return out;
+  return (localCorners(p, d) ?? boxCorners(d)).map((c) =>
+    new Vector3().fromArray(c).applyQuaternion(q).add(_v.fromArray(p.pos)),
+  );
 }
 
 /** A part's bounding box in the coordinates of frame `q` (origin at the world origin). */

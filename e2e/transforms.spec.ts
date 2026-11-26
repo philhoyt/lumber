@@ -203,3 +203,18 @@ test('bevels reach the cut list, and Fit end cuts a tilted leg to sit on the flo
   await expect(page.locator('#pMiterB')).toHaveValue('-15');
   await expect(page.locator('#pZ')).toHaveValue('0');
 });
+
+test('an edge bevel rips a long edge at an angle, like a French cleat', async ({ page }) => {
+  await openBench(page);
+  await selectPart(page, 'Leg LF');
+  await page.locator('#pEdgeBack').fill('45');
+  await page.locator('#pEdgeBack').press('Enter');
+  await page.locator('#pEdgeBack').press('Escape');
+  await expect(page.locator('.part-label')).toContainText('edge 0°/45°');
+  await page.locator('[data-tab="cut"]').click();
+  await expect(page.locator('#cutBody')).toContainText('back 45°');
+  await expect(page.locator('#cutBody')).toContainText('wide at the short point');
+  await page.locator('[data-tab="parts"]').click();
+  await page.locator('#bUndo').click();
+  await expect(page.locator('#pEdgeBack')).toHaveValue('0');
+});

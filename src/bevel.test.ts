@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyFit, endTarget, fitEnd } from './fit';
 import {
-  endCutCorners,
+  cutCorners,
   makeQ,
   mirrorParts,
   quatFromEuler,
@@ -25,26 +25,26 @@ const part = (over: Partial<Part> = {}): Part => ({
 /** A part's corners in world space. */
 const worldCorners = (p: Part, dims: Vec3): Vec3[] => {
   const q = new Quaternion().fromArray(p.q);
-  return endCutCorners(dims, p.miter ?? [0, 0], p.bevel ?? [0, 0]).map((c) => {
+  return cutCorners(dims, p.miter ?? [0, 0], p.bevel ?? [0, 0]).map((c) => {
     const v = new Vector3().fromArray(c).applyQuaternion(q);
     return [v.x + p.pos[0], v.y + p.pos[1], v.z + p.pos[2]];
   });
 };
 
-describe('endCutCorners and shortLength', () => {
+describe('cutCorners and shortLength', () => {
   const dims: Vec3 = [48, 3.5, 1.5];
   it('is a plain box when square', () => {
-    const c = endCutCorners(dims, [0, 0], [0, 0]);
+    const c = cutCorners(dims, [0, 0], [0, 0]);
     expect(c[0]).toEqual([-24, -1.75, -0.75]);
     expect(c[7]).toEqual([24, 1.75, 0.75]);
     expect(shortLength(dims, [0, 0])).toBe(48);
   });
   it('a bevel shortens the face the short point is on', () => {
-    const c = endCutCorners(dims, [0, 0], [0, 45]); // end B, short point on top
+    const c = cutCorners(dims, [0, 0], [0, 45]); // end B, short point on top
     expect(c[1]![0]).toBeCloseTo(24, 9); // bottom corner keeps the long point
     expect(c[5]![0]).toBeCloseTo(24 - 1.5, 9); // top corner comes back by the thickness
     expect(shortLength(dims, [0, 0], [0, 45])).toBeCloseTo(46.5, 9);
-    const neg = endCutCorners(dims, [0, 0], [0, -45]);
+    const neg = cutCorners(dims, [0, 0], [0, -45]);
     expect(neg[1]![0]).toBeCloseTo(22.5, 9);
     expect(neg[5]![0]).toBeCloseTo(24, 9);
   });

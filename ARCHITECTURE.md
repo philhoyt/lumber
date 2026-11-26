@@ -46,7 +46,7 @@ the pointer and key handlers) and delegates the rest to `view/`:
 - `view/snapFeedback.ts`: the quads over the faces a grab snapped to.
 - `view/dimLabels.ts`, `view/measureTool.ts`, `view/fastenMode.ts`: the D, M
   and F tools, each owning its own overlay objects and HTML labels.
-- `view/partMesh.ts`: a part's geometry (box, miter outline, cuts subtracted)
+- `view/partMesh.ts`: a part's geometry (box, or the solid between angled end and edge planes, cuts subtracted)
   and the signature that says when to rebuild it.
 - `view/labels.ts`: pinning HTML labels to world points.
 

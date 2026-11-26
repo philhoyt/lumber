@@ -175,6 +175,14 @@ the saw's compound settings, and the 3D view and drawings show the angled ends.
 Fit end A or B cuts that end to lie flat on the part or the floor it points at,
 an angled kicker meeting the slab say, and brings its long point to touch.
 
+A long edge can be beveled too: the Edge bevels row in the Part section, Fr for
+the front edge and Bk for the back, in degrees from square, ripped through the
+thickness the whole length. Positive puts the short point on the top face. A 45°
+bevel on the back edge of a board makes a French cleat. The width stays long
+point to long point; the cut list prints the angle and the width at the short
+point, and the 3D view and drawings show the sloped edge. Sheet parts take edge
+bevels too, so a plywood cleat works the same way.
+
 The stock table is yours to edit: the gear button in the palette opens it. Change
 sizes, purchase lengths, prices and colors, add custom boards or sheets, delete
 unused ones, or reset to the defaults. Type metric sizes as `38mm`. The model
