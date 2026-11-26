@@ -576,7 +576,14 @@ export class Store {
       }
       for (const p of list) {
         const c = clonePart(p, this.nextId++, offset);
-        if (p.group !== undefined) c.group = groupMap.get(p.group) ?? p.group;
+        const g = p.group === undefined ? undefined : this.groupById(p.group);
+        if (g?.array && !groupMap.has(g.id)) {
+          // A piece of an array copied on its own leaves the array: inside it the copy
+          // would be swept away (a copy) or double the run (the source) on regeneration.
+          if (g.parent === undefined) delete c.group;
+          else c.group = g.parent;
+          delete c.arrayIndex;
+        } else if (p.group !== undefined) c.group = groupMap.get(p.group) ?? p.group;
         this.parts.push(c);
         ids.push(c.id);
       }

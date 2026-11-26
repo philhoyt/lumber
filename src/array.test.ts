@@ -67,6 +67,39 @@ describe('array modifier', () => {
     expect(s.parts[1]!.pos[1] - s.parts[0]!.pos[1]).toBeCloseTo(4.5 * c);
   });
 
+  it('lets a member be duplicated: the copy leaves the array, which stays as it was', () => {
+    const s = slat();
+    const g = s.setArray({ axis: 'y', count: 3, spacing: 1.5, mode: 'gap' })!;
+    const copy = s.parts.find((p) => p.arrayIndex === 2)!;
+    s.select([copy.id]);
+    s.duplicateSelected([16, 0, 0]);
+    expect(s.parts).toHaveLength(4);
+    const dup = s.parts.find((p) => p.pos[0] === 16)!;
+    expect(dup.group).toBeUndefined();
+    expect(dup.arrayIndex).toBeUndefined();
+    expect(s.parts.filter((p) => p.group === g.id)).toHaveLength(3);
+    // The source too: its copy does not become a second source cell.
+    s.select([s.parts.find((p) => p.arrayIndex === 0)!.id]);
+    s.duplicateSelected([32, 0, 0]);
+    expect(s.parts).toHaveLength(5);
+    expect(s.parts.filter((p) => p.group === g.id)).toHaveLength(3);
+    // An array nested in an assembly: the copy joins the assembly, not the array.
+    const t = new Store();
+    const a = t.addPart('2x4');
+    const b = t.addPart('2x6', [40, 0, 0]);
+    t.select([a.id, b.id]);
+    const outer = t.groupSelected('Frame')!;
+    t.select([a.id]);
+    const arr = t.setArray({ axis: 'y', count: 3, spacing: 1.5, mode: 'gap' })!;
+    expect(arr.parent).toBe(outer.id);
+    t.select([t.parts.find((p) => p.arrayIndex === 1)!.id]);
+    t.duplicateSelected([48, 0, 0]);
+    const d2 = t.parts.find((p) => p.pos[0] === 48)!;
+    expect(d2.group).toBe(outer.id);
+    expect(d2.arrayIndex).toBeUndefined();
+    expect(t.parts.filter((p) => p.group === arr.id)).toHaveLength(3);
+  });
+
   it('regenerates when the parameters or the source change', () => {
     const s = slat();
     const g = s.setArray({ axis: 'y', count: 3, spacing: 5, mode: 'center' })!;
