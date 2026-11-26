@@ -134,27 +134,38 @@ export class Store {
     );
     this.notify('model');
   }
-  private coalescing: string | null = null;
+  /** How many coalesces are open; the snapshot is the outermost one's. */
+  private coalesceDepth = 0;
+  private coalesceBefore: string | null = null;
   /**
    * Fold the changes until `endCoalesce` into one undo step: a scrub or a held arrow
-   * key makes many small mutates that should undo together.
+   * key makes many small mutates that should undo together. Begins nest: only the
+   * outermost end records the step. While coalescing, changes notify as 'drag' (the
+   * view follows, the panels wait) and the end sends the one 'model'.
    */
   beginCoalesce(): void {
-    this.coalescing ??= this.snapshot();
+    if (this.coalesceDepth++ === 0) this.coalesceBefore = this.snapshot();
+  }
+  get coalescing(): boolean {
+    return this.coalesceDepth > 0;
   }
   /** Stop coalescing without recording anything: the caller restored the model itself. */
   cancelCoalesce(): void {
-    this.coalescing = null;
+    if (!this.coalesceDepth) return;
+    if (--this.coalesceDepth === 0) this.coalesceBefore = null;
   }
   endCoalesce(): void {
-    const before = this.coalescing;
-    this.coalescing = null;
+    if (!this.coalesceDepth) return;
+    if (--this.coalesceDepth > 0) return;
+    const before = this.coalesceBefore;
+    this.coalesceBefore = null;
     if (before !== null && before !== this.snapshot()) this.commit(before);
+    else this.notify('model');
   }
   /** Record `before` as the undo point for a change that has already been applied. */
   commit(before: string): void {
-    if (this.coalescing !== null) {
-      this.notify('model');
+    if (this.coalesceDepth) {
+      this.notify('drag');
       return;
     }
     this.undoStack.push(before);
@@ -163,11 +174,13 @@ export class Store {
     this.notify('model');
   }
   mutate(fn: () => void): void {
-    const before = this.snapshot();
+    // While coalescing the outermost snapshot is the undo point, so none is taken here.
+    const before = this.coalesceDepth ? null : this.snapshot();
     fn();
     this.regenerateArrays();
     this.pruneGroups();
-    this.commit(before);
+    if (before === null) this.notify('drag');
+    else this.commit(before);
   }
   get canUndo(): boolean {
     return this.undoStack.length > 0;
@@ -176,12 +189,14 @@ export class Store {
     return this.redoStack.length > 0;
   }
   undo(): void {
+    if (this.coalesceDepth) return; // mid-scrub: the step is not finished yet
     const s = this.undoStack.pop();
     if (s === undefined) return;
     this.redoStack.push(this.snapshot());
     this.restore(s);
   }
   redo(): void {
+    if (this.coalesceDepth) return;
     const s = this.redoStack.pop();
     if (s === undefined) return;
     this.undoStack.push(this.snapshot());
@@ -191,7 +206,8 @@ export class Store {
   clearHistory(): void {
     this.undoStack = [];
     this.redoStack = [];
-    this.coalescing = null;
+    this.coalesceDepth = 0;
+    this.coalesceBefore = null;
   }
 
   // ---- selection ----

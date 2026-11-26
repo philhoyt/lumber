@@ -106,6 +106,100 @@ describe('Store', () => {
   });
 });
 
+describe('coalescing', () => {
+  const kinds = (s: Store) => {
+    const seen: string[] = [];
+    s.subscribe((k) => seen.push(k));
+    return seen;
+  };
+
+  it('folds every change between begin and end into one undo step', () => {
+    const s = new Store();
+    const p = s.addPart('2x4');
+    const seen = kinds(s);
+    s.beginCoalesce();
+    s.mutate(() => (p.len = 50));
+    s.mutate(() => (p.len = 60));
+    expect(seen).toEqual(['drag', 'drag']); // the view follows, the panels wait
+    s.endCoalesce();
+    expect(seen.at(-1)).toBe('model');
+    expect(p.len).toBe(60);
+    s.undo();
+    expect(s.parts[0]!.len).toBe(96);
+    s.undo();
+    expect(s.parts).toHaveLength(0);
+  });
+
+  it('records nothing when the changes net out, but still tells the panels', () => {
+    const s = new Store();
+    const p = s.addPart('2x4');
+    s.clearHistory();
+    const seen = kinds(s);
+    s.beginCoalesce();
+    s.mutate(() => (p.len = 50));
+    s.mutate(() => (p.len = 96));
+    s.endCoalesce();
+    expect(s.canUndo).toBe(false);
+    expect(seen).toEqual(['drag', 'drag', 'model']);
+  });
+
+  it('nests: an inner pair does not close the outer one', () => {
+    const s = new Store();
+    const p = s.addPart('2x4');
+    s.clearHistory();
+    s.beginCoalesce();
+    s.mutate(() => (p.len = 50));
+    s.beginCoalesce();
+    s.mutate(() => (p.len = 60));
+    s.endCoalesce();
+    expect(s.coalescing).toBe(true);
+    expect(s.canUndo).toBe(false);
+    s.mutate(() => (p.len = 70));
+    s.endCoalesce();
+    expect(s.coalescing).toBe(false);
+    s.undo();
+    expect(s.parts[0]!.len).toBe(96);
+    // An inner cancel leaves the outer step intact, too.
+    s.beginCoalesce();
+    s.mutate(() => (s.parts[0]!.len = 40));
+    s.beginCoalesce();
+    s.cancelCoalesce();
+    s.endCoalesce();
+    expect(s.canUndo).toBe(true);
+    s.undo();
+    expect(s.parts[0]!.len).toBe(96);
+  });
+
+  it('ignores undo and redo while a step is still being made', () => {
+    const s = new Store();
+    const p = s.addPart('2x4');
+    s.beginCoalesce();
+    s.mutate(() => (p.len = 50));
+    s.undo();
+    expect(s.parts).toHaveLength(1);
+    s.endCoalesce();
+    s.undo();
+    expect(s.parts[0]!.len).toBe(96);
+  });
+
+  it('a new step clears redo, and the history holds 200 steps', () => {
+    const s = new Store();
+    s.addPart('2x4');
+    s.undo();
+    expect(s.canRedo).toBe(true);
+    s.addPart('2x6');
+    expect(s.canRedo).toBe(false);
+    for (let i = 0; i < 250; i++) s.mutate(() => (s.parts[0]!.len = 10 + i));
+    let n = 0;
+    while (s.canUndo) {
+      s.undo();
+      n++;
+    }
+    expect(n).toBe(200);
+    expect(s.parts[0]!.len).toBe(10 + 49); // the 50 oldest steps fell off the end
+  });
+});
+
 describe('clearHistory', () => {
   it('also ends any coalescing, so a load mid-scrub cannot swallow later undo points', () => {
     const s = new Store();

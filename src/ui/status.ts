@@ -64,8 +64,9 @@ export function wireStatus(
     const s = aabbSize(unionAABB(real));
     overallEl.textContent = `${fmt(s[0])} W × ${fmt(s[1])} D × ${fmt(s[2])} H`;
   };
-  store.subscribe((kind) => {
-    if (kind !== 'drag') render();
+  // Counts and the overall size are cheap, so they follow a drag live.
+  store.subscribe(() => {
+    render();
   });
   render();
 }

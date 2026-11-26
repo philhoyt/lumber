@@ -374,7 +374,9 @@ export class LumberScene {
       // button) means its starting snapshot no longer describes the model: drop it.
       if (this.tf && !this.applying && (kind === 'model' || kind === 'selection'))
         this.abandonTransform();
-      if (kind === 'model' || kind === 'selection') this.syncAll();
+      // 'drag' is a coalesced edit in flight (a scrub, an array drag): the view follows
+      // it at once while the panels wait for the 'model' at its end.
+      if (kind === 'model' || kind === 'selection' || kind === 'drag') this.syncAll();
       if (kind === 'selection') this.updateGap();
     });
     this.syncAll();
