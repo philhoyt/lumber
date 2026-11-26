@@ -10,6 +10,7 @@ import { getStock, stockById } from '../stock';
 import type { Store } from '../store';
 import type { ListTarget } from './menu';
 import { DRAG_TYPE } from './palette';
+import { addStock } from './recent';
 import { fmt } from '../units';
 import { hex } from './dom';
 
@@ -357,7 +358,7 @@ export class OutlinerPanel {
     const intoGroup = onto?.kind === 'group' ? onto.id : undefined;
     const ontoPart = onto?.kind === 'part' ? store.partById(onto.id) : undefined;
     if (d.kind === 'stock') {
-      const p = store.addPartLikeSelection(d.id);
+      const p = addStock(store, d.id);
       const g = intoGroup ?? ontoPart?.group;
       if (g !== undefined) store.moveToGroup([p.id], g);
       return;

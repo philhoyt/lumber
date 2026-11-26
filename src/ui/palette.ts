@@ -4,6 +4,7 @@
  */
 import { getStock, stockVersion, type Stock } from '../stock';
 import type { Store } from '../store';
+import { addStock, recentStock } from './recent';
 import { fmt, fmtSheet } from '../units';
 import { esc, hex } from './dom';
 
@@ -27,15 +28,54 @@ function thumbnail(s: Stock): string {
 }
 
 export function renderPalette(
+  recentEl: HTMLElement,
   boardsEl: HTMLElement,
   sheetsEl: HTMLElement,
   searchEl: HTMLInputElement,
   store: Store,
 ): void {
   let items: { el: HTMLElement; text: string }[] = [];
+  let recentItems: { el: HTMLElement; text: string }[] = [];
   const applyFilter = () => {
     const q = searchEl.value.trim().toLowerCase();
-    for (const it of items) it.el.hidden = !!q && !it.text.includes(q);
+    for (const it of [...items, ...recentItems]) it.el.hidden = !!q && !it.text.includes(q);
+  };
+  const makeItem = (s: Stock): { el: HTMLElement; text: string } => {
+    const el = document.createElement('div');
+    el.className = 'stock';
+    el.draggable = true;
+    el.title = `Click to add a ${s.name} at the center, or drag it onto the scene`;
+    const dim = s.sheet
+      ? `${fmt(s.t)} · ${fmtSheet(s.sheet[0], s.sheet[1])}`
+      : `${fmt(s.t)} × ${fmt(s.w ?? 0)}`;
+    el.innerHTML = `${thumbnail(s)}<div><div class="nm">${esc(s.name)}</div><div class="dim">${dim}</div></div>`;
+    el.addEventListener('dragstart', (e) => {
+      e.dataTransfer?.setData(DRAG_TYPE, s.id);
+      if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
+    });
+    el.addEventListener('click', () => addStock(store, s.id, [0, 0, 0]));
+    return { el, text: `${s.name} ${dim}`.toLowerCase() };
+  };
+  // The stock used lately, on top; the heading hides when there is none.
+  let shownRecent = '';
+  const buildRecent = () => {
+    const ids = recentStock();
+    const key = ids.join(',') + '|' + String(stockVersion());
+    if (key === shownRecent) return;
+    shownRecent = key;
+    recentEl.textContent = '';
+    recentItems = [];
+    const byId = new Map(getStock().map((s) => [s.id, s]));
+    for (const id of ids) {
+      const s = byId.get(id);
+      if (!s) continue;
+      const it = makeItem(s);
+      recentEl.appendChild(it.el);
+      recentItems.push(it);
+    }
+    recentEl.hidden = !recentItems.length;
+    recentEl.previousElementSibling?.toggleAttribute('hidden', !recentItems.length);
+    applyFilter();
   };
   let built = -1;
   const build = () => {
@@ -45,27 +85,19 @@ export function renderPalette(
     sheetsEl.textContent = '';
     items = [];
     for (const s of getStock()) {
-      const el = document.createElement('div');
-      el.className = 'stock';
-      el.draggable = true;
-      el.title = `Click to add a ${s.name} at the center, or drag it onto the scene`;
-      const dim = s.sheet
-        ? `${fmt(s.t)} · ${fmtSheet(s.sheet[0], s.sheet[1])}`
-        : `${fmt(s.t)} × ${fmt(s.w ?? 0)}`;
-      el.innerHTML = `${thumbnail(s)}<div><div class="nm">${esc(s.name)}</div><div class="dim">${dim}</div></div>`;
-      el.addEventListener('dragstart', (e) => {
-        e.dataTransfer?.setData(DRAG_TYPE, s.id);
-        if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
-      });
-      el.addEventListener('click', () => store.addPartLikeSelection(s.id, [0, 0, 0]));
-      (s.sheet ? sheetsEl : boardsEl).appendChild(el);
-      items.push({ el, text: `${s.name} ${dim}`.toLowerCase() });
+      const it = makeItem(s);
+      (s.sheet ? sheetsEl : boardsEl).appendChild(it.el);
+      items.push(it);
     }
     applyFilter();
   };
   build();
+  buildRecent();
   searchEl.addEventListener('input', applyFilter);
   store.subscribe((kind) => {
-    if (kind === 'model') build();
+    if (kind === 'model') {
+      build();
+      buildRecent();
+    }
   });
 }

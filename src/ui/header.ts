@@ -26,6 +26,7 @@ import { encodeShare, linkSize } from '../share';
 import { currentTheme, toggleTheme, type Theme } from './theme';
 import { beginMirror, mirrorKey } from './mirror';
 import { toast } from './toast';
+import { addStock } from './recent';
 
 export interface AppActions {
   /** Shift+A: open the add-stock menu at the pointer. */
@@ -218,7 +219,7 @@ export function wireDrop(viewport: HTMLElement, scene: LumberScene, store: Store
     const g = scene.groundPoint(e.clientX, e.clientY) ?? [0, 0, 0];
     const grid = store.settings.grid;
     const snap = (v: number) => (grid ? Math.round(v / grid) * grid : v);
-    store.addPartLikeSelection(id, [snap(g[0]), snap(g[1]), 0]);
+    addStock(store, id, [snap(g[0]), snap(g[1]), 0]);
   });
 }
 

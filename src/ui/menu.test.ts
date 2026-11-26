@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Store } from '../store';
-import { buildListMenu, buildMenu, menuTitle, type MenuActions } from './menu';
+import {
+  buildListMenu,
+  buildMenu,
+  menuTitle,
+  stockGroups,
+  stockSections,
+  type MenuActions,
+} from './menu';
+import { clearRecentStock, noteStockUsed } from './recent';
+import { getStock } from '../stock';
 
 const actions = (): MenuActions => ({
   beginArray: vi.fn(),
@@ -27,9 +36,11 @@ describe('buildMenu', () => {
       ['Add stock', 'Select all', 'Fasteners'],
       ['View', 'Exploded view', 'Assembly steps', 'Fit all'],
     ]);
+    // Add stock holds the groups; the 2x group holds the 2x4.
     const stock = m[0]![0]!.children!;
-    expect(stock.map((s) => s.label)).toContain('2x4');
-    stock.find((s) => s.label === '2x4')!.action!();
+    expect(stock.map((s) => s.label)).toContain('2x lumber');
+    const twoBy = stock.find((s) => s.label === '2x lumber')!.children!;
+    twoBy.find((s) => s.label === '2x4')!.action!();
     expect(store.parts).toHaveLength(1);
     expect(store.parts[0]!.pos[0]).toBe(10);
   });
@@ -124,5 +135,35 @@ describe('buildListMenu', () => {
     expect(labels(m)).toEqual([['Rename'], ['Show']]);
     m[1]![0]!.action!();
     expect(store.parts[0]!.hidden).toBeFalsy();
+  });
+});
+
+describe('stockGroups and stockSections', () => {
+  it('sorts stock into 1x, 2x, 4x and sheet groups', () => {
+    const g = stockGroups(getStock());
+    expect(g.map((x) => x.label)).toEqual(['1x boards', '2x lumber', '4x posts', 'Sheets']);
+    expect(g[1]!.items.map((s) => s.id)).toContain('2x6');
+    expect(g[3]!.items.every((s) => !!s.sheet)).toBe(true);
+  });
+  it('offers recent stock first, then a submenu per group', () => {
+    clearRecentStock();
+    const store = new Store();
+    let sections = stockSections(null, store);
+    expect(sections).toHaveLength(1);
+    expect(sections[0]!.map((i) => i.label)).toEqual([
+      '1x boards',
+      '2x lumber',
+      '4x posts',
+      'Sheets',
+    ]);
+    expect(sections[0]![1]!.children!.some((i) => i.label === '2x4')).toBe(true);
+    noteStockUsed('2x6');
+    noteStockUsed('ply34');
+    sections = stockSections(null, store);
+    expect(sections).toHaveLength(2);
+    expect(sections[0]!.map((i) => i.label)).toEqual(['3/4" plywood', '2x6']);
+    sections[0]![1]!.action!();
+    expect(store.parts[0]!.stock).toBe('2x6');
+    clearRecentStock();
   });
 });

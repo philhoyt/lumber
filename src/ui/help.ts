@@ -63,7 +63,7 @@ const SECTIONS: [string, [string, string][]][] = [
   [
     'Edit',
     [
-      ['Shift+A', 'Add stock at the pointer, turned like the selected part'],
+      ['Shift+A', 'Add stock at the pointer: recent first, then 1x, 2x, 4x and sheets'],
       ['Shift+D', 'Duplicate and grab the copy'],
       ['Ctrl+D', 'Duplicate with an offset'],
       ['Ctrl+G / Ctrl+Shift+G', 'Group / ungroup'],

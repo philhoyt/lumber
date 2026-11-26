@@ -34,8 +34,9 @@ import {
 } from 'lucide';
 import type { AlignMode, Axis, AxisIndex, Vec3 } from '../model';
 import type { MenuContext, ViewName } from '../scene';
-import { getStock } from '../stock';
+import { getStock, type Stock } from '../stock';
 import type { Store } from '../store';
+import { addStock, recentStock } from './recent';
 
 export interface MenuItem {
   label: string;
@@ -89,17 +90,66 @@ const ALIGN: [AxisIndex, AlignMode, string][] = [
   [2, 'max', 'Top'],
 ];
 
-/** One item per stock; choosing it adds a full piece resting on the floor at `ground`. */
-export function stockItems(ground: Vec3 | null, store: Store): MenuItem[] {
-  return getStock().map((s) => ({
+/** Stock sorted the way a yard lists it: 1x boards, 2x lumber, 4x posts, then sheets. */
+export function stockGroups(stocks: readonly Stock[]): { label: string; items: Stock[] }[] {
+  const groups = new Map<string, { label: string; order: number; items: Stock[] }>();
+  for (const s of stocks) {
+    const m = /^(\d+)x/i.exec(s.name);
+    const key = s.sheet ? 'sheets' : m ? m[1]! : 'other';
+    if (!groups.has(key)) {
+      const n = m ? Number(m[1]) : 0;
+      const label = s.sheet
+        ? 'Sheets'
+        : m
+          ? `${m[1]}x ${n === 1 ? 'boards' : n >= 4 ? 'posts' : 'lumber'}`
+          : 'Other';
+      groups.set(key, { label, order: s.sheet ? 1e6 : m ? n : 1e5, items: [] });
+    }
+    groups.get(key)!.items.push(s);
+  }
+  return [...groups.values()]
+    .sort((a, b) => a.order - b.order)
+    .map(({ label, items }) => ({ label, items }));
+}
+
+/** An item that adds one stock as a full piece resting on the floor at `ground`. */
+function stockItem(s: Stock, ground: Vec3 | null, store: Store): MenuItem {
+  return {
     label: s.name,
     action: () => {
       const g = ground ?? [0, 0, 0];
       const grid = store.settings.grid;
       const snap = (v: number) => (grid ? Math.round(v / grid) * grid : v);
-      store.addPartLikeSelection(s.id, [snap(g[0]), snap(g[1]), 0] as Vec3);
+      addStock(store, s.id, [snap(g[0]), snap(g[1]), 0] as Vec3);
     },
-  }));
+  };
+}
+
+/**
+ * The add-stock menu as sections: the stock used lately, then a submenu per group. Flat
+ * (one section) when the list is short enough not to need grouping.
+ */
+export function stockSections(ground: Vec3 | null, store: Store): MenuItem[][] {
+  const stocks = getStock();
+  const byId = new Map(stocks.map((s) => [s.id, s]));
+  const recent = recentStock()
+    .map((id) => byId.get(id))
+    .filter((s): s is Stock => !!s)
+    .map((s) => stockItem(s, ground, store));
+  const groups = stockGroups(stocks);
+  const rest: MenuItem[] =
+    groups.length > 1 && stocks.length > 8
+      ? groups.map((g) => ({
+          label: g.label,
+          children: g.items.map((s) => stockItem(s, ground, store)),
+        }))
+      : stocks.map((s) => stockItem(s, ground, store));
+  return recent.length ? [recent, rest] : [rest];
+}
+
+/** The same, flattened for a submenu: recents first, then the groups. */
+export function stockItems(ground: Vec3 | null, store: Store): MenuItem[] {
+  return stockSections(ground, store).flat();
 }
 
 /** The menu's sections for a right click, as lists separated by rules. */
@@ -324,7 +374,8 @@ export function menuTitle(store: Store): string {
 /** Draws the menu, keeps it on screen, and closes it on an outside click or Escape. */
 export class ContextMenu {
   private root: HTMLElement | null = null;
-  private sub: HTMLElement | null = null;
+  /** Open submenus, outermost first. */
+  private subs: HTMLElement[] = [];
 
   constructor() {
     document.addEventListener(
@@ -333,7 +384,7 @@ export class ContextMenu {
         if (
           this.root &&
           !this.root.contains(e.target as Node) &&
-          !this.sub?.contains(e.target as Node)
+          !this.subs.some((s) => s.contains(e.target as Node))
         )
           this.close();
       },
@@ -368,7 +419,7 @@ export class ContextMenu {
     el.appendChild(t);
     sections.forEach((items, i) => {
       if (i) el.appendChild(document.createElement('hr'));
-      for (const item of items) el.appendChild(this.itemEl(item));
+      for (const item of items) el.appendChild(this.itemEl(item, 0));
     });
     document.body.appendChild(el);
     this.root = el;
@@ -381,13 +432,16 @@ export class ContextMenu {
     this.root = null;
   }
 
-  private closeSub(): void {
-    this.sub?.remove();
-    this.sub = null;
-    this.root?.querySelectorAll('.item.open').forEach((i) => i.classList.remove('open'));
+  /** Close the submenus from `depth` on (all of them by default). */
+  private closeSub(depth = 0): void {
+    for (const s of this.subs.splice(depth)) s.remove();
+    const panels = [this.root, ...this.subs].slice(depth);
+    for (const p of panels)
+      p?.querySelectorAll('.item.open').forEach((i) => i.classList.remove('open'));
   }
 
-  private itemEl(item: MenuItem): HTMLElement {
+  /** An item at `depth` (0 in the root menu, 1 in its submenu, and so on). */
+  private itemEl(item: MenuItem, depth: number): HTMLElement {
     const el = document.createElement('div');
     el.className = 'item';
     el.setAttribute('role', 'menuitem');
@@ -407,14 +461,14 @@ export class ContextMenu {
       el.appendChild(chev);
       const openSub = () => {
         if (el.classList.contains('open')) return;
-        this.closeSub();
+        this.closeSub(depth);
         el.classList.add('open');
         const sub = document.createElement('div');
         sub.className = 'cmenu sub';
         sub.setAttribute('role', 'menu');
-        for (const c of item.children!) sub.appendChild(this.itemEl(c));
+        for (const c of item.children!) sub.appendChild(this.itemEl(c, depth + 1));
         document.body.appendChild(sub);
-        this.sub = sub;
+        this.subs.push(sub);
         const r = el.getBoundingClientRect();
         place(sub, r.right + 2, r.top - 4, r.left - 2);
       };
@@ -430,9 +484,7 @@ export class ContextMenu {
         k.textContent = item.key;
         el.appendChild(k);
       }
-      el.addEventListener('mouseenter', () => {
-        if (el.parentElement === this.root) this.closeSub();
-      });
+      el.addEventListener('mouseenter', () => this.closeSub(depth));
       const run = () => {
         this.close();
         item.action?.();

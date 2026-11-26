@@ -69,7 +69,7 @@ theme.
 | S, move the mouse or type, Enter    | Scale the cut length with the mouse (grid steps) or set it by number      |
 | Drag a handle at a part's end       | Pull that end to meet another part; the end snaps to faces                |
 | Fit end A / B (Part panel)          | Cut the end to meet what it points at: miter, bevel and length            |
-| Shift+A                             | Add stock at the pointer, turned like the selected part if there is one   |
+| Shift+A                             | Add stock at the pointer: recent first, then 1x, 2x, 4x and sheet menus   |
 | Shift+D                             | Duplicate and grab the copy; Ctrl+D duplicates with an offset             |
 | X / Y / Z twice while grabbing      | Move along the part's own axis, snapping to parts in the same plane       |
 | Shift+R, then drag                  | Array: copies fill toward the pointer, 16" o.c. or the panel's spacing    |

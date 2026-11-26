@@ -12,7 +12,7 @@ import { wireLengthFields } from './ui/fields';
 import { togglePanels, wireDrop, wireHeader, wireKeyboard, wireTabs } from './ui/header';
 import { DrawingsOverlay } from './ui/drawings';
 import { HelpOverlay } from './ui/help';
-import { buildListMenu, buildMenu, ContextMenu, menuTitle, stockItems } from './ui/menu';
+import { buildListMenu, buildMenu, ContextMenu, menuTitle, stockSections } from './ui/menu';
 import { OutlinerPanel } from './ui/outliner';
 import { renderPalette } from './ui/palette';
 import { PropsPanel } from './ui/props';
@@ -80,7 +80,7 @@ wireExplodeBar($('viewport'), scene);
 wireAssemblyBar($('viewport'), store, scene);
 wireNavGizmo($('viewport'), scene);
 wireSplitters($('viewport'));
-renderPalette($('boards'), $('sheets'), $<HTMLInputElement>('palSearch'), store);
+renderPalette($('recent'), $('boards'), $('sheets'), $<HTMLInputElement>('palSearch'), store);
 const outliner = new OutlinerPanel(
   $('outBody'),
   $('outCount'),
@@ -106,7 +106,7 @@ wireTabs();
 const actions = {
   addMenu: () => {
     const [x, y] = scene.pointerPosition();
-    menu.open(x, y, 'Add stock', [stockItems(scene.groundPoint(x, y), store)]);
+    menu.open(x, y, 'Add stock', stockSections(scene.groundPoint(x, y), store));
   },
   toggleHelp: () => help.toggle(),
   closeOverlays: () => {

@@ -322,6 +322,24 @@ test('P while rotating turns about a bottom corner instead of the centre', async
   await expect.poll(() => read('#pY')).toBeCloseTo(y0, 3);
 });
 
+test('Shift+A offers stock in groups, with the recent ones first', async ({ page }) => {
+  await openBench(page);
+  await hoverView(page);
+  await page.keyboard.press('Shift+A');
+  const menu = page.locator('.cmenu').first();
+  await expect(menu).toContainText('2x lumber');
+  await menu.getByText('2x lumber').hover();
+  await page.locator('.cmenu.sub').getByText('2x6', { exact: true }).click();
+  await expect(page.locator('#stat')).toContainText('13 parts');
+  // Next time the 2x6 is a top-level item, and the palette shows it under Recent.
+  await hoverView(page);
+  await page.keyboard.press('Shift+A');
+  const first = page.locator('.cmenu').first().locator('.item').first();
+  await expect(first).toHaveText(/2x6/);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#recent .stock')).toHaveCount(1);
+});
+
 test('G moves by a typed distance along the constrained axis', async ({ page }) => {
   await openBench(page);
   await selectPart(page, 'Leg LF');
