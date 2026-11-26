@@ -5,7 +5,7 @@
  */
 import { normalizeStep } from './assembly';
 import { applyFit, fitEnd, type EndFit } from './fit';
-import { centerBetween } from './gap';
+import { centerBetween, spaceBetween, type SpaceUnit } from './gap';
 import { cloneStock, DEFAULT_STOCK, getStock, sanitizeStock, setStock, type Stock } from './stock';
 import { clampFastener, isFace, isFastenerKind, type Fastener } from './fastener';
 import {
@@ -699,6 +699,66 @@ export class Store {
       this.mutate(() => translateParts(list, d));
     }
     return move.axis;
+  }
+  /**
+   * Space the selection evenly between two other parts: equal clear gaps along the axis
+   * those two are apart on. A whole assembly in the selection moves as one piece, and a
+   * live array along that axis keeps being an array, re-spaced by its gap. Returns the
+   * axis, or null when there was nothing to do.
+   */
+  spaceSelectedBetween(aId: number, bId: number): AxisIndex | null {
+    const a = this.partById(aId);
+    const b = this.partById(bId);
+    const list = this.selectedParts().filter((p) => p.id !== aId && p.id !== bId);
+    if (!a || !b || a === b || !list.length) return null;
+    const boxA = partAABB(a);
+    const boxB = partAABB(b);
+    const g = this.selectedGroup();
+    if (g?.array) {
+      // Re-space the array itself: keep its count, set the gap, and put the source cell
+      // first in the run.
+      const source = this.arraySource(g);
+      const axis = AXIS_INDEX[g.array.axis];
+      const extent = aabbSize(unionAABB(source))[axis];
+      const { count } = arrayLayout(g.array, extent);
+      const units: SpaceUnit[] = Array.from({ length: count }, (_, i) => ({
+        id: i,
+        box: { min: [i, i, i], max: [i + extent, i + extent, i + extent] },
+      }));
+      const r = spaceBetween(units, boxA, boxB);
+      if (r?.axis === axis) {
+        const first = r.moves.find((m) => m.id === 0)!;
+        const d: Vec3 = [0, 0, 0];
+        d[axis] = first.delta - unionAABB(source).min[axis];
+        this.mutate(() => {
+          translateParts(source, d);
+          g.array = { axis: g.array!.axis, mode: 'gap', spacing: r.gap, count };
+        });
+        return axis;
+      }
+    }
+    // Otherwise each part, or each whole assembly, is a unit of its own.
+    const units: SpaceUnit<Part[]>[] = [];
+    const seen = new Set<number>();
+    for (const p of list) {
+      if (seen.has(p.id)) continue;
+      const root = this.rootGroupOf(p.id);
+      const members = root ? this.membersOf(root.id) : [p];
+      const whole = members.every((m) => this.selected.has(m.id));
+      const unit = whole ? members : [p];
+      for (const m of unit) seen.add(m.id);
+      units.push({ id: unit, box: unionAABB(unit) });
+    }
+    const r = spaceBetween(units, boxA, boxB);
+    if (!r) return null;
+    this.mutate(() => {
+      for (const m of r.moves) {
+        const d: Vec3 = [0, 0, 0];
+        d[r.axis] = m.delta;
+        translateParts(m.id, d);
+      }
+    });
+    return r.axis;
   }
   /** Lower the selection until it rests on the floor or on the parts beneath it. */
   dropSelected(): void {

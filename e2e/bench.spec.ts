@@ -245,6 +245,23 @@ test('C centres the selection between two parts picked from the list', async ({ 
   await expect(page.locator('.drag-label')).toBeHidden();
 });
 
+test('Shift+C spaces the selection evenly between two parts', async ({ page }) => {
+  await openBench(page);
+  await selectPart(page, 'Stretcher front');
+  await page.locator('.out-row', { hasText: 'Stretcher back' }).click({ modifiers: ['Control'] });
+  await expect(page.locator('#stat')).toContainText('2 selected');
+  // Between the left legs (inner faces at y = ±8 1/2, 17" clear) two 1 1/2" stretchers
+  // get 4 2/3" gaps: the selection's front edge lands at -3 13/16 (to the sixteenth).
+  await page.keyboard.press('Shift+C');
+  await expect(page.locator('.drag-label')).toContainText('Space evenly between');
+  await page.locator('.out-row', { hasText: 'Leg LF' }).click();
+  await page.locator('.out-row', { hasText: 'Leg LB' }).click();
+  await expect(page.locator('#stat')).toContainText('2 selected');
+  await expect(page.locator('#pY')).toHaveValue('-3 13/16');
+  await page.locator('#bUndo').click();
+  await expect(page.locator('#pY')).toHaveValue('-12');
+});
+
 test('G moves by a typed distance along the constrained axis', async ({ page }) => {
   await openBench(page);
   await selectPart(page, 'Leg LF');

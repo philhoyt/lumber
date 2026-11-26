@@ -76,6 +76,9 @@ type Constraint =
   | { kind: 'plane'; axes: AxisIndex[]; plane: THREE.Plane; ref: THREE.Vector3 }
   | { kind: 'axis'; axis: AxisIndex; dir: THREE.Vector3; ref: number };
 
+/** What the two-pick tool does with the selection: put it mid-gap, or spread it out. */
+export type BetweenMode = 'center' | 'space';
+
 interface Transform {
   kind: 'grab' | 'rotate' | 'size' | 'array';
   /** Started from the keyboard: follows the pointer, confirmed by click or Enter. */
@@ -232,11 +235,13 @@ export class LumberScene {
   private readonly gapReadout: GapReadout;
   /** Alt is held: hovering another part shows the distance from the selection to it. */
   private altHeld = false;
-  /** C: the parts picked so far to centre the selection between. */
+  /** C / Shift+C: the parts picked so far to centre or space the selection between. */
   private centerPicks: number[] | null = null;
+  private centerMode: BetweenMode = 'center';
   /** Told when the centre-between tool starts, ends, or picks, for the toolbar and toasts. */
   onCenterBetween:
-    ((state: 'start' | 'picked' | 'done' | 'cancel', axis?: AxisIndex) => void) | null = null;
+    | ((state: 'start' | 'picked' | 'done' | 'cancel', mode: BetweenMode, axis?: AxisIndex) => void)
+    | null = null;
   private readonly fastenMode: FastenMode;
   /** E: how far the view is exploded, 0..1. Parts draw displaced; the model stays put. */
   explode = 0;
@@ -375,23 +380,24 @@ export class LumberScene {
   }
 
   /**
-   * C: centre the selection between two parts. Click (in the view or the Parts list) the
-   * first part, then the second; the selection moves to the middle of the gap between
-   * them, along the axis they are apart on.
+   * C: centre the selection between two parts; Shift+C: space it evenly between them.
+   * Click (in the view or the Parts list) the first part, then the second; the selection
+   * moves along the axis the two are apart on.
    */
-  beginCenterBetween(): void {
+  beginCenterBetween(mode: BetweenMode = 'center'): void {
     if (this.tf || this.lookOnly || !this.store.selected.size) return;
     if (this.measureTool.active) this.measureTool.end();
     if (this.fastenMode.active) this.fastenMode.end();
     this.centerPicks = [];
+    this.centerMode = mode;
     this.container.style.cursor = 'crosshair';
-    this.onCenterBetween?.('start');
+    this.onCenterBetween?.('start', mode);
   }
   endCenterBetween(): void {
     if (!this.centerPicks) return;
     this.centerPicks = null;
     this.container.style.cursor = '';
-    this.onCenterBetween?.('cancel');
+    this.onCenterBetween?.('cancel', this.centerMode);
   }
   /** One of the two parts to centre between, from the view or the Parts list. */
   pickCenterBetween(id: number): void {
@@ -399,13 +405,16 @@ export class LumberScene {
     if (!picks || picks.includes(id) || this.store.selected.has(id)) return;
     picks.push(id);
     if (picks.length < 2) {
-      this.onCenterBetween?.('picked');
+      this.onCenterBetween?.('picked', this.centerMode);
       return;
     }
-    const axis = this.store.centerSelectedBetween(picks[0]!, picks[1]!);
+    const axis =
+      this.centerMode === 'space'
+        ? this.store.spaceSelectedBetween(picks[0]!, picks[1]!)
+        : this.store.centerSelectedBetween(picks[0]!, picks[1]!);
     this.centerPicks = null;
     this.container.style.cursor = '';
-    this.onCenterBetween?.('done', axis ?? undefined);
+    this.onCenterBetween?.('done', this.centerMode, axis ?? undefined);
   }
   get transforming(): boolean {
     return this.tf !== null;
@@ -680,9 +689,10 @@ export class LumberScene {
       this.dragLabelEl.style.display = 'block';
       this.dragLabelEl.style.left = `${x}px`;
       this.dragLabelEl.style.top = `${y}px`;
+      const what = this.centerMode === 'space' ? 'Space evenly between' : 'Center between';
       this.dragLabelEl.textContent = this.centerPicks.length
-        ? 'Center between: now click the second part · Esc'
-        : 'Center between: click the first part · Esc';
+        ? `${what}: now click the second part · Esc`
+        : `${what}: click the first part · Esc`;
     } else this.dragLabelEl.style.display = 'none';
   }
 

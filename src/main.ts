@@ -60,16 +60,17 @@ const props = new PropsPanel(
   $('props'),
   store,
   () => scene.toggleFasten(),
-  () => scene.beginCenterBetween(),
+  (mode) => scene.beginCenterBetween(mode),
 );
-scene.onCenterBetween = (state, axis) => {
-  if (state === 'start') toast('Center between: click the first part, in the view or the list.');
+scene.onCenterBetween = (state, mode, axis) => {
+  const what = mode === 'space' ? 'Space evenly between' : 'Center between';
+  if (state === 'start') toast(`${what}: click the first part, in the view or the list.`);
   else if (state === 'picked') toast('Now click the second part.');
   else if (state === 'done')
     toast(
       axis === undefined
-        ? 'Those two sit on top of each other; nothing to center between.'
-        : `Centered between them on ${'XYZ'[axis]}.`,
+        ? 'Those two sit on top of each other; nothing to put between them.'
+        : `${mode === 'space' ? 'Spaced evenly' : 'Centered'} between them on ${'XYZ'[axis]}.`,
     );
 };
 wireFastenBar($('viewport'), store, scene);

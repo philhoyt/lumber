@@ -40,7 +40,14 @@ describe('buildMenu', () => {
     const m = buildMenu({ x: 0, y: 0, partId: 1, ground: null }, store, a);
     expect(labels(m)).toEqual([
       ['Grab', 'Rotate', 'Set length', 'Fasteners'],
-      ['Duplicate', 'Array by dragging', 'Drop', 'Center between…', 'Mirror'],
+      [
+        'Duplicate',
+        'Array by dragging',
+        'Drop',
+        'Center between…',
+        'Space evenly between…',
+        'Mirror',
+      ],
       ['Hide', 'Delete'],
       ['Add stock', 'Select all', 'View', 'Exploded view', 'Assembly steps'],
     ]);

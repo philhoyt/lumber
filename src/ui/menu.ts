@@ -3,6 +3,7 @@
  * icons and the key beside each item. One level of submenus for stock, align and views.
  */
 import {
+  AlignHorizontalDistributeCenter,
   AlignHorizontalJustifyStart,
   AlignHorizontalSpaceAround,
   ArrowDownToLine,
@@ -46,7 +47,7 @@ export interface MenuItem {
 /** What the menu needs from the scene. */
 export interface MenuActions {
   beginArray(): void;
-  beginCenterBetween(): void;
+  beginCenterBetween(mode?: 'center' | 'space'): void;
   beginGrab(): void;
   beginRotate(): void;
   beginSize(): void;
@@ -184,7 +185,13 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
       label: 'Center between…',
       key: 'C',
       icon: AlignHorizontalSpaceAround,
-      action: () => scene.beginCenterBetween(),
+      action: () => scene.beginCenterBetween('center'),
+    },
+    {
+      label: 'Space evenly between…',
+      key: 'Shift+C',
+      icon: AlignHorizontalDistributeCenter,
+      action: () => scene.beginCenterBetween('space'),
     },
     {
       label: 'Mirror',

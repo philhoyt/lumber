@@ -261,8 +261,8 @@ export class PropsPanel {
     private store: Store,
     /** Start placing fastener markers in the view. */
     private place: () => void = () => {},
-    /** Start the centre-between tool: click two parts to centre the selection between. */
-    private centerBetween: () => void = () => {},
+    /** Start the two-pick tool: click two parts to centre or space the selection between. */
+    private centerBetween: (mode: 'center' | 'space') => void = () => {},
   ) {
     try {
       const saved = JSON.parse(localStorage.getItem(SECTIONS_KEY) ?? '[]') as SectionId[];
@@ -414,7 +414,8 @@ export class PropsPanel {
       ${anglesHtml(list)}
       <label class="small">Mirror (Ctrl+M, then axis)</label>
       <div class="row btns"><button id="bMirX" title="Ctrl+M X: flip left-right">Left-right</button><button id="bMirY" title="Ctrl+M Y: flip front-back">Front-back</button><button id="bMirZ" title="Ctrl+M Z: flip top-bottom">Top-bottom</button></div>
-      <div class="row btns"><button id="bCenterBetween" title="C: click two other parts, in the view or the list; the selection moves to the middle of the gap between them">Center between two parts…</button></div>`;
+      <label class="small">Between two other parts (click them in the view or the list)</label>
+      <div class="row btns"><button id="bCenterBetween" title="C: the selection moves to the middle of the gap between the two parts you click">Center…</button><button id="bSpaceBetween" title="Shift+C: the selected pieces spread out between the two parts you click, with equal gaps; a live array keeps its count and gets the gap">Space evenly…</button></div>`;
 
     // ---- Align (several parts) ----
     let arrange = '';
@@ -698,7 +699,8 @@ export class PropsPanel {
     onChange(el, 'rotY', setAngles);
     onChange(el, 'rotZ', setAngles);
     onClick(el, 'bSquare', () => store.squareUpSelected());
-    onClick(el, 'bCenterBetween', () => this.centerBetween());
+    onClick(el, 'bCenterBetween', () => this.centerBetween('center'));
+    onClick(el, 'bSpaceBetween', () => this.centerBetween('space'));
     onClick(el, 'bRotY', () => store.rotateSelected('y'));
     onClick(el, 'bRotZ', () => store.rotateSelected('z'));
     onClick(el, 'bMirX', () => store.mirrorSelected('x'));

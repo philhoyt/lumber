@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boxGap, centerBetween, gapText } from './gap';
+import { boxGap, centerBetween, gapText, spaceBetween } from './gap';
 import type { AABB } from './model';
 import { fmt } from './units';
 
@@ -73,5 +73,33 @@ describe('centerBetween', () => {
     const sel = box([0, 0, 5], [1, 1, 6]);
     expect(centerBetween(sel, low, high)).toEqual({ axis: 2, delta: -4.75 });
     expect(centerBetween(sel, low, low)).toBeNull();
+  });
+});
+
+describe('spaceBetween', () => {
+  it('spreads the units with equal clear gaps, keeping their order', () => {
+    // Two 1 1/2" joists between studA (0..1 1/2) and a joist at 46 1/2..48: 45" clear.
+    const outer = box([46.5, 0, 0], [48, 3.5, 92.625]);
+    const j1 = { id: 'near', box: box([3, 0, 0], [4.5, 3.5, 92.625]) };
+    const j2 = { id: 'far', box: box([40, 0, 0], [41.5, 3.5, 92.625]) };
+    const r = spaceBetween([j2, j1], studA, outer)!;
+    expect(r.axis).toBe(0);
+    expect(r.gap).toBe(14); // (45 - 3) / 3
+    expect(r.moves).toEqual([
+      { id: 'near', delta: 12.5 }, // to 15.5
+      { id: 'far', delta: -9 }, // to 31
+    ]);
+  });
+  it('works whichever reference comes first, and on other axes', () => {
+    const low = box([0, 0, 0], [10, 10, 1]);
+    const high = box([0, 0, 13], [10, 10, 14]);
+    const u = { id: 1, box: box([0, 0, 2], [10, 10, 3]) };
+    expect(spaceBetween([u], high, low)!.moves).toEqual([{ id: 1, delta: 4.5 }]);
+    expect(spaceBetween([u], low, high)!.axis).toBe(2);
+  });
+  it('gives up when the references coincide or nothing is selected', () => {
+    const b = box([0, 0, 0], [1, 1, 1]);
+    expect(spaceBetween([{ id: 1, box: b }], b, b)).toBeNull();
+    expect(spaceBetween([], b, box([5, 0, 0], [6, 1, 1]))).toBeNull();
   });
 });

@@ -65,6 +65,49 @@ export function gapText(g: Gap, fmt: (n: number) => string): string {
   return parts.join('  ·  ');
 }
 
+/** The axis two boxes are apart on, or the one their centres differ most on; null if neither. */
+function betweenAxis(g: Gap): AxisIndex | null {
+  if (g.axis !== null) return g.axis;
+  let best: AxisIndex = 0;
+  for (const i of [1, 2] as const) if (Math.abs(g.oc[i]) > Math.abs(g.oc[best])) best = i;
+  return Math.abs(g.oc[best]) < 1e-9 ? null : best;
+}
+
+/** Something spaced as one piece: a part, or a whole assembly. */
+export interface SpaceUnit<T = number> {
+  id: T;
+  box: AABB;
+}
+
+/**
+ * Spread units between boxes `a` and `b` with equal clear gaps, in the order they
+ * already sit along the axis the two are apart on. Gives each unit's move on that
+ * axis, and the gap. Null when `a` and `b` sit on top of each other.
+ */
+export function spaceBetween<T>(
+  units: readonly SpaceUnit<T>[],
+  a: AABB,
+  b: AABB,
+): { axis: AxisIndex; gap: number; moves: { id: T; delta: number }[] } | null {
+  const g = boxGap(a, b);
+  const axis = betweenAxis(g);
+  if (axis === null || !units.length) return null;
+  const lo = Math.min(g.from[axis], g.to[axis]);
+  const hi = Math.max(g.from[axis], g.to[axis]);
+  const sorted = [...units].sort(
+    (u, v) => u.box.min[axis] + u.box.max[axis] - (v.box.min[axis] + v.box.max[axis]),
+  );
+  const total = sorted.reduce((n, u) => n + (u.box.max[axis] - u.box.min[axis]), 0);
+  const gap = (hi - lo - total) / (sorted.length + 1);
+  let at = lo + gap;
+  const moves = sorted.map((u) => {
+    const delta = Math.round((at - u.box.min[axis]) * 64) / 64;
+    at += u.box.max[axis] - u.box.min[axis] + gap;
+    return { id: u.id, delta };
+  });
+  return { axis, gap: Math.round(gap * 64) / 64, moves };
+}
+
 /**
  * The move that centres box `sel` in the gap between `a` and `b`: along the axis the
  * two are apart on (or, when they overlap, the axis their centres differ most on), to

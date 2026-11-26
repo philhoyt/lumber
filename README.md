@@ -77,6 +77,7 @@ theme.
 | Double-click a part                 | Select that one part inside its group                                     |
 | Alt+G                               | Drop onto the floor or the parts beneath                                  |
 | C, then click two parts             | Center the selection in the gap between them (view or Parts list); Esc    |
+| Shift+C, then click two parts       | Space the selected pieces evenly between them; an array keeps its count   |
 | Ctrl+M then X / Y / Z               | Mirror across that axis through the selection's centre                    |
 | F                                   | Fastener markers: click a face to place one, a marker to remove it        |
 | H, Alt+H                            | Hide the selection, show everything                                       |

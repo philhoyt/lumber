@@ -294,7 +294,7 @@ export function wireKeyboard(
     else if (k === 'r') scene.beginRotate();
     else if (k === 's') scene.beginSize();
     else if (k === 'h') store.hideSelected();
-    else if (k === 'c') scene.beginCenterBetween();
+    else if (k === 'c') scene.beginCenterBetween(e.shiftKey ? 'space' : 'center');
     else if (k === 'm') scene.toggleMeasure();
     else if (k === 'f') scene.toggleFasten();
     else if (k === 'e') scene.toggleExplode();

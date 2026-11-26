@@ -182,3 +182,45 @@ describe('centerSelectedBetween', () => {
     expect(s.centerSelectedBetween(a.id, 99)).toBeNull();
   });
 });
+
+describe('spaceSelectedBetween', () => {
+  it('spaces loose parts evenly between two others, in their order', () => {
+    const s = new Store();
+    const left = s.addPart('2x4', [0, 0, 0]); // flat: 3 1/2 across Y, so inner face at 1 3/4
+    const right = s.addPart('2x4', [0, 30, 0]); // inner face at 28 1/4: 26 1/2 clear
+    const m1 = s.addPart('2x4', [0, 5, 0]);
+    const m2 = s.addPart('2x4', [0, 20, 0]);
+    s.select([m1.id, m2.id]);
+    expect(s.spaceSelectedBetween(left.id, right.id)).toBe(1);
+    // (26.5 - 7) / 3 = 6.5 clear: mins at 8.25 and 18.25, centres at 10 and 20
+    expect(s.partById(m1.id)!.pos[1]).toBe(10);
+    expect(s.partById(m2.id)!.pos[1]).toBe(20);
+    expect(s.partById(left.id)!.pos[1]).toBe(0);
+  });
+  it('re-spaces a live array by its gap and keeps it live', () => {
+    const s = new Store();
+    const left = s.addPart('2x4', [0, 0, 0]);
+    const right = s.addPart('2x4', [0, 40, 0]); // inner faces 1.75 and 38.25: 36.5 clear
+    const src = s.addPart('2x4', [0, 3, 0]);
+    s.select([src.id]);
+    const g = s.setArray({ axis: 'y', count: 3, spacing: 10, mode: 'center' })!;
+    expect(s.spaceSelectedBetween(left.id, right.id)).toBe(1);
+    // three 3 1/2 wide: (36.5 - 10.5) / 4 = 6.5 clear; source min at 8.25, centre 10
+    expect(g.array).toEqual({ axis: 'y', mode: 'gap', spacing: 6.5, count: 3 });
+    expect(s.partById(src.id)!.pos[1]).toBe(10);
+    expect(s.parts.filter((p) => p.group === g.id).map((p) => p.pos[1])).toEqual([10, 20, 30]);
+  });
+  it('moves a whole assembly as one unit', () => {
+    const s = new Store();
+    const left = s.addPart('2x4', [0, 0, 0]);
+    const right = s.addPart('2x4', [0, 40, 0]);
+    const a = s.addPart('2x4', [0, 5, 0]);
+    const b = s.addPart('2x4', [0, 9, 0]);
+    s.select([a.id, b.id]);
+    s.groupSelected();
+    expect(s.spaceSelectedBetween(left.id, right.id)).toBe(1);
+    // the pair spans 3.25..10.75 (7 1/2): (36.5 - 7.5) / 2 = 14.5 clear; min to 16.25
+    expect(s.partById(a.id)!.pos[1]).toBe(18);
+    expect(s.partById(b.id)!.pos[1]).toBe(22);
+  });
+});

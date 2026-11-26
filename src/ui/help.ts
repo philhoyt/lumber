@@ -51,6 +51,7 @@ const SECTIONS: [string, [string, string][]][] = [
       ['Alt + hover another part', 'Distance from the selection to it: gap, on centre, straight'],
       ['Alt+G', 'Drop onto the floor or the parts below'],
       ['C, then click two parts', 'Center the selection in the gap between them; Esc'],
+      ['Shift+C, then click two parts', 'Space the selected pieces evenly between them'],
       ['Ctrl+M then X / Y / Z', 'Mirror across that axis through the centre'],
     ],
   ],
