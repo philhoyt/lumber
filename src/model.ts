@@ -60,13 +60,19 @@ export interface Part {
   fasteners?: Fastener[];
   /** Assembly step, 1-based: the order the parts go together. Unset parts come last. */
   step?: number;
-  /** Reference boxes only: the box's height, in place of the stock's thickness. */
+  /** Reference parts only: the height, in place of the stock's thickness. */
   t?: number;
 }
 
-/** Whether a part is a reference box: a stand-in, not something to cut. */
+/** Whether a part is a reference box or cylinder: a stand-in, not something to cut. */
 export function isReferencePart(p: Part): boolean {
   return stockById(p.stock).reference === true;
+}
+
+/** Whether a part is a reference cylinder: `len` is its diameter, `t` its height. */
+export function isCylinderPart(p: Part): boolean {
+  const s = stockById(p.stock);
+  return s.reference === true && s.shape === 'cylinder';
 }
 
 /**
@@ -412,7 +418,10 @@ export const DEFAULT_Q: Quat = [0, 0, 0, 1];
 /** Size of the part in its local frame: [length, width, thickness]. */
 export function partDims(p: Part): Vec3 {
   const s = stockById(p.stock);
-  return [p.len, stockWidth(s, p.w), s.reference ? (p.t ?? s.t) : s.t];
+  if (!s.reference) return [p.len, stockWidth(s, p.w), s.t];
+  // A cylinder's box is its diameter both ways; it stands on end.
+  const w = s.shape === 'cylinder' ? p.len : stockWidth(s, p.w);
+  return [p.len, w, p.t ?? s.t];
 }
 
 const _v = new Vector3();

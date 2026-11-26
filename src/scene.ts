@@ -72,7 +72,7 @@ import { GapReadout } from './view/gapReadout';
 import { FastenMode } from './view/fastenMode';
 import { toScreen } from './view/labels';
 import { MeasureTool } from './view/measureTool';
-import { meshSignature, partGeometry } from './view/partMesh';
+import { meshSignature, partEdges, partGeometry } from './view/partMesh';
 import { SnapFeedback } from './view/snapFeedback';
 
 export type { Projection, ViewName } from './view/camera';
@@ -550,7 +550,7 @@ export class LumberScene {
     const geo = partGeometry(p, d);
     const mesh = new THREE.Mesh(geo, this.materialFor(stockById(p.stock), 'normal'));
     mesh.userData.id = p.id;
-    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), this.edgeMats.normal);
+    const edges = new THREE.LineSegments(partEdges(p, geo), this.edgeMats.normal);
     g.add(mesh, edges, buildMarkers(fastenersOf(p), d));
     g.userData.id = p.id;
     g.userData.sig = meshSignature(p, d);
@@ -718,7 +718,11 @@ export class LumberScene {
       const miter =
         (hasMiter(p) ? ` · miter ${Math.abs(m[0])}°/${Math.abs(m[1])}°` : '') +
         (hasBevel(p) ? ` · bevel ${Math.abs(b[0])}°/${Math.abs(b[1])}°` : '');
-      this.labelEl.textContent = `${p.name} · ${s.name} · ${s.sheet ? fmt(p.w ?? s.sheet[0]) + ' × ' : ''}${fmt(p.len)}${miter}`;
+      const size =
+        s.shape === 'cylinder'
+          ? `⌀${fmt(p.len)} × ${fmt(p.t ?? s.t)}`
+          : `${s.sheet ? fmt(p.w ?? s.sheet[0]) + ' × ' : ''}${fmt(p.len)}`;
+      this.labelEl.textContent = `${p.name} · ${s.name} · ${size}${miter}`;
     } else this.labelEl.style.display = 'none';
 
     const t = this.tf;

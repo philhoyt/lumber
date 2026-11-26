@@ -15,6 +15,14 @@ function thumbnail(s: Stock): string {
   const W = 32;
   const H = 24;
   const fill = hex(s.color);
+  if (s.shape === 'cylinder') {
+    // A can seen from slightly above: a body with an elliptical lid.
+    return `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true"><path d="M9 6 v12 a7 3 0 0 0 14 0 v-12" fill="${fill}" stroke="rgba(0,0,0,.45)"/><ellipse cx="16" cy="6" rx="7" ry="3" fill="${fill}" stroke="rgba(0,0,0,.45)"/></svg>`;
+  }
+  if (s.reference) {
+    // A box in a corner view: the front face with its top and side set back.
+    return `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true"><path d="M7 8 l5 -4 h13 l-5 4 z" fill="${fill}" opacity=".75" stroke="rgba(0,0,0,.45)"/><path d="M20 8 l5 -4 v12 l-5 4 z" fill="${fill}" opacity=".55" stroke="rgba(0,0,0,.45)"/><rect x="7" y="8" width="13" height="12" fill="${fill}" stroke="rgba(0,0,0,.45)"/></svg>`;
+  }
   if (s.sheet) {
     // A sheet seen on edge: wide and thin, with a faint second line for the far edge.
     const t = Math.max(2, s.t * 4);
@@ -48,9 +56,12 @@ export function renderPalette(
     el.title = s.reference
       ? 'A stand-in for something to design around. It is not cut or bought. Click to add, or drag it onto the scene'
       : `Click to add a ${s.name} at the center, or drag it onto the scene`;
-    const dim = s.sheet
-      ? `${fmt(s.t)} · ${fmtSheet(s.sheet[0], s.sheet[1])}`
-      : `${fmt(s.t)} × ${fmt(s.w ?? 0)}`;
+    const dim =
+      s.shape === 'cylinder' && s.sheet
+        ? `⌀${fmt(s.sheet[0])} × ${fmt(s.t)} tall`
+        : s.sheet
+          ? `${fmt(s.t)} · ${fmtSheet(s.sheet[0], s.sheet[1])}`
+          : `${fmt(s.t)} × ${fmt(s.w ?? 0)}`;
     el.innerHTML = `${thumbnail(s)}<div><div class="nm">${esc(s.name)}</div><div class="dim">${dim}</div></div>`;
     el.addEventListener('dragstart', (e) => {
       e.dataTransfer?.setData(DRAG_TYPE, s.id);

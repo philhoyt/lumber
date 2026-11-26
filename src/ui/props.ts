@@ -325,22 +325,38 @@ export class PropsPanel {
         .join('');
       part = `<div class="row"><div><label class="small">Name</label><input type="text" id="pName" value="${esc(p.name)}"></div>
         <div><label class="small">Stock</label><select id="pStock">${options}</select></div></div>
-        <div class="row">${inlineField('pLen', 'L', 'Length, long point to long point (S scales it in the view)', `<input type="text" class="len" data-min="0.0625" id="pLen" value="${fmt(p.len)}">`)}
-        ${
-          s.sheet
+        <div class="row">${
+          s.shape === 'cylinder'
             ? inlineField(
-                'pW',
-                'W',
-                'Width cut from the sheet',
-                `<input type="text" class="len" data-min="0.0625" id="pW" value="${fmt(p.w ?? s.sheet[0])}">`,
+                'pLen',
+                'D',
+                'Diameter of the reference cylinder (S scales it in the view)',
+                `<input type="text" class="len" data-min="0.0625" id="pLen" value="${fmt(p.len)}">`,
               )
-            : `<div><div class="static muted" title="Thickness × width of the stock">${fmt(s.t)} × ${fmt(s.w ?? 0)} section</div></div>`
+            : inlineField(
+                'pLen',
+                'L',
+                'Length, long point to long point (S scales it in the view)',
+                `<input type="text" class="len" data-min="0.0625" id="pLen" value="${fmt(p.len)}">`,
+              )
+        }
+        ${
+          s.shape === 'cylinder'
+            ? ''
+            : s.sheet
+              ? inlineField(
+                  'pW',
+                  'W',
+                  'Width cut from the sheet',
+                  `<input type="text" class="len" data-min="0.0625" id="pW" value="${fmt(p.w ?? s.sheet[0])}">`,
+                )
+              : `<div><div class="static muted" title="Thickness × width of the stock">${fmt(s.t)} × ${fmt(s.w ?? 0)} section</div></div>`
         }${
           s.reference
             ? inlineField(
                 'pH',
                 'H',
-                'Height of the reference box',
+                `Height of the reference ${s.shape === 'cylinder' ? 'cylinder' : 'box'}`,
                 `<input type="text" class="len" data-min="0.0625" id="pH" value="${fmt(p.t ?? s.t)}">`,
               )
             : ''

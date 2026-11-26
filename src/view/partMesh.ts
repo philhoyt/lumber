@@ -12,6 +12,7 @@ import {
   cutsOf,
   endCutCorners,
   hasEndCut,
+  isCylinderPart,
   miterOf,
   type Part,
   type Vec3,
@@ -85,11 +86,21 @@ function subtractCuts(base: THREE.BufferGeometry, p: Part, d: Vec3): THREE.Buffe
   return brush.geometry;
 }
 
-/** A box, or for a board with mitered or beveled ends the solid between its end planes. */
+/**
+ * A box, or for a board with mitered or beveled ends the solid between its end planes. A
+ * reference cylinder is round: its diameter across X and Y, standing on end along Z.
+ */
 export function partGeometry(p: Part, d: Vec3): THREE.BufferGeometry {
+  if (isCylinderPart(p))
+    return new THREE.CylinderGeometry(d[0] / 2, d[0] / 2, d[2], 48).rotateX(Math.PI / 2);
   const geo =
     !hasEndCut(p) || stockById(p.stock).sheet
       ? new THREE.BoxGeometry(d[0], d[1], d[2])
       : hexahedron(endCutCorners(d, miterOf(p), bevelOf(p)));
   return cutsOf(p).length && !stockById(p.stock).sheet ? subtractCuts(geo, p, d) : geo;
+}
+
+/** The outline drawn over a part: every edge of a box, only the rims of a cylinder. */
+export function partEdges(p: Part, geo: THREE.BufferGeometry): THREE.EdgesGeometry {
+  return new THREE.EdgesGeometry(geo, isCylinderPart(p) ? 30 : 1);
 }

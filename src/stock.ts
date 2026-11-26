@@ -30,13 +30,15 @@ export interface Stock {
    * sized freely per part and left out of the cut list, buy list, nesting and drawings.
    */
   reference?: boolean;
+  /** Reference stock only: the solid's shape. A box when unset; a cylinder stands on end. */
+  shape?: 'cylinder';
 }
 
 const BOARD = 0xcfa872;
 const ONE_BY = 0xd8b88a;
 const PLY = 0xe3cfa3;
 
-/** The one reference stock, always present so a model can hold stand-ins. */
+/** The reference box, always present so a model can hold stand-ins. */
 export const REFERENCE_STOCK: Stock = {
   id: 'ref',
   name: 'Reference box',
@@ -46,6 +48,21 @@ export const REFERENCE_STOCK: Stock = {
   color: 0x8fa3b8,
   reference: true,
 };
+
+/** The reference cylinder: a round stand-in (a bucket, a post, a pipe), standing on end. */
+export const REFERENCE_CYLINDER: Stock = {
+  id: 'refcyl',
+  name: 'Reference cylinder',
+  t: 12,
+  sheet: [12, 12],
+  price: 0,
+  color: 0x8fa3b8,
+  reference: true,
+  shape: 'cylinder',
+};
+
+/** Every reference shape, in menu order. */
+export const REFERENCE_STOCKS: readonly Stock[] = [REFERENCE_STOCK, REFERENCE_CYLINDER];
 
 export const DEFAULT_STOCK: readonly Stock[] = [
   { id: '1x2', name: '1x2', t: 0.75, w: 1.5, lengths: [96], price: 2.5, color: ONE_BY },
@@ -105,7 +122,7 @@ export const DEFAULT_STOCK: readonly Stock[] = [
     price: 45,
     color: 0xb9a27f,
   },
-  REFERENCE_STOCK,
+  ...REFERENCE_STOCKS,
 ];
 
 /** @deprecated The defaults; the live library is `getStock()`. */
@@ -118,11 +135,13 @@ export const cloneStock = (list: readonly Stock[]): Stock[] =>
     sheet: s.sheet ? [...s.sheet] : undefined,
     nominal: s.nominal ? [...s.nominal] : undefined,
     reference: s.reference ? true : undefined,
+    shape: s.shape,
   }));
 
-/** The list with the reference stock in it, added when a file predates it. */
+/** The list with every reference shape in it, each added when a file predates it. */
 export function withReferenceStock(list: Stock[]): Stock[] {
-  return list.some((s) => s.reference) ? list : [...list, { ...REFERENCE_STOCK }];
+  const missing = REFERENCE_STOCKS.filter((r) => !list.some((s) => s.id === r.id));
+  return missing.length ? [...list, ...missing.map((r) => ({ ...r }))] : list;
 }
 
 /** "2x4" or "1 x 6" as a nominal [thickness, width]; null when it does not read as one. */
@@ -217,6 +236,7 @@ export function sanitizeStock(list: unknown): Stock[] | null {
     }
     if (x.priceUnit === 'bf') s.priceUnit = 'bf';
     if (x.reference === true) s.reference = true;
+    if (s.reference && x.shape === 'cylinder') s.shape = 'cylinder';
     out.push(s);
   }
   return out;

@@ -87,11 +87,13 @@ snapshot to the store; cancel restores it.
 
 ## Reference boxes
 
-Stock with `reference: true` (one entry, `ref`, always present in a model's stock
-table) is a stand-in with a per-part height (`Part.t`). The cut rows, stock grouping,
-drawing rows and model views skip reference parts, the status bar counts them apart,
-and the view draws them translucent. Everything else, moving, snapping, grouping,
-treats them as parts.
+Stock with `reference: true` (`ref`, the box, and `refcyl`, the cylinder, both always
+present in a model's stock table) is a stand-in with a per-part height (`Part.t`). A
+cylinder (`shape: 'cylinder'`) stands on end with `len` as its diameter, so its box is
+`len × len × t` and every box-based tool (snapping, gaps, arrays) sees that box; only
+the mesh is round. The cut rows, stock grouping, drawing rows and model views skip
+reference parts, the status bar counts them apart, and the view draws them translucent.
+Everything else, moving, snapping, grouping, treats them as parts.
 
 ## Local frames
 

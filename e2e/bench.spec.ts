@@ -362,6 +362,27 @@ test('a reference box is a part to design around, not to cut', async ({ page }) 
   await expect(page.locator('#stat')).not.toContainText('reference');
 });
 
+test('a reference cylinder takes a diameter and a height, no width', async ({ page }) => {
+  await openBench(page);
+  await hoverView(page);
+  await page.keyboard.press('Shift+A');
+  await page.locator('.cmenu').first().getByText('Reference').hover();
+  await page.locator('.cmenu.sub').getByText('Reference cylinder').click();
+  await expect(page.locator('#stat')).toContainText('12 parts · 1 reference · 1 selected');
+  await expect(page.locator('#pW')).toHaveCount(0);
+  await expect(page.locator('label[for="pLen"]')).toHaveText('D');
+  await page.locator('#pLen').fill('8');
+  await page.locator('#pLen').press('Enter');
+  await page.locator('#pH').fill('30');
+  await page.locator('#pH').press('Enter');
+  await expect(page.locator('#pLen')).toHaveValue('8');
+  await expect(page.locator('#pH')).toHaveValue('30');
+  await expect(page.locator('#overall')).toContainText('48" W × 24" D × 34" H');
+  await page.locator('[data-tab="cut"]').click();
+  await expect(page.locator('#cutBody')).not.toContainText('Reference cylinder');
+  await page.locator('[data-tab="parts"]').click();
+});
+
 test('G moves by a typed distance along the constrained axis', async ({ page }) => {
   await openBench(page);
   await selectPart(page, 'Leg LF');
