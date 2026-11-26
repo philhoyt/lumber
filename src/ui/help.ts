@@ -70,7 +70,10 @@ const SECTIONS: [string, [string, string][]][] = [
       ['F', 'Fastener markers: click a face to place one, a marker to remove it'],
       ['H / Alt+H', 'Hide / show all'],
       ['X or Delete', 'Delete'],
-      ['Ctrl+Z / Ctrl+Shift+Z', 'Undo / redo'],
+      [
+        'Ctrl+Z / Ctrl+Shift+Z',
+        'Undo / redo; in a field too, once Enter has applied what you typed',
+      ],
       ['Ctrl+S / Ctrl+O', 'Save / open'],
       ['Up / Down in a length field', 'Step by the grid; Shift 1", Ctrl 1/16"'],
       ["Drag a field's label", 'Scrub the value with the same steps; Alt-drag the field itself'],

@@ -85,7 +85,7 @@ theme.
 | F                                   | Fastener markers: click a face to place one, a marker to remove it        |
 | H, Alt+H                            | Hide the selection, show everything                                       |
 | X or Delete                         | Delete                                                                    |
-| Ctrl+Z, Ctrl+Shift+Z                | Undo, redo                                                                |
+| Ctrl+Z, Ctrl+Shift+Z                | Undo, redo; in a field too, once Enter has applied what you typed         |
 | Ctrl+S, Ctrl+O                      | Save, open                                                                |
 | Middle-drag, Shift+middle, wheel    | Orbit, pan, zoom (right-drag pans too)                                    |
 | Alt+drag                            | Orbit without a middle button; Shift+Alt pans, Ctrl+Alt zooms             |

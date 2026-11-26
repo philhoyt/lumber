@@ -244,6 +244,12 @@ const PAN_KEYS: Record<string, [number, number]> = {
   '2': [0, -1],
 };
 
+/** Whether a focused control holds nothing the user typed and has not yet applied. */
+function fieldIsClean(t: HTMLElement): boolean {
+  if (!(t instanceof HTMLInputElement) || t.type === 'checkbox') return t.tagName !== 'TEXTAREA';
+  return t.dataset.was === undefined || t.dataset.was === t.value;
+}
+
 export function wireKeyboard(
   store: Store,
   scene: LumberScene,
@@ -252,8 +258,17 @@ export function wireKeyboard(
 ): void {
   window.addEventListener('keydown', (e) => {
     const t = e.target as HTMLElement | null;
+    const k = e.key.toLowerCase();
+    const mod = e.ctrlKey || e.metaKey;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) {
       if (e.key === 'Escape') t.blur();
+      // Undo in a field is the model's once what was typed has been applied (Enter leaves
+      // the field focused); while there is uncommitted text it is the field's own.
+      else if (mod && (k === 'z' || k === 'y') && fieldIsClean(t)) {
+        if (k === 'y' || e.shiftKey) store.redo();
+        else store.undo();
+        e.preventDefault();
+      }
       return;
     }
     if (scene.transforming) return; // the scene handles keys during G / R / S
@@ -261,8 +276,6 @@ export function wireKeyboard(
       e.preventDefault();
       return;
     }
-    const k = e.key.toLowerCase();
-    const mod = e.ctrlKey || e.metaKey;
     const step = store.settings.grid || 0.0625;
     const digit = e.code.startsWith('Numpad') ? e.code.slice(6) : e.code.replace('Digit', '');
 

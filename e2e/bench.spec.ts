@@ -383,6 +383,28 @@ test('a reference cylinder takes a diameter and a height, no width', async ({ pa
   await page.locator('[data-tab="parts"]').click();
 });
 
+test('Ctrl+Z undoes an angle typed in the panel while the field still has focus', async ({
+  page,
+}) => {
+  await openBench(page);
+  await selectPart(page, 'Leg LF');
+  const rotX = page.locator('#rotX');
+  await rotX.fill('30');
+  await rotX.press('Enter');
+  await expect(rotX).toHaveValue('30');
+  await expect(rotX).toBeFocused();
+  // Nothing new typed, so undo is the model's, not the field's.
+  await rotX.press('Control+z');
+  await expect(page.locator('#rotX')).toHaveValue('0');
+  await page.locator('#rotX').press('Control+Shift+z');
+  await expect(page.locator('#rotX')).toHaveValue('30');
+  // With text typed but not applied, Ctrl+Z leaves the model alone.
+  await page.locator('#rotX').fill('45');
+  await page.locator('#rotX').press('Control+z');
+  await page.locator('#rotX').press('Escape');
+  await expect(page.locator('#rotX')).toHaveValue('30');
+});
+
 test('G moves by a typed distance along the constrained axis', async ({ page }) => {
   await openBench(page);
   await selectPart(page, 'Leg LF');
