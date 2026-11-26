@@ -110,8 +110,9 @@ and the eye to hide or show. Hovering a row highlights the part.
 
 You can drag a part's body to slide it on the floor, or drag the gizmo's
 arrows and squares. Drag stock in from the left, or click it to add at the
-center. With several parts selected, the Align buttons make them flush or
-centred on any axis. Length fields take fractions, feet and inches, millimetres
+center. A pinned row at the top of the properties panel names the selection and holds its
+actions: drop, duplicate, group, hide, delete. With several parts selected, the Align
+buttons make them flush or centred on any axis. Length fields take fractions, feet and inches, millimetres
 and arithmetic: `48 - 3/4`, `(96 - 2 * 1.5) / 3`, `2 ft + 3 1/2`. A slash with no spaces
 is a fraction (`3/4`, `1-1/2`); with spaces around it, it divides (`48 / 3`). Start
 with an operator to change what is there: `+1/2` adds half an inch, `*2` doubles. With

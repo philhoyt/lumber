@@ -748,6 +748,46 @@ footer .saved.warn {
 #props .empty {
   padding: 10px 12px;
 }
+/* The selection's name and its actions stay put while the sections scroll. */
+.props-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px 5px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.props-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.props-title .count {
+  margin-left: 6px;
+  color: var(--muted);
+}
+.props-actions {
+  display: flex;
+  gap: 1px;
+  flex: none;
+}
+.props-actions button.icon {
+  width: 26px;
+  height: 24px;
+}
+.props-actions button.icon svg {
+  width: 15px;
+  height: 15px;
+}
+.props-actions button.danger:hover {
+  background: var(--panel2);
+}
 .sec {
   border-bottom: 1px solid var(--line);
 }

@@ -1,9 +1,18 @@
 /**
- * The properties panel: the selection in collapsible sections. Part (name, stock, size),
- * Transform (position, rotation), Arrange (duplicate, group, hide, align), Fasteners and
- * Array.
+ * The properties panel: a pinned header naming the selection with its actions (drop,
+ * duplicate, group, hide, delete), then collapsible sections. Part (name, stock, size),
+ * Transform (position, rotation), Align (several parts), Assembly, Fasteners and Array.
  */
-import { ChevronDown, ChevronRight } from 'lucide';
+import {
+  ArrowDownToLine,
+  Boxes,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  EyeOff,
+  Trash2,
+  Ungroup,
+} from 'lucide';
 import {
   aabbSize,
   clampCut,
@@ -43,7 +52,7 @@ import { fmt, parseLen, parseLenEdit } from '../units';
 import { esc, onChange, onClick } from './dom';
 import { keepFocus } from './fields';
 import { toast } from './toast';
-import { icon } from './icons';
+import { icon, iconButton } from './icons';
 
 type SectionId = 'part' | 'transform' | 'arrange' | 'assembly' | 'fasteners' | 'array';
 
@@ -355,16 +364,12 @@ export class PropsPanel {
       <label class="small">Mirror (Ctrl+M, then axis)</label>
       <div class="row btns"><button id="bMirX" title="Ctrl+M X: flip left-right">Left-right</button><button id="bMirY" title="Ctrl+M Y: flip front-back">Front-back</button><button id="bMirZ" title="Ctrl+M Z: flip top-bottom">Top-bottom</button></div>`;
 
-    // ---- Arrange ----
-    const groupBtns =
-      (list.length > 1 && !group ? `<button id="bGroup" title="Ctrl+G">Group</button>` : '') +
-      (inGroup ? `<button id="bUngroup" title="Ctrl+Shift+G">Ungroup</button>` : '');
-    let arrange = `<div class="row btns"><button id="bDrop" title="Alt+G: rest on the floor or the parts below">Drop</button><button id="bDup" title="Shift+D, or Ctrl+D for an offset copy">Duplicate</button>${groupBtns}<button id="bHide" title="H">Hide</button><button id="bDel" class="danger" title="X or Delete">Delete</button></div>`;
+    // ---- Align (several parts) ----
+    let arrange = '';
     if (list.length > 1) {
       const btn = (axis: number, mode: string, label: string, title: string) =>
         `<button data-align="${axis}:${mode}" title="${title}">${label}</button>`;
-      arrange += `<label class="small">Align</label>
-      <div class="row btns align">${btn(0, 'min', 'Left', 'Flush on the left (min X)')}${btn(0, 'center', 'Center X', 'Centre on X')}${btn(0, 'max', 'Right', 'Flush on the right (max X)')}</div>
+      arrange = `<div class="row btns align">${btn(0, 'min', 'Left', 'Flush on the left (min X)')}${btn(0, 'center', 'Center X', 'Centre on X')}${btn(0, 'max', 'Right', 'Flush on the right (max X)')}</div>
       <div class="row btns align">${btn(1, 'min', 'Front', 'Flush at the front (min Y)')}${btn(1, 'center', 'Center Y', 'Centre on Y')}${btn(1, 'max', 'Back', 'Flush at the back (max Y)')}</div>
       <div class="row btns align">${btn(2, 'min', 'Bottom', 'Flush on the bottom (min Z)')}${btn(2, 'center', 'Center Z', 'Centre on Z')}${btn(2, 'max', 'Top', 'Flush on top (max Z)')}</div>`;
     }
@@ -431,10 +436,16 @@ export class PropsPanel {
         <div><label class="small">${modeSel('center')}</label><input type="text" class="len" data-min="0" id="arrS" value="16"></div><div class="grow0"><button id="bArr" class="primary" title="Make a live array you can keep adjusting">Array</button></div></div>`;
     }
 
+    // ---- Header: what is selected, and what you can do with it ----
+    const headTitle = list.length === 1 ? list[0]!.name : group ? group.name : 'Selection';
+    const headSub = list.length === 1 ? stockById(list[0]!.stock).name : `${list.length} parts`;
+    const head = `<div class="props-head"><div class="props-title" title="${esc(headTitle)}">${esc(headTitle)}<span class="count">${esc(headSub)}</span></div><div class="props-actions"></div></div>`;
+
     const html =
+      head +
       this.section('part', partTitle, part, partCount) +
       this.section('transform', 'Transform', transform) +
-      this.section('arrange', 'Arrange', arrange) +
+      (arrange ? this.section('arrange', 'Align', arrange) : '') +
       this.section('assembly', 'Assembly', assemblyHtml(list)) +
       this.section('fasteners', 'Fasteners', fasteners, fastCount) +
       this.section('array', 'Array', array, arrayCount) +
@@ -442,6 +453,30 @@ export class PropsPanel {
 
     const restoreFocus = keepFocus(el);
     el.innerHTML = html;
+    const actions = el.querySelector('.props-actions')!;
+    const action = (
+      id: string,
+      node: Parameters<typeof iconButton>[0],
+      title: string,
+      fn: () => void,
+      cls = '',
+    ) => {
+      const b = iconButton(node, title, fn, `icon ghost ${cls}`.trim());
+      b.id = id;
+      actions.appendChild(b);
+    };
+    action('bDrop', ArrowDownToLine, 'Drop onto the floor or the parts below (Alt+G)', () =>
+      store.dropSelected(),
+    );
+    action('bDup', Copy, 'Duplicate (Shift+D; Ctrl+D for an offset copy)', () =>
+      store.duplicateSelected(),
+    );
+    if (list.length > 1 && !group)
+      action('bGroup', Boxes, 'Group (Ctrl+G)', () => store.groupSelected());
+    if (inGroup)
+      action('bUngroup', Ungroup, 'Ungroup (Ctrl+Shift+G)', () => store.ungroupSelected());
+    action('bHide', EyeOff, 'Hide (H)', () => store.hideSelected());
+    action('bDel', Trash2, 'Delete (X or Delete)', () => store.deleteSelected(), 'danger');
     el.querySelectorAll<HTMLElement>('.sec > h3').forEach((h) => {
       const id = h.dataset.toggle as SectionId;
       h.querySelector('.chev')!.appendChild(
@@ -609,10 +644,6 @@ export class PropsPanel {
     onClick(el, 'bMirX', () => store.mirrorSelected('x'));
     onClick(el, 'bMirY', () => store.mirrorSelected('y'));
     onClick(el, 'bMirZ', () => store.mirrorSelected('z'));
-    onClick(el, 'bDrop', () => store.dropSelected());
-    onClick(el, 'bHide', () => store.hideSelected());
-    onClick(el, 'bGroup', () => store.groupSelected());
-    onClick(el, 'bUngroup', () => store.ungroupSelected());
     el.querySelectorAll<HTMLButtonElement>('[data-align]').forEach((b) =>
       b.addEventListener('click', () => {
         const [axis, mode] = b.dataset.align!.split(':');
@@ -620,7 +651,5 @@ export class PropsPanel {
       }),
     );
     if (list.length > 1) onClick(el, 'bPlaceFast', this.place);
-    onClick(el, 'bDup', () => store.duplicateSelected());
-    onClick(el, 'bDel', () => store.deleteSelected());
   }
 }

@@ -109,6 +109,24 @@ test('several parts show Mixed and a relative edit changes each of them', async 
   await expect(page.locator('.out-row', { hasText: 'Leg LF' })).toContainText('33 1/4"');
 });
 
+test('the panel header names the selection and its actions work', async ({ page }) => {
+  await openBench(page);
+  await selectPart(page, 'Apron back');
+  const head = page.locator('.props-head');
+  await expect(head).toContainText('Apron back');
+  await expect(head).toContainText('2x4');
+  await expect(head.locator('#bGroup')).toHaveCount(0);
+  await head.locator('#bDup').click();
+  await expect(page.locator('#stat')).toContainText('13 parts');
+  await head.locator('#bDel').click();
+  await expect(page.locator('#stat')).toContainText('12 parts');
+  await page.locator('.out-row', { hasText: 'Apron back' }).click();
+  await page.locator('.out-row', { hasText: 'Leg LF' }).click({ modifiers: ['Shift'] });
+  await expect(head).toContainText('2 parts');
+  await expect(head.locator('#bGroup')).toBeVisible();
+  await expect(page.locator('[data-align="0:min"]')).toBeVisible();
+});
+
 test('G moves by a typed distance along the constrained axis', async ({ page }) => {
   await openBench(page);
   await selectPart(page, 'Leg LF');
