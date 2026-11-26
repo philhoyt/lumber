@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { partDims } from './model';
 import { DEFAULT_STOCK, getStock, sanitizeStock, setStock, stockById } from './stock';
-import { parseDocument, Store } from './store';
+import { parseDocument } from './document';
+import { Store } from './store';
 
 afterEach(() => setStock(DEFAULT_STOCK));
 

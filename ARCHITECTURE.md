@@ -20,7 +20,8 @@ units      stock        pure data and conversions, no dependencies
     /     \
  snap      pack        dragging snaps; cut list and buy list packing
     \     /
-    store              state, selection, settings, undo/redo, autosave, file format
+    store              state, selection, settings, undo/redo, autosave
+    document           the saved file format and its parser/migrator
     /     \
  scene     ui/*        three.js view        DOM panels (palette, props, cutlist, header, status)
     \     /

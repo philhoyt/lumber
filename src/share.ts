@@ -2,7 +2,7 @@
  * Share links: the whole document, deflated and base64url-encoded, after the page's
  * hash as `#m=1.<data>`. Nothing is uploaded; the link carries the model.
  */
-import { parseDocument, type Document } from './store';
+import { parseDocument, type Document } from './document';
 
 const VERSION = '1';
 

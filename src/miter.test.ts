@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { clampMiter, miterOutline, miterSetback, shortLength, type Part } from './model';
 import { cutRows } from './pack';
-import { parseDocument } from './store';
+import { parseDocument } from './document';
 
 describe('miter math', () => {
   it('a 45° miter sets back by the width', () => {

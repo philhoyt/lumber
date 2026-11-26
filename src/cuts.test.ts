@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { clampCut, cutBox, cutsKey, defaultCut, describeCut, type Cut, type Part } from './model';
 import { cutRows } from './pack';
-import { parseDocument } from './store';
+import { parseDocument } from './document';
 import { fmt } from './units';
 
 const dims: [number, number, number] = [96, 3.5, 1.5]; // a 2x4

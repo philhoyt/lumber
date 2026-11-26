@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { arrayLayout, quatFromEuler } from './model';
-import { parseDocument, Store } from './store';
+import { parseDocument } from './document';
+import { Store } from './store';
 
 describe('arrayLayout', () => {
   it('steps on centre or by gap', () => {

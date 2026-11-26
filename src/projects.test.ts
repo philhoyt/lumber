@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ProjectStore, timeAgo, uniqueName, type StorageLike } from './projects';
-import type { Document } from './store';
+import type { Document } from './document';
 
 class FakeStorage implements StorageLike {
   map = new Map<string, string>();

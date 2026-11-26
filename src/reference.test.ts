@@ -10,7 +10,8 @@ import {
 } from './model';
 import { fmt } from './units';
 import { cutRows, partsByStock } from './pack';
-import { parseDocument, Store } from './store';
+import { parseDocument } from './document';
+import { Store } from './store';
 import {
   DEFAULT_STOCK,
   REFERENCE_CYLINDER,

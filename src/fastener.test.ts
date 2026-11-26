@@ -12,7 +12,8 @@ import {
   type Fastener,
 } from './fastener';
 import { DEFAULT_Q, makeQ, mirrorParts, type Part } from './model';
-import { parseDocument, Store } from './store';
+import { parseDocument } from './document';
+import { Store } from './store';
 import { fmt } from './units';
 
 const dims: [number, number, number] = [96, 3.5, 1.5]; // a 2x4

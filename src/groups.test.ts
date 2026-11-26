@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { parseDocument, Store } from './store';
+import { parseDocument } from './document';
+import { Store } from './store';
 
 const twoParts = () => {
   const s = new Store();

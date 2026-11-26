@@ -6,7 +6,8 @@
 import type { FolderSync } from './folderSync';
 import { type ProjectStore, type ProjectMeta } from './projects';
 import { sampleWorkbench } from './sample';
-import { parseDocument, type Document, type Store } from './store';
+import { parseDocument, type Document } from './document';
+import type { Store } from './store';
 
 export type SaveStatus = 'saved' | 'saving' | 'error';
 

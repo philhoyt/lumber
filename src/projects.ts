@@ -4,7 +4,7 @@
  * use a fake; the app passes localStorage.
  */
 import { sampleWorkbench } from './sample';
-import { parseDocument, type Document } from './store';
+import { parseDocument, type Document } from './document';
 
 export interface ProjectMeta {
   id: string;

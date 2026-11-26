@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { sampleWorkbench } from './sample';
 import { decodeShare, encodeShare, linkSize } from './share';
-import type { Document } from './store';
+import type { Document } from './document';
 
 describe('share links', () => {
   it('round-trips the sample bench with its name', async () => {

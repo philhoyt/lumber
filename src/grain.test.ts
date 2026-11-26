@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Part } from './model';
 import { cutRows, packSheets } from './pack';
-import { parseDocument } from './store';
+import { parseDocument } from './document';
 
 describe('packSheets with grain', () => {
   // A 4x8 sheet is 48 wide (SW) by 96 long (SL); grain runs the long way.
