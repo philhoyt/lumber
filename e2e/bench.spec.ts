@@ -356,3 +356,28 @@ test('the panels resize by dragging the view edges and remember it', async ({ pa
   await page.keyboard.press('t');
   await expect(page.locator('.splitter.left')).toBeHidden();
 });
+
+test('the properties panel never scrolls sideways, even at its narrowest', async ({ page }) => {
+  await openBench(page);
+  await selectPart(page, 'Apron back');
+  const bar = page.locator('.splitter.right');
+  const b = (await bar.boundingBox())!;
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width / 2 + 200, b.y + b.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await expect
+    .poll(async () => Math.round((await page.locator('#side').boundingBox())!.width))
+    .toBe(260);
+  await expect(page.locator('#bArr')).toBeVisible();
+  const props = page.locator('#props');
+  const over = await props.evaluate((el) => el.scrollWidth - el.clientWidth);
+  expect(over).toBe(0);
+  const inside = await page.locator('#bArr').evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const p = el.closest('#props')!.getBoundingClientRect();
+    return r.right <= p.right && r.left >= p.left;
+  });
+  expect(inside).toBe(true);
+  await bar.dblclick();
+});

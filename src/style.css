@@ -786,7 +786,11 @@ footer .saved.warn {
   min-width: 0;
 }
 .row > div.grow0 {
-  flex: 0;
+  flex: none;
+}
+.row select {
+  max-width: 100%;
+  min-width: 0;
 }
 .row.btns {
   gap: 4px;
