@@ -56,8 +56,8 @@ export interface MenuActions {
   beginRotate(): void;
   beginSize(): void;
   duplicateAndGrab(): void;
-  setView(name: ViewName): void;
-  flipView(): void;
+  /** The camera, for the view items. */
+  rig: { setView(name: ViewName): void; flipView(): void };
   toggleFasten(): void;
   toggleExplode(): void;
   toggleAssembly(): void;
@@ -169,9 +169,9 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
       ...VIEWS.map(([name, label, key]) => ({
         label,
         key,
-        action: () => scene.setView(name),
+        action: () => scene.rig.setView(name),
       })),
-      { label: 'Opposite side', key: '9', action: () => scene.flipView() },
+      { label: 'Opposite side', key: '9', action: () => scene.rig.flipView() },
     ],
   };
   const exploded: MenuItem = {
@@ -214,7 +214,7 @@ export function buildMenu(ctx: MenuContext, store: Store, scene: MenuActions): M
         views,
         exploded,
         assembly,
-        { label: 'Fit all', key: 'Home', icon: Maximize, action: () => scene.setView('fit') },
+        { label: 'Fit all', key: 'Home', icon: Maximize, action: () => scene.rig.setView('fit') },
       ],
     ];
   }
@@ -338,7 +338,7 @@ export function buildListMenu(
   }
   const own: MenuItem[] = [
     rename,
-    { label: 'Frame in view', key: '.', icon: Focus, action: () => scene.setView('selected') },
+    { label: 'Frame in view', key: '.', icon: Focus, action: () => scene.rig.setView('selected') },
   ];
   const others = store.parts.filter((p) => !store.selected.has(p.id) && !p.hidden);
   if (others.length)

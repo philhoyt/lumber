@@ -70,7 +70,7 @@ import {
 } from './arrayDrag';
 import type { ArrayParams, Quat } from './model';
 import { coframedBoxes, extentAlong, localAxisDir, unionInFrame } from './frame';
-import { CameraRig, Z_UP, type Projection, type ViewName } from './view/camera';
+import { CameraRig, Z_UP, type ViewName } from './view/camera';
 import { DimLabels } from './view/dimLabels';
 import { GapReadout } from './view/gapReadout';
 import { FastenMode } from './view/fastenMode';
@@ -464,61 +464,6 @@ export class LumberScene {
     return this.dims.on;
   }
 
-  // ---- the camera rig's API, forwarded ----
-  get projection(): Projection {
-    return this.rig.projection;
-  }
-  get onProjectionChange(): ((mode: Projection) => void) | null {
-    return this.rig.onProjectionChange;
-  }
-  set onProjectionChange(fn: ((mode: Projection) => void) | null) {
-    this.rig.onProjectionChange = fn;
-  }
-  setProjection(mode: Projection, fromAxis = false): void {
-    this.rig.setProjection(mode, fromAxis);
-  }
-  toggleProjection(): void {
-    this.rig.toggleProjection();
-  }
-  watchCamera(fn: () => void): void {
-    this.rig.watchCamera(fn);
-  }
-  cameraAxes(): [Vec3, Vec3, Vec3] {
-    return this.rig.cameraAxes();
-  }
-  viewDir(): Vec3 {
-    return this.rig.viewDir();
-  }
-  setView(name: ViewName): void {
-    this.rig.setView(name);
-  }
-  orbitStep(az: number, el: number): void {
-    this.rig.orbitStep(az, el);
-  }
-  orbitFree(az: number, el: number): void {
-    this.rig.orbitFree(az, el);
-  }
-  flipView(): void {
-    this.rig.flipView();
-  }
-  zoomStep(inward: boolean): void {
-    this.rig.zoomStep(inward);
-  }
-  panStep(dx: number, dy: number): void {
-    this.rig.panStep(dx, dy);
-  }
-  panPixels(dx: number, dy: number): void {
-    this.rig.panPixels(dx, dy);
-  }
-  dolly(scale: number): void {
-    this.rig.dolly(scale);
-  }
-  get trackpad(): boolean {
-    return this.rig.trackpad;
-  }
-  setTrackpad(on: boolean): void {
-    this.rig.setTrackpad(on);
-  }
   /** What a named view should frame: the selection for `selected`, else everything visible. */
   private boundsFor(name: ViewName): AABB {
     const parts =

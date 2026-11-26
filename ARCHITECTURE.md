@@ -41,8 +41,8 @@ the pointer and key handlers) and delegates the rest to `view/`:
 
 - `view/camera.ts` `CameraRig`: the perspective and orthographic cameras on
   one orbit, the named views, Blender's view keys and auto-perspective, and
-  the Alt+drag and trackpad gestures. The scene forwards its API so the
-  panels have one handle.
+  the Alt+drag and trackpad gestures. The scene exposes it as `rig`, which
+  the header's view keys, the menus and the corner gizmo drive directly.
 - `view/snapFeedback.ts`: the quads over the faces a grab snapped to.
 - `view/dimLabels.ts`, `view/measureTool.ts`, `view/fastenMode.ts`: the D, M
   and F tools, each owning its own overlay objects and HTML labels.

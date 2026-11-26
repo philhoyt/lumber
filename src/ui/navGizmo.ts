@@ -30,14 +30,14 @@ export function wireNavGizmo(viewport: HTMLElement, scene: LumberScene): void {
   box.appendChild(svg);
 
   const zoom = dragButton(icon(ZoomIn, 16), 'Drag to zoom (+ / -)', (_dx, dy) =>
-    scene.dolly(zoomScale(dy)),
+    scene.rig.dolly(zoomScale(dy)),
   );
   const pan = dragButton(icon(Move, 16), 'Drag to pan (Ctrl+2 / 4 / 6 / 8)', (dx, dy) =>
-    scene.panPixels(-dx, dy),
+    scene.rig.panPixels(-dx, dy),
   );
   const proj = document.createElement('button');
   proj.type = 'button';
-  proj.addEventListener('click', () => scene.toggleProjection());
+  proj.addEventListener('click', () => scene.rig.toggleProjection());
   box.append(zoom, pan, proj);
   viewport.appendChild(box);
 
@@ -45,16 +45,16 @@ export function wireNavGizmo(viewport: HTMLElement, scene: LumberScene): void {
   let hot: HandleSpot | null = null;
 
   const draw = (): void => {
-    spots = layoutHandles(scene.cameraAxes(), RADIUS);
+    spots = layoutHandles(scene.rig.cameraAxes(), RADIUS);
     handles.innerHTML = spots.map((s) => handleSvg(s, hot)).join('');
-    const mode = scene.projection;
+    const mode = scene.rig.projection;
     proj.textContent = '';
     proj.appendChild(viewIcon(mode === 'ortho' ? 'ortho' : 'persp', 16));
     proj.title =
       mode === 'ortho' ? 'Orthographic · 5 for perspective' : 'Perspective · 5 for orthographic';
     proj.setAttribute('aria-label', proj.title);
   };
-  scene.watchCamera(draw);
+  scene.rig.watchCamera(draw);
   draw();
 
   // Pointer position in the gizmo's own coordinates, centre at 0,0.
@@ -91,7 +91,7 @@ export function wireNavGizmo(viewport: HTMLElement, scene: LumberScene): void {
     drag.x = e.clientX;
     drag.y = e.clientY;
     const { az, el } = dragOrbit(dx, dy, RADIUS);
-    scene.orbitFree(az, el);
+    scene.rig.orbitFree(az, el);
   });
   svg.addEventListener('pointerup', (e) => {
     if (!drag) return;
@@ -100,7 +100,7 @@ export function wireNavGizmo(viewport: HTMLElement, scene: LumberScene): void {
     if (!wasClick) return;
     const [x, y] = local(e);
     const h = handleAt(spots, x, y, BALL + 2);
-    if (h) scene.setView(handleView(h, scene.viewDir()));
+    if (h) scene.rig.setView(handleView(h, scene.rig.viewDir()));
   });
   svg.addEventListener('pointerleave', () => setHot(null));
   svg.addEventListener('pointercancel', () => (drag = null));

@@ -322,16 +322,16 @@ export function wireKeyboard(
     else if (e.key === 'Tab') togglePanels('both');
     else if (e.key === '[') scene.stepAssembly(-1);
     else if (e.key === ']') scene.stepAssembly(1);
-    else if (e.key === 'Home') scene.setView('fit');
-    else if (e.code === 'NumpadDecimal' || e.code === 'Period') scene.setView('selected');
-    else if (digit === '5') scene.toggleProjection();
-    else if (VIEW_KEYS[digit]) scene.setView(VIEW_KEYS[digit][mod ? 1 : 0]);
-    else if (digit === '9') scene.flipView();
-    else if (mod && PAN_KEYS[digit]) scene.panStep(...PAN_KEYS[digit]);
-    else if (ORBIT_KEYS[digit]) scene.orbitStep(...ORBIT_KEYS[digit]);
+    else if (e.key === 'Home') scene.rig.setView('fit');
+    else if (e.code === 'NumpadDecimal' || e.code === 'Period') scene.rig.setView('selected');
+    else if (digit === '5') scene.rig.toggleProjection();
+    else if (VIEW_KEYS[digit]) scene.rig.setView(VIEW_KEYS[digit][mod ? 1 : 0]);
+    else if (digit === '9') scene.rig.flipView();
+    else if (mod && PAN_KEYS[digit]) scene.rig.panStep(...PAN_KEYS[digit]);
+    else if (ORBIT_KEYS[digit]) scene.rig.orbitStep(...ORBIT_KEYS[digit]);
     else if (!mod && (e.code === 'NumpadAdd' || e.key === '+' || e.key === '='))
-      scene.zoomStep(true);
-    else if (!mod && (e.code === 'NumpadSubtract' || e.key === '-')) scene.zoomStep(false);
+      scene.rig.zoomStep(true);
+    else if (!mod && (e.code === 'NumpadSubtract' || e.key === '-')) scene.rig.zoomStep(false);
     else if (e.key === 'ArrowLeft') store.nudge([-step, 0, 0]);
     else if (e.key === 'ArrowRight') store.nudge([step, 0, 0]);
     else if (e.key === 'ArrowUp') store.nudge([0, step, 0]);

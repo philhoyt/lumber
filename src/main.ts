@@ -166,8 +166,8 @@ const actions = {
     });
   },
   showDrawings: () => drawings.toggle(),
-  trackpad: () => scene.trackpad,
-  setTrackpad: (on: boolean) => scene.setTrackpad(on),
+  trackpad: () => scene.rig.trackpad,
+  setTrackpad: (on: boolean) => scene.rig.setTrackpad(on),
 };
 wireHeader(store, pm, actions);
 wireDrop($('viewport'), scene, store);
