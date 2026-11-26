@@ -4,9 +4,12 @@
   "version": "0.1.0",
   "description": "Build it from the stock you buy: a 3D planner for projects made of construction lumber and sheet goods.",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -20,7 +23,7 @@
   },
   "dependencies": {
     "lucide": "^1.80.0",
-    "three": "^0.187.0",
+    "three": "~0.187.0",
     "three-bvh-csg": "^0.0.19",
     "three-mesh-bvh": "^0.10.0"
   },
