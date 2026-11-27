@@ -184,6 +184,13 @@ point to long point; the cut list prints the angle and the width at the short
 point, and the 3D view and drawings show the sloped edge. Sheet parts take edge
 bevels too, so a plywood cleat works the same way.
 
+Parts that run into each other show red in the view, the status bar counts them
+(click the count to select them), and the Part section names what a part runs
+into. The check is on the real solids, so a leaning brace or a mitered end is
+judged by its cut shape, parts that only touch do not count, and a part sitting
+in another's dado, groove, rabbet or notch is where it belongs. Reference
+stand-ins are left out, since one placed through the frame is a choice.
+
 The stock table is yours to edit: the gear button in the palette opens it. Change
 sizes, purchase lengths, prices and colors, add custom boards or sheets, delete
 unused ones, or reset to the defaults. Type metric sizes as `38mm`. The model

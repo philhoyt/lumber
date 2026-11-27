@@ -45,6 +45,19 @@ export function wireStatus(
     const refs = store.parts.filter(isReferencePart).length;
     const built = n - refs;
     countEl.textContent = `${built} part${built === 1 ? '' : 's'}${refs ? ` · ${refs} reference` : ''}${sel ? ` · ${sel} selected` : ''}`;
+    const overlaps = store.overlaps();
+    if (overlaps.ids.size) {
+      // Parts that run into each other: the count is a button that selects them.
+      const b = document.createElement('button');
+      b.id = 'overlapCount';
+      b.className = 'overlap';
+      b.textContent = `${overlaps.ids.size} overlapping`;
+      b.title = 'Parts that run into each other (shown red); click to select them';
+      b.addEventListener('click', () => {
+        store.select(overlaps.ids);
+      });
+      countEl.append(' · ', b);
+    }
     const hints = sel === 0 ? HINTS.none : sel === 1 ? HINTS.one : HINTS.many;
     hintsEl.textContent = '';
     hints.forEach(([k, what], i) => {

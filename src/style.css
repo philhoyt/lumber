@@ -1150,6 +1150,18 @@ footer .hints {
   text-overflow: ellipsis;
   white-space: pre;
 }
+footer button.overlap {
+  font: inherit;
+  color: var(--danger);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+.note.danger {
+  color: var(--danger);
+}
 footer .hints kbd {
   font: inherit;
   color: var(--text);

@@ -37,7 +37,7 @@ export function isCoframed(a: Quat, b: Quat, eps = 1e-6): boolean {
 }
 
 /** A part's corners in world space: the cut corners for a board with angled ends or edges. */
-function worldCorners(p: Part): Vector3[] {
+export function worldCorners(p: Part): Vector3[] {
   const d = partDims(p);
   const q = new Quaternion().fromArray(p.q);
   return (localCorners(p, d) ?? boxCorners(d)).map((c) =>

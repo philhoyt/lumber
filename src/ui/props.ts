@@ -50,6 +50,7 @@ import {
   type Fastener,
   type FastenerKind,
 } from '../fastener';
+import { overlapsOf } from '../overlap';
 import { getStock, stockById } from '../stock';
 import type { Store } from '../store';
 import { fmt, parseLen, parseLenEdit } from '../units';
@@ -415,6 +416,11 @@ export class PropsPanel {
         const g = store.groupById(p.group!);
         part += `<div class="muted note">In ${esc(g?.name ?? 'a group')} · click the part in the view to select the whole group</div>`;
       }
+      const into = overlapsOf(store.overlaps(), p.id)
+        .map((id) => store.partById(id)?.name)
+        .filter((n): n is string => n !== undefined);
+      if (into.length)
+        part += `<div class="note danger" id="pOverlap" title="This part shares space with these; move or shorten one of them">Runs into ${into.map(esc).join(', ')}</div>`;
     } else {
       partTitle = group ? esc(group.name) : 'Selection';
       partCount = `${list.length} parts`;

@@ -177,3 +177,22 @@ test('Add cut adds a dado, and changing its kind to a chamfer reaches the cut li
   await page.locator('#bUndo').click();
   await expect(page.locator('#cut-0-kind')).toHaveCount(0);
 });
+
+test('a part moved into another is flagged as overlapping, and the count selects both', async ({
+  page,
+}) => {
+  await openBench(page);
+  await expect(page.locator('#stat')).not.toContainText('overlapping');
+  await selectPart(page, 'Leg LF');
+  // An inch along X pushes the leg into the front apron, the front stretcher and the shelf.
+  await page.locator('#pX').fill('+1');
+  await page.locator('#pX').press('Enter');
+  await expect(page.locator('#stat')).toContainText('4 overlapping');
+  await expect(page.locator('#pOverlap')).toContainText(
+    'Runs into Apron front, Stretcher front, Shelf',
+  );
+  await page.locator('#overlapCount').click();
+  await expect(page.locator('#stat')).toContainText('4 selected');
+  await page.locator('#bUndo').click();
+  await expect(page.locator('#stat')).not.toContainText('overlapping');
+});

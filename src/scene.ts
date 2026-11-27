@@ -85,13 +85,14 @@ export interface MenuContext {
   ground: Vec3 | null;
 }
 
-/** `pending` and `current` are for walking the assembly steps. */
-type MeshState = 'normal' | 'hover' | 'selected' | 'pending' | 'current';
+/** `overlap` runs into another part; `pending` and `current` are for walking the assembly steps. */
+type MeshState = 'normal' | 'hover' | 'selected' | 'overlap' | 'pending' | 'current';
 
 const EDGE_COLORS: Record<MeshState, number> = {
   normal: 0x3a2a15,
   hover: 0xd9c08a,
   selected: 0x9fd3ff,
+  overlap: 0xff6b5f,
   pending: 0x55585e,
   current: 0xe0a94b,
 };
@@ -99,6 +100,7 @@ const EMISSIVE: Record<MeshState, number> = {
   normal: 0,
   hover: 0x2a2416,
   selected: 0x1e4b73,
+  overlap: 0x6a1c14,
   pending: 0,
   current: 0x3a2e10,
 };
@@ -114,6 +116,7 @@ export class LumberScene {
     normal: new THREE.LineBasicMaterial({ color: EDGE_COLORS.normal }),
     hover: new THREE.LineBasicMaterial({ color: EDGE_COLORS.hover }),
     selected: new THREE.LineBasicMaterial({ color: EDGE_COLORS.selected }),
+    overlap: new THREE.LineBasicMaterial({ color: EDGE_COLORS.overlap }),
     pending: new THREE.LineBasicMaterial({
       color: EDGE_COLORS.pending,
       transparent: true,
@@ -404,6 +407,7 @@ export class LumberScene {
   private stateOf(id: number): MeshState {
     if (this.store.selected.has(id)) return 'selected';
     if (this.hoverId === id) return 'hover';
+    if (this.store.overlaps().ids.has(id)) return 'overlap';
     if (this.assembly !== null) {
       const step = this.store.partById(id)?.step ?? this.assemblyLast + 1;
       if (step > this.assembly) return 'pending';

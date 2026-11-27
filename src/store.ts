@@ -8,6 +8,7 @@ import type { Document } from './document';
 import { applyFit, fitEnd, type EndFit } from './fit';
 import { centerBetween, spaceBetween, type SpaceUnit } from './gap';
 import { blockBetween, extentAlong, localAxisDir } from './frame';
+import { findOverlaps, type OverlapReport } from './overlap';
 import {
   cloneStock,
   DEFAULT_STOCK,
@@ -89,7 +90,14 @@ export class Store {
     return () => this.listeners.delete(fn);
   }
   notify(kind: ChangeKind): void {
+    if (kind === 'model' || kind === 'drag') this.overlapCache = null;
     for (const fn of this.listeners) fn(kind);
+  }
+
+  /** Parts that run into each other, found once per change for the view and the panels. */
+  private overlapCache: OverlapReport | null = null;
+  overlaps(): OverlapReport {
+    return (this.overlapCache ??= findOverlaps(this.parts));
   }
 
   // ---- undo / redo ----

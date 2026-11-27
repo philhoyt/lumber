@@ -19,6 +19,7 @@ units      stock        pure data and conversions, no dependencies
     model              Part, bounding boxes, quarter-turn rotation (uses three's math only)
     /     \
  snap      pack        dragging snaps; cut list and buy list packing
+ overlap               parts that run into each other (separating-axis test on frame's corners)
     \     /
     store              state, selection, settings, undo/redo, autosave
     document           the saved file format and its parser/migrator
@@ -110,6 +111,14 @@ parts share a frame (their axes line up, quarter turns aside), and the fit of a 
 between two parallel parts. The scene uses it for moves and array drags along a local
 axis (an axis key tapped twice, or the gizmo on a tilted part), snapping those moves
 to co-framed parts in that frame, and the store for local arrays and `addBlockBetween`.
+
+`overlap.ts` finds parts that share space: a bounding-box pass, then the separating-axis
+test on the two solids' corners from `frame.ts`, so tilted boxes and angled ends are
+judged exactly and touching faces (within 1/32") do not count. A part whose share of
+another's box lies inside one of its pocket cuts is left alone, and so are reference
+stand-ins. The store computes the
+report once per model change or drag and hands it to the view (red parts), the status
+bar (a count that selects them) and the Part section (what a part runs into).
 
 ## Groups and arrays
 
